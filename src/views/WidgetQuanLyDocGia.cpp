@@ -1,0 +1,1252 @@
+#include "views/WidgetQuanLyDocGia.h"
+#include "views/dialogs/ManHinhThemDocGia.h"
+#include "views/dialogs/ManHinhSuaDocGia.h"
+#include "models/DocGia.h"
+#include "models/QuanLySach.h"
+#include "utils/ConfirmationDialog.h"
+#include "utils/AnimationHelper.h"
+#include "utils/NgayThang.h"
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QHeaderView>
+#include <QMessageBox>
+#include <QInputDialog>
+#include <QFileDialog>
+#include <QTextStream>
+#include <QPrinter>
+#include <QPrintDialog>
+#include <QTextDocument>
+#include <QPageLayout>
+#include <QDate>
+#include <QDialog>
+#include <QTextEdit>
+#include <QDialogButtonBox>
+#include <QTabBar>
+#include <QRegularExpression>
+
+extern PTRDG rootDocGia;
+
+// Set modern stylesheet for reader widget
+static const QString READER_WIDGET_STYLE = R"(
+    WidgetQuanLyDocGia {
+        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #0F172A, stop:1 #1E293B);
+    }
+)";
+
+// ==================== ReaderTableModel Implementation ====================
+
+ReaderTableModel::ReaderTableModel(QObject *parent)
+    : QAbstractTableModel(parent)
+    , readers(nullptr)
+    , readerCount(0)
+    , isSearchMode(false)
+    , sortColumn(-1)
+    , sortOrder(Qt::AscendingOrder)
+{
+    readers = new PTRDG[1000]; // Max readers
+}
+
+int ReaderTableModel::rowCount(const QModelIndex &parent) const {
+    Q_UNUSED(parent);
+    return readerCount;
+}
+
+int ReaderTableModel::columnCount(const QModelIndex &parent) const {
+    Q_UNUSED(parent);
+    return 5; // Ma The, Ho, Ten, Phai, Trang Thai
+}
+
+QVariant ReaderTableModel::data(const QModelIndex &index, int role) const {
+    if (!index.isValid() || index.row() >= readerCount || !readers)
+        return QVariant();
+    
+    PTRDG reader = readers[index.row()];
+    if (!reader)
+        return QVariant();
+    
+    if (role == Qt::DisplayRole) {
+        switch (index.column()) {
+            case 0: return reader->data.MaThe;
+            case 1: return QString::fromStdString(reader->data.Ho);
+            case 2: return QString::fromStdString(reader->data.Ten);
+            case 3: return reader->data.Phai ? "Nữ" : "Nam";
+            case 4: {
+                QString status = reader->data.TrangThai ? "Hoạt động" : "Khóa";
+                if (isReaderOverdue(reader)) {
+                    status += " ⚠ Quá hạn";
+                }
+                return status;
+            }
+        }
+    } else if (role == Qt::TextAlignmentRole) {
+        if (index.column() == 0 || index.column() >= 3) {
+            return Qt::AlignCenter;
+        }
+    } else if (role == Qt::ForegroundRole) {
+        // Highlight overdue readers in orange/red
+        if (isReaderOverdue(reader)) {
+            return QColor("#F59E0B"); // Orange warning color
+        }
+        // Highlight locked readers in red
+        if (!reader->data.TrangThai) {
+            return QColor("#EF4444"); // Red color
+        }
+    } else if (role == Qt::FontRole) {
+        // Bold font for overdue readers
+        if (isReaderOverdue(reader)) {
+            QFont font;
+            font.setBold(true);
+            return font;
+        }
+    }
+    
+    return QVariant();
+}
+
+QVariant ReaderTableModel::headerData(int section, Qt::Orientation orientation, int role) const {
+    if (role != Qt::DisplayRole)
+        return QVariant();
+    
+    if (orientation == Qt::Horizontal) {
+        switch (section) {
+            case 0: return "Mã Thẻ";
+            case 1: return "Họ";
+            case 2: return "Tên";
+            case 3: return "Phái";
+            case 4: return "Trạng Thái";
+        }
+    }
+    return QVariant();
+}
+
+void ReaderTableModel::collectReadersFromTree(PTRDG root, PTRDG* arr, int &count) {
+    if (!root || count >= 1000) return;
+    
+    collectReadersFromTree(root->left, arr, count);
+    arr[count++] = root;
+    collectReadersFromTree(root->right, arr, count);
+}
+
+void ReaderTableModel::refreshData() {
+    beginResetModel();
+    readerCount = 0;
+    isSearchMode = false;
+    collectReadersFromTree(rootDocGia, readers, readerCount);
+    endResetModel();
+}
+
+void ReaderTableModel::setSearchResults(PTRDG* results, int count) {
+    beginResetModel();
+    readers = results;
+    readerCount = count;
+    isSearchMode = true;
+    endResetModel();
+}
+
+PTRDG ReaderTableModel::getReaderAt(int row) const {
+    if (row >= 0 && row < readerCount && readers) {
+        return readers[row];
+    }
+    return nullptr;
+}
+
+void ReaderTableModel::sort(int column, Qt::SortOrder order) {
+    if (!readers || readerCount == 0) return;
+    
+    sortColumn = column;
+    sortOrder = order;
+    
+    layoutAboutToBeChanged();
+    
+    // Bubble sort
+    for (int i = 0; i < readerCount - 1; i++) {
+        for (int j = 0; j < readerCount - i - 1; j++) {
+            bool swap = false;
+            
+            switch (column) {
+                case 0: // Ma The
+                    swap = (sortOrder == Qt::AscendingOrder) ? 
+                           (readers[j]->data.MaThe > readers[j+1]->data.MaThe) :
+                           (readers[j]->data.MaThe < readers[j+1]->data.MaThe);
+                    break;
+                case 1: // Ho
+                    swap = (sortOrder == Qt::AscendingOrder) ? 
+                           (readers[j]->data.Ho > readers[j+1]->data.Ho) :
+                           (readers[j]->data.Ho < readers[j+1]->data.Ho);
+                    break;
+                case 2: // Ten
+                    swap = (sortOrder == Qt::AscendingOrder) ? 
+                           (readers[j]->data.Ten > readers[j+1]->data.Ten) :
+                           (readers[j]->data.Ten < readers[j+1]->data.Ten);
+                    break;
+                case 3: // Phai
+                    swap = (sortOrder == Qt::AscendingOrder) ? 
+                           (readers[j]->data.Phai > readers[j+1]->data.Phai) :
+                           (readers[j]->data.Phai < readers[j+1]->data.Phai);
+                    break;
+                case 4: // Trang Thai
+                    swap = (sortOrder == Qt::AscendingOrder) ? 
+                           (readers[j]->data.TrangThai > readers[j+1]->data.TrangThai) :
+                           (readers[j]->data.TrangThai < readers[j+1]->data.TrangThai);
+                    break;
+            }
+            
+            if (swap) {
+                PTRDG temp = readers[j];
+                readers[j] = readers[j+1];
+                readers[j+1] = temp;
+            }
+        }
+    }
+    
+    layoutChanged();
+}
+
+bool ReaderTableModel::isReaderOverdue(PTRDG reader) const {
+    if (!reader) return false;
+    
+    // Check if reader has overdue books
+    MUONTRA mt = reader->data.dsmt;
+    while (mt) {
+        if (mt->data.TrangThai == 0) { // Đang mượn
+            // Parse date string (format: "DD/MM/YYYY")
+            QString ngayMuonStr = QString::fromStdString(mt->data.NgayMuon);
+            QStringList parts = ngayMuonStr.split('/');
+            if (parts.size() == 3) {
+                QDate dateMuon(parts[2].toInt(), parts[1].toInt(), parts[0].toInt());
+                QDate dateHienTai = QDate::currentDate();
+                
+                int soNgayMuon = dateMuon.daysTo(dateHienTai);
+                if (soNgayMuon > 7) { // Quá hạn nếu mượn > 7 ngày
+                    return true;
+                }
+            }
+        }
+        mt = mt->next;
+    }
+    
+    return false;
+}
+
+int ReaderTableModel::getBorrowedBookCount(PTRDG reader) const {
+    if (!reader) return 0;
+    
+    int count = 0;
+    MUONTRA mt = reader->data.dsmt;
+    while (mt) {
+        if (mt->data.TrangThai == 0) { // Đang mượn
+            count++;
+        }
+        mt = mt->next;
+    }
+    
+    return count;
+}
+
+// ==================== WidgetQuanLyDocGia Implementation ====================
+
+WidgetQuanLyDocGia::WidgetQuanLyDocGia(QWidget *parent)
+    : QWidget(parent)
+    , selectedReader(nullptr)
+{
+    searchTimer = new QTimer(this);
+    searchTimer->setSingleShot(true);
+    searchTimer->setInterval(300);
+    
+    setupUI();
+    setupConnections();
+    setupKeyboardShortcuts();
+    updateButtonStates();
+}
+
+WidgetQuanLyDocGia::~WidgetQuanLyDocGia() {
+}
+
+void WidgetQuanLyDocGia::setupUI() {
+    // Apply modern gradient stylesheet
+    setStyleSheet(READER_WIDGET_STYLE);
+    
+    QVBoxLayout *mainLayout = new QVBoxLayout(this);
+    mainLayout->setSpacing(20);
+    mainLayout->setContentsMargins(32, 32, 32, 32);
+    
+    // Modern title with gradient effect
+    QLabel *titleLabel = new QLabel("👥 QUẢN LÝ ĐỘC GIẢ", this);
+    QFont titleFont;
+    titleFont.setPointSize(28);
+    titleFont.setBold(true);
+    titleFont.setLetterSpacing(QFont::AbsoluteSpacing, 1.5);
+    titleLabel->setFont(titleFont);
+    titleLabel->setStyleSheet("color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #60A5FA, stop:1 #A78BFA); padding: 8px 0; background: transparent;");
+    mainLayout->addWidget(titleLabel);
+    
+    // Modern tab widget matching book widget style
+    tabWidget = new QTabWidget(this);
+    tabWidget->setDocumentMode(false);
+    tabWidget->setStyleSheet(
+        "QTabWidget::pane {"
+        "    border: 2px solid #475569;"
+        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1E293B, stop:1 #334155);"
+        "    border-radius: 12px;"
+        "    top: -1px;"
+        "}"
+        "QTabBar::tab {"
+        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #334155, stop:1 #1E293B);"
+        "    color: #CBD5E1;"
+        "    padding: 12px 24px;"
+        "    margin-right: 6px;"
+        "    border-top-left-radius: 10px;"
+        "    border-top-right-radius: 10px;"
+        "    border: 2px solid #475569;"
+        "    border-bottom: none;"
+        "    font-weight: 600;"
+        "    font-size: 14px;"
+        "}"
+        "QTabBar::tab:selected {"
+        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1E293B, stop:1 #334155);"
+        "    color: #60A5FA;"
+        "    font-weight: 700;"
+        "    border-color: #60A5FA;"
+        "}"
+        "QTabBar::tab:hover:!selected {"
+        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #475569, stop:1 #334155);"
+        "    color: #F1F5F9;"
+        "}"
+    );
+    
+    // Setup 2 tabs
+    setupTabQuanLy();
+    setupTabQuaHan();
+    
+    mainLayout->addWidget(tabWidget);
+}
+
+void WidgetQuanLyDocGia::setupTabQuanLy() {
+    tabQuanLy = new QWidget();
+    QVBoxLayout *layout = new QVBoxLayout(tabQuanLy);
+    layout->setSpacing(12);
+    layout->setContentsMargins(12, 12, 12, 12);
+    
+    // Toolbar
+    toolbar = new QToolBar(tabQuanLy);
+    toolbar->setIconSize(QSize(20, 20));
+    toolbar->setStyleSheet(
+        "QToolBar {"
+        "    background: #F8FAFC;"
+        "    border: 1px solid #E2E8F0;"
+        "    border-radius: 6px;"
+        "    padding: 8px;"
+        "}"
+        "QToolButton {"
+        "    background: white;"
+        "    border: 1px solid #E2E8F0;"
+        "    border-radius: 4px;"
+        "    padding: 6px 12px;"
+        "    color: #475569;"
+        "    font-weight: 500;"
+        "}"
+        "QToolButton:hover {"
+        "    background: #5B7FFF;"
+        "    color: white;"
+        "    border-color: #5B7FFF;"
+        "}"
+    );
+    
+    QAction *actToggleStatus = toolbar->addAction("⇄ Đổi Trạng Thái");
+    actToggleStatus->setToolTip("Khóa/Mở khóa độc giả được chọn");
+    connect(actToggleStatus, &QAction::triggered, this, &WidgetQuanLyDocGia::onToggleStatus);
+    
+    QAction *actHistory = toolbar->addAction("◫ Lịch Sử Mượn");
+    actHistory->setToolTip("Xem lịch sử mượn trả của độc giả");
+    connect(actHistory, &QAction::triggered, this, &WidgetQuanLyDocGia::onViewHistory);
+    
+    QAction *actPrintCard = toolbar->addAction("▣ In Thẻ");
+    actPrintCard->setToolTip("In thẻ độc giả (Ctrl+P)");
+    actPrintCard->setShortcut(QKeySequence::Print);
+    connect(actPrintCard, &QAction::triggered, this, &WidgetQuanLyDocGia::onPrintCard);
+    
+    toolbar->addSeparator();
+    
+    QAction *actWarnings = toolbar->addAction("⚠ Cảnh Báo");
+    actWarnings->setToolTip("Xem các cảnh báo (quá hạn, khóa đang mượn...)");
+    connect(actWarnings, &QAction::triggered, this, &WidgetQuanLyDocGia::onShowWarnings);
+    
+    toolbar->addSeparator();
+    
+    QAction *actExport = toolbar->addAction("◫ Export CSV");
+    actExport->setToolTip("Export danh sách độc giả ra CSV");
+    connect(actExport, &QAction::triggered, this, &WidgetQuanLyDocGia::onExportCSV);
+    
+    QAction *actImport = toolbar->addAction("◫ Import CSV");
+    actImport->setToolTip("Import độc giả từ file CSV");
+    connect(actImport, &QAction::triggered, this, &WidgetQuanLyDocGia::onImportCSV);
+    
+    layout->addWidget(toolbar);
+    
+    // Thanh tim kiem
+    QHBoxLayout *searchLayout = new QHBoxLayout();
+    searchLayout->addWidget(new QLabel("Tìm kiếm:", tabQuanLy));
+    searchEdit = new QLineEdit(tabQuanLy);
+    searchEdit->setPlaceholderText("Nhập mã thẻ, tên, họ...");
+    searchLayout->addWidget(searchEdit);
+    
+    // Advanced search combo
+    searchTypeCombo = new QComboBox(tabQuanLy);
+    searchTypeCombo->addItem("🔍 Tìm theo mã", 0);
+    searchTypeCombo->addItem("👤 Tìm theo tên", 1);
+    searchTypeCombo->addItem("👥 Tìm theo họ", 2);
+    searchTypeCombo->addItem("👤👥 Tìm theo họ tên", 3);
+    searchTypeCombo->addItem("📊 Lọc theo trạng thái", 4);
+    searchTypeCombo->setToolTip(
+        "Loại tìm kiếm:\n"
+        "• Theo mã: Nhập mã thẻ độc giả (số nguyên)\n"
+        "• Theo tên: Tìm theo tên (VD: 'Lan')\n"
+        "• Theo họ: Tìm theo họ đệm (VD: 'Nguyễn')\n"
+        "• Theo họ tên: Tìm theo họ và tên\n"
+        "• Lọc trạng thái: 0=Khóa, 1=Hoạt động"
+    );
+    searchLayout->addWidget(searchTypeCombo);
+    
+    btnSearch = new QPushButton("🔍 Tìm", tabQuanLy);
+    btnSearch->setToolTip("Tìm kiếm độc giả (Enter hoặc Ctrl+F)");
+    btnSearch->setShortcut(QKeySequence(Qt::Key_Return));
+    btnClearSearch = new QPushButton("❌ Xóa", tabQuanLy);
+    searchLayout->addWidget(btnSearch);
+    searchLayout->addWidget(btnClearSearch);
+    
+    layout->addLayout(searchLayout);
+    
+    // Filter controls
+    QHBoxLayout *filterLayout = new QHBoxLayout();
+    filterLayout->setSpacing(12);
+    
+    QLabel *filterLabel = new QLabel("🔎 Lọc nhanh:", tabQuanLy);
+    filterLabel->setStyleSheet("font-weight: bold; color: #64B5F6;");
+    filterLayout->addWidget(filterLabel);
+    
+    filterGioiTinhCombo = new QComboBox(tabQuanLy);
+    filterGioiTinhCombo->addItem("Tất cả giới tính");
+    filterGioiTinhCombo->addItem("Nam");
+    filterGioiTinhCombo->addItem("Nữ");
+    filterGioiTinhCombo->setMinimumWidth(150);
+    filterGioiTinhCombo->setToolTip("Lọc theo giới tính");
+    filterLayout->addWidget(filterGioiTinhCombo);
+    
+    filterTrangThaiCombo = new QComboBox(tabQuanLy);
+    filterTrangThaiCombo->addItem("Tất cả trạng thái");
+    filterTrangThaiCombo->addItem("Hoạt động");
+    filterTrangThaiCombo->addItem("Khóa");
+    filterTrangThaiCombo->addItem("Quá hạn");
+    filterTrangThaiCombo->setMinimumWidth(150);
+    filterTrangThaiCombo->setToolTip("Lọc theo trạng thái");
+    filterLayout->addWidget(filterTrangThaiCombo);
+    
+    filterLayout->addStretch();
+    layout->addLayout(filterLayout);
+    
+    // Connect filter combo boxes
+    connect(filterGioiTinhCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), 
+            this, &WidgetQuanLyDocGia::applyFilters);
+    connect(filterTrangThaiCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), 
+            this, &WidgetQuanLyDocGia::applyFilters);
+    
+    // Bang hien thi
+    tableView = new QTableView(tabQuanLy);
+    readerModel = new ReaderTableModel(this);
+    tableView->setModel(readerModel);
+    tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
+    tableView->setSelectionMode(QAbstractItemView::SingleSelection);
+    tableView->setAlternatingRowColors(true);
+    tableView->horizontalHeader()->setStretchLastSection(true);
+    tableView->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+    tableView->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    tableView->setSortingEnabled(true); // Enable column sorting
+    
+    layout->addWidget(tableView);
+    
+    // Thanh trang thai
+    statusLabel = new QLabel("", tabQuanLy);
+    statusLabel->setStyleSheet("color: #27ae60; font-weight: bold;");
+    layout->addWidget(statusLabel);
+    
+    // Cac nut chuc nang
+    QHBoxLayout *buttonLayout = new QHBoxLayout();
+    btnAdd = new QPushButton("➕ Thêm Độc Giả", tabQuanLy);
+    btnEdit = new QPushButton("✏️ Sửa", tabQuanLy);
+    btnDelete = new QPushButton("🗑️ Xóa", tabQuanLy);
+    btnViewLoans = new QPushButton("📖 Xem Mượn Trả", tabQuanLy);
+    btnBack = new QPushButton("⬅️ Quay Lại", tabQuanLy);
+    
+    // Add keyboard shortcut tooltips
+    btnAdd->setToolTip("Thêm độc giả mới (Ctrl+N)");
+    btnEdit->setToolTip("Sửa thông tin độc giả (Ctrl+E)");
+    btnDelete->setToolTip("Xóa độc giả đã chọn (Delete hoặc Ctrl+D)");
+    btnViewLoans->setToolTip("Xem lịch sử mượn trả");
+    btnBack->setToolTip("Quay lại màn hình chính (ESC)");
+    
+    btnAdd->setStyleSheet("background-color: #27ae60; color: white; padding: 8px; font-weight: bold;");
+    btnEdit->setStyleSheet("background-color: #f39c12; color: white; padding: 8px; font-weight: bold;");
+    btnDelete->setStyleSheet("background-color: #e74c3c; color: white; padding: 8px; font-weight: bold;");
+    btnViewLoans->setStyleSheet("background-color: #3498db; color: white; padding: 8px; font-weight: bold;");
+    btnBack->setStyleSheet("background-color: #7f8c8d; color: white; padding: 8px; font-weight: bold;");
+    
+    buttonLayout->addWidget(btnAdd);
+    buttonLayout->addWidget(btnEdit);
+    buttonLayout->addWidget(btnDelete);
+    buttonLayout->addWidget(btnViewLoans);
+    buttonLayout->addStretch();
+    buttonLayout->addWidget(btnBack);
+    
+    layout->addLayout(buttonLayout);
+    
+    tabWidget->addTab(tabQuanLy, "◉ Danh Sách Độc Giả");
+}
+
+void WidgetQuanLyDocGia::setupTabQuaHan() {
+    tabQuaHan = new QWidget();
+    QVBoxLayout *layout = new QVBoxLayout(tabQuaHan);
+    layout->setSpacing(16);
+    layout->setContentsMargins(16, 16, 16, 16);
+    
+    // Hướng dẫn
+    QLabel *lblHuongDan = new QLabel("⚠ DANH SÁCH ĐỘC GIẢ QUÁ HẠN", tabQuaHan);
+    QFont font = lblHuongDan->font();
+    font.setPointSize(16);
+    font.setBold(true);
+    lblHuongDan->setFont(font);
+    lblHuongDan->setStyleSheet("color: #DC2626; padding: 12px; background: transparent;");
+    layout->addWidget(lblHuongDan);
+    
+    // Thống kê
+    lblThongKeQuaHan = new QLabel("Đang tải dữ liệu...", tabQuaHan);
+    lblThongKeQuaHan->setStyleSheet(
+        "padding: 12px;"
+        "background: #FEE2E2;"
+        "border: 1px solid #FCA5A5;"
+        "border-radius: 8px;"
+        "color: #991B1B;"
+    );
+    layout->addWidget(lblThongKeQuaHan);
+    
+    // Placeholder message
+    QLabel *placeholderMsg = new QLabel("📊 Chức năng đang được phát triển...\n\n"
+        "Sẽ hiển thị danh sách độc giả có sách mượn quá hạn.", tabQuaHan);
+    placeholderMsg->setAlignment(Qt::AlignCenter);
+    placeholderMsg->setStyleSheet(
+        "padding: 40px;"
+        "color: #64748B;"
+        "font-size: 14px;"
+    );
+    layout->addWidget(placeholderMsg, 1);
+    
+    // Refresh button
+    QPushButton *btnRefresh = new QPushButton("🔄 Làm Mới Dữ Liệu", tabQuaHan);
+    btnRefresh->setStyleSheet(
+        "QPushButton {"
+        "    background: #EF4444;"
+        "    color: white;"
+        "    border: none;"
+        "    border-radius: 6px;"
+        "    padding: 10px 20px;"
+        "    font-weight: 600;"
+        "}"
+        "QPushButton:hover {"
+        "    background: #DC2626;"
+        "}"
+    );
+    connect(btnRefresh, &QPushButton::clicked, this, &WidgetQuanLyDocGia::onRefreshQuaHan);
+    layout->addWidget(btnRefresh, 0, Qt::AlignRight);
+    
+    tabWidget->addTab(tabQuaHan, "⚠ Độc Giả Quá Hạn");
+}
+
+void WidgetQuanLyDocGia::setupConnections() {
+    connect(btnSearch, &QPushButton::clicked, this, &WidgetQuanLyDocGia::onSearchClicked);
+    connect(btnClearSearch, &QPushButton::clicked, this, &WidgetQuanLyDocGia::onClearSearchClicked);
+    connect(btnAdd, &QPushButton::clicked, this, &WidgetQuanLyDocGia::showAddReaderDialog);
+    connect(btnEdit, &QPushButton::clicked, this, &WidgetQuanLyDocGia::showEditReaderDialog);
+    connect(btnDelete, &QPushButton::clicked, this, &WidgetQuanLyDocGia::onDeleteReaderClicked);
+    connect(btnViewLoans, &QPushButton::clicked, this, &WidgetQuanLyDocGia::onViewLoansClicked);
+    connect(btnBack, &QPushButton::clicked, this, &WidgetQuanLyDocGia::onBackClicked);
+    connect(tableView, &QTableView::doubleClicked, this, &WidgetQuanLyDocGia::onTableDoubleClicked);
+    connect(searchEdit, &QLineEdit::returnPressed, this, &WidgetQuanLyDocGia::onSearchClicked);
+    
+    // Real-time search
+    connect(searchEdit, &QLineEdit::textChanged, this, &WidgetQuanLyDocGia::onSearchTextChanged);
+    connect(searchTimer, &QTimer::timeout, this, &WidgetQuanLyDocGia::performSearch);
+    
+    connect(tableView->selectionModel(), &QItemSelectionModel::selectionChanged,
+            [this]() {
+                QModelIndexList selected = tableView->selectionModel()->selectedRows();
+                if (!selected.isEmpty()) {
+                    selectedReader = readerModel->getReaderAt(selected.first().row());
+                } else {
+                    selectedReader = nullptr;
+                }
+                updateButtonStates();
+            });
+}
+
+void WidgetQuanLyDocGia::setupKeyboardShortcuts() {
+    // Ctrl+F - Focus search
+    shortcutSearch = new QShortcut(QKeySequence("Ctrl+F"), this);
+    connect(shortcutSearch, &QShortcut::activated, this, [this]() {
+        searchEdit->setFocus();
+        searchEdit->selectAll();
+    });
+    
+    // Ctrl+N - Add reader
+    shortcutAdd = new QShortcut(QKeySequence("Ctrl+N"), this);
+    connect(shortcutAdd, &QShortcut::activated, this, &WidgetQuanLyDocGia::showAddReaderDialog);
+    
+    // Ctrl+E - Edit reader
+    shortcutEdit = new QShortcut(QKeySequence("Ctrl+E"), this);
+    connect(shortcutEdit, &QShortcut::activated, this, [this]() {
+        if (selectedReader) {
+            showEditReaderDialog();
+        }
+    });
+    
+    // Delete / Ctrl+D - Delete reader
+    shortcutDelete = new QShortcut(QKeySequence("Delete"), this);
+    connect(shortcutDelete, &QShortcut::activated, this, [this]() {
+        if (selectedReader) {
+            onDeleteReaderClicked();
+        }
+    });
+    
+    QShortcut *shortcutDeleteAlt = new QShortcut(QKeySequence("Ctrl+D"), this);
+    connect(shortcutDeleteAlt, &QShortcut::activated, this, [this]() {
+        if (selectedReader) {
+            onDeleteReaderClicked();
+        }
+    });
+    
+    // F5 / Ctrl+R - Refresh
+    shortcutRefresh = new QShortcut(QKeySequence("F5"), this);
+    connect(shortcutRefresh, &QShortcut::activated, this, &WidgetQuanLyDocGia::refreshData);
+    
+    QShortcut *shortcutRefreshAlt = new QShortcut(QKeySequence("Ctrl+R"), this);
+    connect(shortcutRefreshAlt, &QShortcut::activated, this, &WidgetQuanLyDocGia::refreshData);
+}
+
+void WidgetQuanLyDocGia::applyFilters() {
+    // Get filter values
+    QString gioiTinh = filterGioiTinhCombo->currentText();
+    QString trangThai = filterTrangThaiCombo->currentText();
+    
+    // Store original search text
+    QString searchText = searchEdit->text();
+    
+    // Apply filtering logic in performSearch
+    performSearch();
+    
+    // Update status message
+    int totalCount = readerModel->rowCount();
+    QString filterMsg;
+    if (gioiTinh != "Tất cả" || trangThai != "Tất cả") {
+        filterMsg = QString(" (Lọc: %1, %2)").arg(gioiTinh, trangThai);
+    }
+    showMessage(QString("Hiển thị %1 độc giả%2").arg(totalCount).arg(filterMsg));
+}
+
+QString WidgetQuanLyDocGia::validateCMND(const QString &cmnd) {
+    // Check empty
+    if (cmnd.trimmed().isEmpty()) {
+        return "CMND/CCCD không được để trống";
+    }
+    
+    // Check format: 9 or 12 digits
+    QRegularExpression regex("^[0-9]{9}$|^[0-9]{12}$");
+    QRegularExpressionMatch match = regex.match(cmnd.trimmed());
+    
+    if (!match.hasMatch()) {
+        return "CMND/CCCD phải có 9 hoặc 12 chữ số";
+    }
+    
+    return ""; // Valid
+}
+
+void WidgetQuanLyDocGia::refreshData() {
+    readerModel->refreshData();
+    selectedReader = nullptr;
+    updateButtonStates();
+    showMessage(QString("Đã tải %1 độc giả").arg(readerModel->rowCount()));
+}
+
+void WidgetQuanLyDocGia::updateButtonStates() {
+    bool hasSelection = (selectedReader != nullptr);
+    btnEdit->setEnabled(hasSelection);
+    btnDelete->setEnabled(hasSelection);
+    btnViewLoans->setEnabled(hasSelection);
+}
+
+void WidgetQuanLyDocGia::showMessage(const QString &message, bool isError) {
+    statusLabel->setText(message);
+    statusLabel->setStyleSheet(isError ? 
+        "color: #e74c3c; font-weight: bold;" : 
+        "color: #27ae60; font-weight: bold;");
+}
+
+void WidgetQuanLyDocGia::onSearchClicked() {
+    QString keyword = searchEdit->text().trimmed();
+    int searchType = searchTypeCombo->currentData().toInt();
+    
+    extern PTRDG rootDocGia;
+    static PTRDG searchResults[1000];
+    int count = 0;
+    
+    if (searchType == 0) {
+        // Search by card number
+        bool ok;
+        int maThe = keyword.toInt(&ok);
+        
+        if (!ok || maThe <= 0) {
+            showMessage("⚠️ Vui lòng nhập mã thẻ hợp lệ!", true);
+            return;
+        }
+        
+        PTRDG reader = timDocGia(rootDocGia, maThe);
+        if (reader) {
+            showMessage(QString("🎫 Tìm thấy độc giả: %1 %2")
+                .arg(QString::fromStdString(reader->data.Ho))
+                .arg(QString::fromStdString(reader->data.Ten)));
+        } else {
+            showMessage("❌ Không tìm thấy độc giả!", true);
+        }
+        
+    } else if (searchType == 1) {
+        // Search by first name
+        if (keyword.isEmpty()) {
+            showMessage("⚠️ Vui lòng nhập tên!", true);
+            return;
+        }
+        
+        count = TimDocGiaTheoTen(rootDocGia, keyword.toStdString(), searchResults, 1000);
+        showMessage(QString("👤 Tìm thấy %1 độc giả có tên '%2'").arg(count).arg(keyword));
+        
+    } else if (searchType == 2) {
+        // Search by last name
+        if (keyword.isEmpty()) {
+            showMessage("⚠️ Vui lòng nhập họ!", true);
+            return;
+        }
+        
+        count = TimDocGiaTheoHo(rootDocGia, keyword.toStdString(), searchResults, 1000);
+        showMessage(QString("👥 Tìm thấy %1 độc giả có họ '%2'").arg(count).arg(keyword));
+        
+    } else if (searchType == 3) {
+        // Search by full name
+        if (keyword.isEmpty()) {
+            showMessage("⚠️ Vui lòng nhập họ tên!", true);
+            return;
+        }
+        
+        count = TimDocGiaTheoHoTen(rootDocGia, keyword.toStdString(), searchResults, 1000);
+        showMessage(QString("👤👥 Tìm thấy %1 độc giả có họ tên '%2'").arg(count).arg(keyword));
+        
+    } else if (searchType == 4) {
+        // Filter by status
+        QStringList options;
+        options << "1 - Hoạt động" << "0 - Bị khóa";
+        
+        bool ok;
+        QString item = QInputDialog::getItem(this, "Lọc theo trạng thái",
+                                            "Chọn trạng thái:", options, 0, false, &ok);
+        if (!ok) return;
+        
+        int status = item.left(1).toInt();
+        
+        count = TimDocGiaTheoTrangThai(rootDocGia, status, searchResults, 1000);
+        showMessage(QString("📊 Tìm thấy %1 độc giả '%2'").arg(count).arg(item.mid(4)));
+    }
+}
+
+void WidgetQuanLyDocGia::onClearSearchClicked() {
+    searchEdit->clear();
+    searchTypeCombo->setCurrentIndex(0);
+    refreshData();
+}
+
+void WidgetQuanLyDocGia::showAddReaderDialog() {
+    ManHinhThemDocGia dialog(this);
+    connect(&dialog, &ManHinhThemDocGia::docGiaDaThem, this, &WidgetQuanLyDocGia::refreshData);
+    dialog.exec();
+}
+
+void WidgetQuanLyDocGia::showEditReaderDialog() {
+    if (!selectedReader) return;
+    
+    ManHinhSuaDocGia dialog(QString::number(selectedReader->data.MaThe), this);
+    connect(&dialog, &ManHinhSuaDocGia::docGiaDaCapNhat, this, &WidgetQuanLyDocGia::refreshData);
+    dialog.exec();
+}
+
+void WidgetQuanLyDocGia::onDeleteReaderClicked() {
+    if (!selectedReader) return;
+    
+    // Build detailed info with borrowing status
+    QString detail;
+    int borrowedCount = readerModel->getBorrowedBookCount(selectedReader);
+    bool isOverdue = readerModel->isReaderOverdue(selectedReader);
+    
+    detail += QString("📇 <b>Mã thẻ:</b> %1<br>").arg(selectedReader->data.MaThe);
+    detail += QString("👤 <b>Họ tên:</b> %1 %2<br>")
+              .arg(QString::fromStdString(selectedReader->data.Ho))
+              .arg(QString::fromStdString(selectedReader->data.Ten));
+    detail += QString("👤 <b>Giới tính:</b> %1<br>")
+              .arg(selectedReader->data.Phai ? "Nam" : "Nữ");
+    detail += QString("📊 <b>Trạng thái:</b> %1<br>")
+              .arg(selectedReader->data.TrangThai ? "Hoạt động" : "Khóa");
+    
+    // Borrowing status with warnings
+    if (borrowedCount > 0) {
+        detail += QString("<br><span style='color: #F59E0B; font-weight: bold;'>⚠ Đang mượn: %1 cuốn</span><br>")
+                  .arg(borrowedCount);
+        if (isOverdue) {
+            detail += QString("<span style='color: #EF4444; font-weight: bold;'>⚠ CÓ SÁCH QUÁ HẠN!</span><br>");
+        }
+    } else {
+        detail += QString("<br><span style='color: #10B981;'>✓ Không có sách đang mượn</span><br>");
+    }
+    
+    // Warning messages
+    QString warningMsg;
+    if (borrowedCount > 0) {
+        warningMsg = "\n\n⚠ LƯU Ý:\n";
+        warningMsg += "• Độc giả đang mượn sách, nên xử lý trả sách trước\n";
+        warningMsg += "• Xóa sẽ mất toàn bộ lịch sử mượn trả\n";
+        warningMsg += "• Hành động này không thể hoàn tác";
+    } else {
+        warningMsg = "\n\nLịch sử mượn trả của độc giả này sẽ bị xóa vĩnh viễn.";
+    }
+    
+    // Use ConfirmationDialog with warning type if has borrowed books
+    ConfirmationDialog::Type dialogType = (borrowedCount > 0) 
+        ? ConfirmationDialog::Type::Warning 
+        : ConfirmationDialog::Type::Delete;
+    
+    bool confirmed = ConfirmationDialog::confirm(
+        this,
+        "Xác nhận xóa độc giả",
+        QString("Bạn có chắc chắn muốn xóa độc giả này?%1").arg(warningMsg),
+        detail,
+        dialogType
+    );
+    
+    if (confirmed) {
+        // TODO: Call backend delete function
+        // For now, just show placeholder
+        AnimationHelper::shake(this);
+        QMessageBox::information(this, "Xóa Độc Giả", 
+            "⚠ Chức năng xóa độc giả đang được phát triển.\n"
+            "Cần implement hàm XoaDocGia() trong backend.");
+        
+        // When implemented:
+        // extern NODEDG* rootDocGia;
+        // XoaDocGia(rootDocGia, selectedReader->data.MaThe);
+        // extern bool duLieuDaThayDoi;
+        // duLieuDaThayDoi = true;
+        // refreshData();
+        // showMessage(QString("✅ Đã xóa độc giá: %1 %2")
+        //     .arg(QString::fromStdString(selectedReader->data.Ho))
+        //     .arg(QString::fromStdString(selectedReader->data.Ten)));
+    }
+}
+
+void WidgetQuanLyDocGia::onViewLoansClicked() {
+    if (!selectedReader) return;
+    QMessageBox::information(this, "Xem Mượn Trả", "Chức năng đang phát triển...");
+}
+
+void WidgetQuanLyDocGia::onBackClicked() {
+    emit backToHome();
+}
+
+void WidgetQuanLyDocGia::onTableDoubleClicked(const QModelIndex &index) {
+    Q_UNUSED(index);
+    if (selectedReader) {
+        onViewHistory(); // Changed to view history instead
+    }
+}
+
+// ==================== NEW ADVANCED FEATURES ====================
+
+void WidgetQuanLyDocGia::onSearchTextChanged() {
+    searchTimer->stop();
+    if (searchTypeCombo->currentData().toInt() == 0) {
+        searchTimer->start();
+    }
+}
+
+void WidgetQuanLyDocGia::performSearch() {
+    QString keyword = searchEdit->text().trimmed();
+    if (keyword.isEmpty()) {
+        onClearSearchClicked();
+        return;
+    }
+    if (searchTypeCombo->currentData().toInt() == 0) {
+        onSearchClicked();
+    }
+}
+
+void WidgetQuanLyDocGia::onToggleStatus() {
+    if (!selectedReader) {
+        QMessageBox::warning(this, "Chưa chọn", "Vui lòng chọn độc giả để đổi trạng thái!");
+        return;
+    }
+    
+    QString currentStatus = selectedReader->data.TrangThai ? "Hoạt động" : "Khóa";
+    QString newStatus = selectedReader->data.TrangThai ? "Khóa" : "Hoạt động";
+    
+    QMessageBox::StandardButton reply = QMessageBox::question(this,
+        "Xác nhận đổi trạng thái",
+        QString("Độc giả: %1 %2\nTrạng thái hiện tại: %3\n\n"
+                "Bạn có muốn chuyển sang trạng thái: %4?")
+            .arg(QString::fromStdString(selectedReader->data.Ho))
+            .arg(QString::fromStdString(selectedReader->data.Ten))
+            .arg(currentStatus)
+            .arg(newStatus),
+        QMessageBox::Yes | QMessageBox::No);
+    
+    if (reply == QMessageBox::Yes) {
+        selectedReader->data.TrangThai = !selectedReader->data.TrangThai;
+        extern bool duLieuDaThayDoi;
+        duLieuDaThayDoi = true;
+        refreshData();
+        showMessage(QString("✅ Đã chuyển trạng thái sang: %1").arg(newStatus));
+    }
+}
+
+void WidgetQuanLyDocGia::onViewHistory() {
+    if (!selectedReader) {
+        QMessageBox::warning(this, "Chưa chọn", "Vui lòng chọn độc giả để xem lịch sử!");
+        return;
+    }
+    
+    extern PTRDS dsDauSach[MAX_DAUSACH];
+    extern int soLuongDauSach;
+    
+    // Build history HTML
+    QString html = "<html><head><style>"
+                   "body { font-family: Arial, sans-serif; }"
+                   "h2 { color: #2c3e50; }"
+                   "table { width: 100%; border-collapse: collapse; margin-top: 10px; }"
+                   "th { background-color: #3498db; color: white; padding: 8px; text-align: left; }"
+                   "td { border: 1px solid #ddd; padding: 8px; }"
+                   "tr:nth-child(even) { background-color: #f2f2f2; }"
+                   ".returned { color: #27ae60; }"
+                   ".borrowing { color: #e74c3c; font-weight: bold; }"
+                   "</style></head><body>";
+    
+    html += QString("<h2>📚 Lịch Sử Mượn Trả</h2>");
+    html += QString("<p><b>Độc giả:</b> %1 %2 (Mã thẻ: %3)</p>")
+            .arg(QString::fromStdString(selectedReader->data.Ho))
+            .arg(QString::fromStdString(selectedReader->data.Ten))
+            .arg(selectedReader->data.MaThe);
+    
+    MUONTRA mt = selectedReader->data.dsmt;
+    int total = 0;
+    int borrowing = 0;
+    
+    // Count first
+    MUONTRA temp = mt;
+    while (temp) {
+        total++;
+        if (temp->data.TrangThai == 0) borrowing++;
+        temp = temp->next;
+    }
+    
+    html += QString("<p><b>Tổng số giao dịch:</b> %1 | <b class='borrowing'>Đang mượn:</b> %2</p>")
+            .arg(total).arg(borrowing);
+    
+    if (total == 0) {
+        html += "<p style='color: #95a5a6;'>Chưa có giao dịch nào.</p>";
+    } else {
+        html += "<table>";
+        html += "<tr>"
+                "<th>STT</th>"
+                "<th>Mã Sách</th>"
+                "<th>Tên Sách</th>"
+                "<th>Ngày Mượn</th>"
+                "<th>Ngày Trả</th>"
+                "<th>Trạng Thái</th>"
+                "</tr>";
+        
+        int stt = 1;
+        while (mt) {
+            // Find book name
+            QString bookName = "N/A";
+            QString maSach = "N/A";
+            if (mt->data.banSaoSach) {
+                maSach = QString::fromStdString(mt->data.banSaoSach->maSach);
+                for (int i = 0; i < soLuongDauSach; i++) {
+                    PTRDMS dms = dsDauSach[i]->dms;
+                    while (dms) {
+                        if (dms->maSach == mt->data.banSaoSach->maSach) {
+                            bookName = QString::fromStdString(dsDauSach[i]->tenSach);
+                            break;
+                        }
+                        dms = dms->next;
+                    }
+                    if (bookName != "N/A") break;
+                }
+            }
+            
+            QString status = mt->data.TrangThai == 0 ? 
+                "<span class='borrowing'>Đang mượn</span>" : 
+                "<span class='returned'>Đã trả</span>";
+            
+            QString ngayTra = mt->data.TrangThai == 0 ? "-" : QString::fromStdString(mt->data.NgayTra);
+            
+            html += QString("<tr>"
+                           "<td>%1</td>"
+                           "<td>%2</td>"
+                           "<td>%3</td>"
+                           "<td>%4</td>"
+                           "<td>%5</td>"
+                           "<td>%6</td>"
+                           "</tr>")
+                    .arg(stt++)
+                    .arg(maSach)
+                    .arg(bookName)
+                    .arg(QString::fromStdString(mt->data.NgayMuon))
+                    .arg(ngayTra)
+                    .arg(status);
+            
+            mt = mt->next;
+        }
+        html += "</table>";
+    }
+    
+    html += "</body></html>";
+    
+    // Show dialog
+    QDialog dialog(this);
+    dialog.setWindowTitle("Lịch Sử Mượn Trả");
+    dialog.resize(800, 500);
+    
+    QVBoxLayout *layout = new QVBoxLayout(&dialog);
+    QTextEdit *textEdit = new QTextEdit(&dialog);
+    textEdit->setHtml(html);
+    textEdit->setReadOnly(true);
+    layout->addWidget(textEdit);
+    
+    QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok, &dialog);
+    connect(buttonBox, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    layout->addWidget(buttonBox);
+    
+    dialog.exec();
+}
+
+void WidgetQuanLyDocGia::onPrintCard() {
+    if (!selectedReader) {
+        QMessageBox::warning(this, "Chưa chọn", "Vui lòng chọn độc giả để in thẻ!");
+        return;
+    }
+    
+    QPrinter printer(QPrinter::HighResolution);
+    printer.setPageSize(QPageSize::A7);
+    
+    QPrintDialog printDialog(&printer, this);
+    if (printDialog.exec() != QDialog::Accepted) {
+        return;
+    }
+    
+    // Card HTML (A7 size - like ID card)
+    QString html = "<html><head><style>"
+                   "body { font-family: Arial, sans-serif; margin: 20px; }"
+                   ".card { border: 3px solid #3498db; padding: 20px; border-radius: 10px; }"
+                   ".header { text-align: center; color: #2c3e50; margin-bottom: 20px; }"
+                   ".info { margin: 10px 0; font-size: 14pt; }"
+                   ".label { font-weight: bold; color: #7f8c8d; }"
+                   ".value { color: #2c3e50; }"
+                   ".barcode { text-align: center; font-size: 24pt; font-family: monospace; "
+                   "           border: 2px dashed #95a5a6; padding: 10px; margin-top: 20px; }"
+                   "</style></head><body>";
+    
+    html += "<div class='card'>";
+    html += "<div class='header'>";
+    html += "<h1>📚 THƯ VIỆN</h1>";
+    html += "<h3>THẺ ĐỘC GIẢ</h3>";
+    html += "</div>";
+    
+    html += QString("<div class='info'><span class='label'>Mã thẻ:</span> "
+                   "<span class='value'>%1</span></div>")
+            .arg(selectedReader->data.MaThe);
+    
+    html += QString("<div class='info'><span class='label'>Họ tên:</span> "
+                   "<span class='value'>%1 %2</span></div>")
+            .arg(QString::fromStdString(selectedReader->data.Ho))
+            .arg(QString::fromStdString(selectedReader->data.Ten));
+    
+    html += QString("<div class='info'><span class='label'>Giới tính:</span> "
+                   "<span class='value'>%1</span></div>")
+            .arg(selectedReader->data.Phai ? "Nữ" : "Nam");
+    
+    html += QString("<div class='info'><span class='label'>Trạng thái:</span> "
+                   "<span class='value' style='color: %2;'>%1</span></div>")
+            .arg(selectedReader->data.TrangThai ? "Hoạt động ✓" : "Khóa ✗")
+            .arg(selectedReader->data.TrangThai ? "#27ae60" : "#e74c3c");
+    
+    html += QString("<div class='barcode'>*%1*</div>")
+            .arg(QString::number(selectedReader->data.MaThe).rightJustified(8, '0'));
+    
+    html += "</div></body></html>";
+    
+    QTextDocument document;
+    document.setHtml(html);
+    document.print(&printer);
+    
+    showMessage("✅ Đã in thẻ độc giả!");
+}
+
+void WidgetQuanLyDocGia::onShowWarnings() {
+    // extern PTRDS dsDauSach[MAX_DAUSACH];  // Unused variables - commented out
+    // extern int soLuongDauSach;
+    
+    QString warnings;
+    int warnCount = 0;
+    
+    // Collect warnings from all readers
+    PTRDG tempReaders[1000];
+    int count = 0;
+    
+    std::function<void(PTRDG)> collectAll = [&](PTRDG root) {
+        if (!root || count >= 1000) return;
+        collectAll(root->left);
+        tempReaders[count++] = root;
+        collectAll(root->right);
+    };
+    
+    collectAll(rootDocGia);
+    
+    for (int i = 0; i < count; i++) {
+        PTRDG reader = tempReaders[i];
+        
+        // Warning: Locked but has borrowed books
+        if (!reader->data.TrangThai) {
+            int borrowing = 0;
+            MUONTRA mt = reader->data.dsmt;
+            while (mt) {
+                if (mt->data.TrangThai == 0) borrowing++;
+                mt = mt->next;
+            }
+            
+            if (borrowing > 0) {
+                warnings += QString("⚠️ Độc giả KHÓA nhưng còn %1 sách chưa trả: %2 %3 (Mã: %4)\n")
+                            .arg(borrowing)
+                            .arg(QString::fromStdString(reader->data.Ho))
+                            .arg(QString::fromStdString(reader->data.Ten))
+                            .arg(reader->data.MaThe);
+                warnCount++;
+            }
+        }
+        
+        // Warning: Overdue books
+        int maxDays = TinhSoNgayQuaHanLonNhat(reader);
+        
+        if (maxDays >= 7) {
+            int overdue = 0;
+            MUONTRA mt = reader->data.dsmt;
+            while (mt) {
+                if (mt->data.TrangThai == 0) {
+                    overdue++;
+                }
+                mt = mt->next;
+            }
+            
+            warnings += QString("🔴 Quá hạn %1 ngày: %2 %3 (Mã: %4) - %5 sách\n")
+                        .arg(maxDays)
+                        .arg(QString::fromStdString(reader->data.Ho))
+                        .arg(QString::fromStdString(reader->data.Ten))
+                        .arg(reader->data.MaThe)
+                        .arg(overdue);
+            warnCount++;
+        }
+    }
+    
+    if (warnCount == 0) {
+        QMessageBox::information(this, "Cảnh Báo ✅", 
+            "Không có cảnh báo nào!\n\n"
+            "✓ Tất cả độc giả đều ổn định.");
+    } else {
+        QMessageBox::warning(this, QString("Cảnh Báo ⚠️ (%1)").arg(warnCount),
+            QString("Phát hiện %1 vấn đề:\n\n%2").arg(warnCount).arg(warnings));
+    }
+}
+
+void WidgetQuanLyDocGia::onExportCSV() {
+    QString fileName = QFileDialog::getSaveFileName(this,
+        "Export danh sách độc giả", 
+        "readers_export.csv",
+        "CSV Files (*.csv);;All Files (*)");
+    
+    if (fileName.isEmpty()) return;
+    
+    QFile file(fileName);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::critical(this, "Lỗi", "Không thể mở file để ghi!");
+        return;
+    }
+    
+    QTextStream out(&file);
+    out.setEncoding(QStringConverter::Utf8);
+    
+    // Header
+    out << "Mã Thẻ,Họ,Tên,Giới Tính,Trạng Thái,Số Sách Đang Mượn\n";
+    
+    // Collect all readers
+    PTRDG allReaders[1000];
+    int totalCount = 0;
+    
+    std::function<void(PTRDG)> collect = [&](PTRDG root) {
+        if (!root || totalCount >= 1000) return;
+        collect(root->left);
+        allReaders[totalCount++] = root;
+        collect(root->right);
+    };
+    
+    collect(rootDocGia);
+    
+    for (int i = 0; i < totalCount; i++) {
+        PTRDG reader = allReaders[i];
+        
+        // Count borrowing books
+        int borrowing = 0;
+        MUONTRA mt = reader->data.dsmt;
+        while (mt) {
+            if (mt->data.TrangThai == 0) borrowing++;
+            mt = mt->next;
+        }
+        
+        out << reader->data.MaThe << ","
+            << "\"" << QString::fromStdString(reader->data.Ho) << "\","
+            << "\"" << QString::fromStdString(reader->data.Ten) << "\","
+            << (reader->data.Phai ? "Nữ" : "Nam") << ","
+            << (reader->data.TrangThai ? "Hoạt động" : "Khóa") << ","
+            << borrowing << "\n";
+    }
+    
+    file.close();
+    
+    QMessageBox::information(this, "Thành công ✅",
+        QString("Đã export %1 độc giả ra file:\n%2")
+        .arg(totalCount).arg(fileName));
+}
+
+void WidgetQuanLyDocGia::onImportCSV() {
+    QMessageBox::information(this, "Import CSV", 
+        "Tính năng import độc giả từ CSV sẽ được triển khai trong phiên bản sau.\n\n"
+        "Hiện tại vui lòng sử dụng chức năng 'Thêm Độc Giả' để thêm từng người.");
+}
+
+void WidgetQuanLyDocGia::onRefreshQuaHan() {
+    // TODO: Refresh overdue readers list
+    showMessage("Chức năng Quá hạn đang được phát triển");
+}
+
+void WidgetQuanLyDocGia::onTableQuaHanDoubleClicked(const QModelIndex &index) {
+    Q_UNUSED(index);
+    // TODO: Handle double click on overdue readers table
+}

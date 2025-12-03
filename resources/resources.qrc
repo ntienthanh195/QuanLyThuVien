@@ -1,0 +1,21 @@
+<RCC>
+    <qresource prefix="/">
+        <file>styles.qss</file>
+        <file>modern-dashboard.qss</file>
+    </qresource>
+    <!-- Tạm thời comment out icons cho đến khi có file thật -->
+    <!--
+    <qresource prefix="/">
+        <file>icons/book.png</file>
+        <file>icons/reader.png</file>
+        <file>icons/loan.png</file>
+        <file>icons/add.png</file>
+        <file>icons/edit.png</file>
+        <file>icons/delete.png</file>
+        <file>icons/search.png</file>
+        <file>icons/save.png</file>
+        <file>icons/cancel.png</file>
+        <file>icons/info.png</file>
+    </qresource>
+    -->
+</RCC>
