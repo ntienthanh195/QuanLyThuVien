@@ -1,5 +1,6 @@
 #include "views/dialogs/ManHinhSuaSach.h"
 #include "models/QuanLySach.h"
+#include "utils/Utf8Helper.h"
 #include "models/KiemTraDuLieu.h"
 #include "utils/XuLyChuoi.h"
 #include <QVBoxLayout>
@@ -38,7 +39,7 @@ void ManHinhSuaSach::thietLapGiaoDien() {
     mainLayout->addWidget(titleLabel);
 
     // Form group
-    QGroupBox* formGroup = new QGroupBox("Thông Tin Đầu Sách");
+    QGroupBox* formGroup = new QGroupBox("Thông Tin Đầu Sách", this);
     formGroup->setObjectName("formGroup");
     QFormLayout* formLayout = new QFormLayout(formGroup);
     formLayout->setSpacing(12);
@@ -316,9 +317,9 @@ void ManHinhSuaSach::khiNhanLuu() {
     }
 
     // Get values
-    QString name = QString::fromStdString(ChuanHoaKhoangTrang(nhapTenSach->text().trimmed().toStdString()));
-    QString author = QString::fromStdString(ChuanHoaKhoangTrang(nhapTacGia->text().trimmed().toStdString()));
-    QString genre = QString::fromStdString(ChuanHoaKhoangTrang(chonTheLoai->currentText().trimmed().toStdString()));
+    QString name = Utf8Helper::fromStdString(ChuanHoaKhoangTrang(Utf8Helper::toStdString(nhapTenSach->text().trimmed())));
+    QString author = Utf8Helper::fromStdString(ChuanHoaKhoangTrang(Utf8Helper::toStdString(nhapTacGia->text().trimmed())));
+    QString genre = Utf8Helper::fromStdString(ChuanHoaKhoangTrang(Utf8Helper::toStdString(chonTheLoai->currentText().trimmed())));
     int year = nhapNamXuatBan->value();
     int pages = nhapSoTrang->value();
 

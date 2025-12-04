@@ -1,5 +1,6 @@
 #include "views/dialogs/ManHinhThemDocGia.h"
 #include "models/DocGia.h"
+#include "utils/Utf8Helper.h"
 #include "models/KiemTraDuLieu.h"
 #include "utils/XuLyChuoi.h"
 #include "utils/AnimationHelper.h"
@@ -38,7 +39,7 @@ void ManHinhThemDocGia::thietLapGiaoDien() {
     mainLayout->addWidget(titleLabel);
 
     // Reader code display
-    QGroupBox* codeGroup = new QGroupBox("Mã Thẻ Độc Giả");
+    QGroupBox* codeGroup = new QGroupBox("Mã Thẻ Độc Giả", this);
     codeGroup->setObjectName("codeGroup");
     QVBoxLayout* codeLayout = new QVBoxLayout(codeGroup);
     codeLayout->setContentsMargins(15, 15, 15, 15);
@@ -64,7 +65,7 @@ void ManHinhThemDocGia::thietLapGiaoDien() {
     mainLayout->addWidget(codeGroup);
 
     // Form group
-    QGroupBox* formGroup = new QGroupBox("Thông Tin Độc Giả");
+    QGroupBox* formGroup = new QGroupBox("Thông Tin Độc Giả", this);
     formGroup->setObjectName("formGroup");
     QFormLayout* formLayout = new QFormLayout(formGroup);
     formLayout->setSpacing(12);
@@ -290,9 +291,9 @@ void ManHinhThemDocGia::kiemTraDuLieu() {
 }
 
 void ManHinhThemDocGia::khiNhanLuu() {
-    // Get values
-    QString lastName = QString::fromStdString(ChuanHoaKhoangTrang(nhapHo->text().trimmed().toStdString()));
-    QString firstName = QString::fromStdString(ChuanHoaKhoangTrang(nhapTen->text().trimmed().toStdString()));
+    // Get values with auto-capitalization
+    QString lastName = Utf8Helper::fromStdString(ChuyenThanhTitleCaseUnicode(Utf8Helper::toStdString(nhapHo->text().trimmed())));
+    QString firstName = Utf8Helper::fromStdString(ChuyenThanhTitleCaseUnicode(Utf8Helper::toStdString(nhapTen->text().trimmed())));
     int genderValue = chonGioiTinh->currentData().toInt();
 
     // Validate họ đệm

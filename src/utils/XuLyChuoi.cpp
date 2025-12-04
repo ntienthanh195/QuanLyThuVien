@@ -4,6 +4,9 @@
 #include "Constants.h"
 #include <stdexcept>
 #include <cctype>
+#include <cstring>
+#include <QString>
+#include <QRegularExpression>
 
 //TIEN ICH NHO (HO TRO NOI BO) 
 
@@ -41,11 +44,18 @@ std::string ChuyenInHoa(const std::string& chuoi) {
 
 // Chuyen toan bo chuoi thanh chu thuong
 std::string ChuyenInThuong(const std::string& chuoi) {
-    std::string ketQua = chuoi;
-    for (size_t i = 0; i < ketQua.length(); ++i) {
-        ketQua[i] = std::tolower(static_cast<unsigned char>(ketQua[i]));
+    if (chuoi.empty()) return "";
+    
+    try {
+        std::string ketQua = chuoi;
+        for (size_t i = 0; i < ketQua.length(); ++i) {
+            ketQua[i] = std::tolower(static_cast<unsigned char>(ketQua[i]));
+        }
+        return ketQua;
+    } catch (...) {
+        // Neu co loi, tra ve chuoi goc
+        return chuoi;
     }
-    return ketQua;
 }
 
 // Chuyen chuoi thanh dang Title Case (Chu Cai Dau Moi Tu Viet Hoa)
@@ -65,6 +75,13 @@ std::string ChuyenThanhTitleCase(const std::string& chuoi) {
         }
     }
     return ketQua;
+}
+
+// Chuyen chuoi thanh dang Title Case ho tro tieng Viet (UTF-8)
+// DEPRECATED: Use ChuanHoaHoTenHienDai() instead for safer Unicode handling
+std::string ChuyenThanhTitleCaseUnicode(const std::string& chuoi) {
+    // Wrapper around modern Qt-based implementation to avoid crashes
+    return ChuanHoaHoTenHienDai(chuoi);
 }
 
 // Bo dau tieng Viet va chuyen thanh chu thuong (dung cho so sanh)
@@ -133,6 +150,7 @@ std::string CatKhoangTrang(const std::string& chuoi) {
 
 // Chuan hoa khoang trang: Thay nhieu khoang trang thanh 1 va cat dau/cuoi
 std::string ChuanHoaKhoangTrang(const std::string& chuoi) {
+    if (chuoi.empty()) return "";
     std::string ketQua;
     ketQua.reserve(chuoi.size());
     bool coKhoangTrangTruocDo = false;
@@ -223,17 +241,20 @@ bool ChuyenChuoiThanhSoNguyen(const std::string& chuoi, int& ketQua, bool chiCho
 
 //CHUAN HOA THEO DINH DANG RIENG 
 
-// Chuan hoa chuoi cho tim kiem: Chuyen chu thuong va chuan hoa khoang trang
+// Chuan hoa chuoi cho tim kiem: Bo dau tieng Viet, chuyen chu thuong va chuan hoa khoang trang
 std::string ChuanHoaChuoiTimKiem(const std::string& chuoi) {
+    // Buoc 1: Bo dau va chuyen thanh chu thuong
+    std::string chuoiBoDau = BoDauVaThuong(chuoi);
+    
+    // Buoc 2: Chuan hoa khoang trang (bo khoang trang dau/cuoi, collapse multiple spaces)
     std::string ketQua;
-    ketQua.reserve(chuoi.size());
+    ketQua.reserve(chuoiBoDau.size());
     bool coKhoangTrangTruocDo = false;
     bool daBatDau = false;
     
-    for (size_t i = 0; i < chuoi.length(); ++i) {
-        char kyTu = chuoi[i];
-        char kyTuThuong = std::tolower(static_cast<unsigned char>(kyTu));
-        char kyTuXuLy = laKyTuKhoangTrang(kyTuThuong) ? ' ' : kyTuThuong;
+    for (size_t i = 0; i < chuoiBoDau.length(); ++i) {
+        char kyTu = chuoiBoDau[i];
+        char kyTuXuLy = laKyTuKhoangTrang(kyTu) ? ' ' : kyTu;
         
         if (kyTuXuLy == ' ') {
             if (!coKhoangTrangTruocDo && daBatDau) {
@@ -253,6 +274,168 @@ std::string ChuanHoaChuoiTimKiem(const std::string& chuoi) {
     }
     
     return ketQua;
+}
+
+// Chuan hoa ho ten nguoi: collapse spaces, trim, and apply title-case (UTF-8 aware)
+std::string ChuanHoaHoTen(const std::string& chuoiHoTen) {
+    // Su dung ham hien dai hon voi Qt
+    return ChuanHoaHoTenHienDai(chuoiHoTen);
+}
+
+//============================================================================
+// HAM XU LY UNICODE HIEN DAI (SU DUNG QT)
+//============================================================================
+
+// Chuyen std::string UTF-8 sang QString
+QString ChuyenSangQString(const std::string& chuoi) {
+    return QString::fromUtf8(chuoi.c_str());
+}
+
+// Chuyen QString sang std::string UTF-8
+std::string ChuyenSangStdString(const QString& qstr) {
+    return qstr.toUtf8().toStdString();
+}
+
+// Chuan hoa ho ten hien dai voi Qt (tot nhat cho tieng Viet)
+std::string ChuanHoaHoTenHienDai(const std::string& chuoiHoTen) {
+    if (chuoiHoTen.empty()) return "";
+    
+    QString qstr = ChuyenSangQString(chuoiHoTen);
+    
+    // Buoc 1: Cat va chuan hoa khoang trang
+    qstr = qstr.trimmed();
+    qstr = qstr.simplified();  // Thay nhieu khoang trang thanh 1
+    
+    if (qstr.isEmpty()) return "";
+    
+    // Buoc 2: Tach thanh cac tu
+    QStringList cacTu = qstr.split(' ', Qt::SkipEmptyParts);
+    
+    // Buoc 3: Title Case - viet hoa chu cai dau moi tu, lowercase con lai
+    for (int i = 0; i < cacTu.size(); ++i) {
+        QString& tu = cacTu[i];
+        if (tu.isEmpty()) continue;
+        
+        // Chuyen toan bo thanh lowercase truoc
+        tu = tu.toLower();
+        
+        // Viet hoa ky tu dau tien (ho tro UTF-8/Unicode dung cach)
+        if (tu.length() > 0) {
+            tu[0] = tu[0].toUpper();
+        }
+    }
+    
+    // Buoc 4: Ghep lai thanh chuoi hoan chinh
+    QString ketQua = cacTu.join(' ');
+    
+    return ChuyenSangStdString(ketQua);
+}
+
+// Kiem tra tinh hop le cua ho ten
+bool KiemTraHoTenHopLe(const std::string& hoTen, std::string& thongBaoLoi) {
+    if (hoTen.empty()) {
+        thongBaoLoi = "Ho ten khong duoc de trong!";
+        return false;
+    }
+    
+    QString qstr = ChuyenSangQString(hoTen).trimmed();
+    
+    if (qstr.isEmpty()) {
+        thongBaoLoi = "Ho ten chi chua khoang trang!";
+        return false;
+    }
+    
+    // Kiem tra do dai (2-100 ky tu)
+    if (qstr.length() < 2) {
+        thongBaoLoi = "Ho ten qua ngan (toi thieu 2 ky tu)!";
+        return false;
+    }
+    
+    if (qstr.length() > 100) {
+        thongBaoLoi = "Ho ten qua dai (toi da 100 ky tu)!";
+        return false;
+    }
+    
+    // Kiem tra ky tu dau tien khong phai la so hoac ky tu dac biet
+    QChar kyTuDau = qstr[0];
+    if (kyTuDau.isDigit()) {
+        thongBaoLoi = "Ho ten khong duoc bat dau bang so!";
+        return false;
+    }
+    
+    // Kiem tra cac ky tu hop le: chu cai, khoang trang, dau + - .
+    QRegularExpression regex("^[\\p{L}\\s.'-]+$", QRegularExpression::UseUnicodePropertiesOption);
+    if (!regex.match(qstr).hasMatch()) {
+        thongBaoLoi = "Ho ten chua ky tu khong hop le! Chi cho phep chu cai, khoang trang, dau . - '";
+        return false;
+    }
+    
+    // Kiem tra khong qua nhieu khoang trang lien tiep (sau simplified)
+    if (qstr.contains("  ")) {
+        thongBaoLoi = "Ho ten chua qua nhieu khoang trang lien tiep!";
+        return false;
+    }
+    
+    thongBaoLoi = "";
+    return true;
+}
+
+// Chuan hoa ten Unicode hien dai (dung cho ten sach, tac gia, the loai)
+std::string ChuanHoaTenHienDai(const std::string& ten, size_t doDaiToiThieu, 
+                                 size_t doDaiToiDa, std::string& thongBaoLoi) {
+    if (ten.empty()) {
+        thongBaoLoi = "Ten khong duoc de trong!";
+        return "";
+    }
+    
+    QString qstr = ChuyenSangQString(ten);
+    qstr = qstr.trimmed().simplified();
+    
+    if (qstr.isEmpty()) {
+        thongBaoLoi = "Ten chi chua khoang trang!";
+        return "";
+    }
+    
+    // Kiem tra ky tu dau tien
+    if (qstr[0].isDigit()) {
+        thongBaoLoi = "Ten khong duoc bat dau bang so!";
+        return "";
+    }
+    
+    // Kiem tra do dai
+    size_t doDai = static_cast<size_t>(qstr.length());
+    if (doDai < doDaiToiThieu) {
+        thongBaoLoi = "Ten qua ngan (toi thieu " + std::to_string(doDaiToiThieu) + " ky tu)!";
+        return "";
+    }
+    
+    if (doDai > doDaiToiDa) {
+        thongBaoLoi = "Ten qua dai (toi da " + std::to_string(doDaiToiDa) + " ky tu)!";
+        return "";
+    }
+    
+    // Kiem tra ky tu hop le (chu cai, so, khoang trang, cac ky tu dac biet co ban)
+    QRegularExpression regex("^[\\p{L}\\d\\s.,'#:+()\\-]+$", 
+                            QRegularExpression::UseUnicodePropertiesOption);
+    if (!regex.match(qstr).hasMatch()) {
+        thongBaoLoi = "Ten chua ky tu khong hop le!";
+        return "";
+    }
+    
+    // Apply Title Case
+    QStringList cacTu = qstr.split(' ', Qt::SkipEmptyParts);
+    for (int i = 0; i < cacTu.size(); ++i) {
+        QString& tu = cacTu[i];
+        if (tu.isEmpty()) continue;
+        tu = tu.toLower();
+        if (tu.length() > 0) {
+            tu[0] = tu[0].toUpper();
+        }
+    }
+    
+    QString ketQua = cacTu.join(' ');
+    thongBaoLoi = "";
+    return ChuyenSangStdString(ketQua);
 }
 
 // Chuan hoa gioi tinh: "Nam" hoac "Nu"
@@ -358,54 +541,21 @@ std::string ChuanHoaISBNFile(const std::string& chuoiISBN, std::string& ketQua) 
 }
 
 // Chuan hoa ten Unicode (ten sach, tac gia, the loai...)
+// Chuan hoa ten Unicode (ten sach, tac gia, the loai...)
+// UPDATED: Now uses Qt-based validation for safety
 std::string ChuanHoaTenUnicode(const std::string& chuoiDauVao, size_t doDaiToiThieu, 
                                 size_t doDaiToiDa, std::string& chuoiKetQua) {
-    // Kiem tra rong
-    if (chuoiDauVao.empty()) {
-        return "Loi: Khong duoc de trong!\nVui long nhap thong tin hop le.";
+    // Use modern Qt-based implementation
+    std::string thongBaoLoi;
+    std::string ketQua = ChuanHoaTenHienDai(chuoiDauVao, doDaiToiThieu, doDaiToiDa, thongBaoLoi);
+    
+    if (!thongBaoLoi.empty()) {
+        // Convert modern error format to legacy format
+        return "Loi: " + thongBaoLoi;
     }
     
-    std::string chuoiDaCat = CatKhoangTrang(chuoiDauVao);
-    if (chuoiDaCat.empty() || KiemTraChuoiRongHoacKhoangTrang(chuoiDaCat)) {
-        return "Loi: Chi chua khoang trang!\nVui long nhap ky tu hop le, khong chi co khoang trang.";
-    }
-    
-    // Kiem tra ky tu dau tien phai la chu cai
-    if (!laKyTuChuCai(chuoiDaCat[0])) {
-        return "Loi: Ky tu dau tien phai la chu cai!";
-    }
-    
-    // Kiem tra cac ky tu con lai
-    for (size_t i = 1; i < chuoiDaCat.length(); ++i) {
-        char kyTu = chuoiDaCat[i];
-        bool kyTuHopLe = laKyTuChuCai(kyTu) || laKyTuSo(kyTu) || laKyTuKhoangTrang(kyTu) ||
-                         kyTu == '+' || kyTu == '#' || kyTu == '-' || 
-                         kyTu == '.' || kyTu == '_';
-        
-        if (!kyTuHopLe) {
-            return "Loi: Chi duoc chua chu cai, so, khoang trang va cac ky tu: + # - . _";
-        }
-    }
-    
-    // Chuan hoa khoang trang
-    std::string chuoiChuan = ChuanHoaKhoangTrang(chuoiDaCat);
-    
-    // Kiem tra do dai sau khi chuan hoa
-    if (chuoiChuan.empty()) {
-        return "Loi: Sau khi chuan hoa bi rong!";
-    }
-    
-    if (chuoiChuan.length() < doDaiToiThieu) {
-        return "Loi: Qua ngan (>= " + std::to_string(doDaiToiThieu) + ")!";
-    }
-    
-    if (chuoiChuan.length() > doDaiToiDa) {
-        return "Loi: Qua dai (<= " + std::to_string(doDaiToiDa) + ")!";
-    }
-    
-    // Gan ket qua
-    chuoiKetQua = chuoiChuan;
-    return "";  // Thanh cong
+    chuoiKetQua = ketQua;
+    return "";  // Success
 }
 
 //  STRUCT VA HAM HO TRO TIM KIEM 

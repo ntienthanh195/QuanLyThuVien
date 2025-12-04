@@ -100,18 +100,18 @@ std::string KiemTraSoDienThoai(const std::string& sdt) {
     // Kiem tra chi chua chu so
     for (char c : sdt) {
         if (c < '0' || c > '9') {
-            return "Loi: So dien thoai chi duoc chua chu so!\nVi du: 0123456789";
+            return "Loi: So dien thoai chi duoc chua chu so!\nVi du: 0328378331";
         }
     }
     
     // Kiem tra do dai 10-11 chu so
     if (sdt.length() < 10 || sdt.length() > 11) {
-        return "Loi: So dien thoai phai co 10-11 chu so!\nVi du: 0123456789";
+        return "Loi: So dien thoai phai co 10-11 chu so!\nVi du: 0328378331";
     }
     
     // Kiem tra bat dau bang 0
     if (sdt[0] != '0') {
-        return "Loi: So dien thoai phai bat dau bang so 0!\nVi du: 0123456789";
+        return "Loi: So dien thoai phai bat dau bang so 0!\nVi du: 0328378331";
     }
     
     return "";

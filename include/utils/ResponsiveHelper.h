@@ -53,6 +53,17 @@ public:
     static void applyResponsiveLayout(QWidget *widget);
     static void centerWindow(QWidget *widget);
     
+    // Physical screen helpers
+    static qreal getPhysicalDiagonalInches(); // diagonal size in inches
+
+    // Global font scaling for various physical sizes (10" - 17")
+    static void applyGlobalFontScaling(QApplication *app, int basePointSize = 10);
+
+    // Window state management
+    static void saveWindowGeometry(QWidget *widget, const QString &key = "MainWindow");
+    static void restoreWindowGeometry(QWidget *widget, const QString &key = "MainWindow");
+    static void setupResizableWindow(QWidget *widget);
+    
     // Debug info
     static QString getScreenInfo();
 

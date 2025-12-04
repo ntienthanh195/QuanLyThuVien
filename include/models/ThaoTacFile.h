@@ -7,8 +7,8 @@
 #include "ThongBao.h"
 #include "Constants.h"
 
-static constexpr char FILE_DAUSACH[] = "E:/Qt/LibraryManagement/files/dausach.txt";
-static constexpr char FILE_DANHMUCSACH[] = "E:/Qt/LibraryManagement/files/danhmucsach.txt";
+static constexpr char FILE_DAUSACH[] = "files/dausach.txt";
+static constexpr char FILE_DANHMUCSACH[] = "files/danhmucsach.txt";
 
 // Đọc ghi file
 void NapDanhSachDauSach(const char* path, PTRDS dsDauSach[], int& soLuongDauSach, std::ostream& out = std::cout);

@@ -2,6 +2,13 @@
     <qresource prefix="/">
         <file>styles.qss</file>
         <file>modern-dashboard.qss</file>
+        <file>enterprise-theme.qss</file>
+    </qresource>
+    <qresource prefix="/icons">
+        <file>app_icon.ico</file>
+    </qresource>
+    <qresource prefix="/fonts">
+        <file>fonts/LibreBarcode128Text-Regular.ttf</file>
     </qresource>
     <!-- Tạm thời comment out icons cho đến khi có file thật -->
     <!--

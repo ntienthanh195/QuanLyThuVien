@@ -6,6 +6,7 @@
 #include "utils/ConfirmationDialog.h"
 #include "utils/AnimationHelper.h"
 #include "utils/NgayThang.h"
+#include "utils/Utf8Helper.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -26,12 +27,8 @@
 
 extern PTRDG rootDocGia;
 
-// Set modern stylesheet for reader widget
-static const QString READER_WIDGET_STYLE = R"(
-    WidgetQuanLyDocGia {
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #0F172A, stop:1 #1E293B);
-    }
-)";
+// Modern Card-based Design - No hardcoded styles
+// All styles are managed by modern-dashboard.qss
 
 // ==================== ReaderTableModel Implementation ====================
 
@@ -85,11 +82,11 @@ QVariant ReaderTableModel::data(const QModelIndex &index, int role) const {
     } else if (role == Qt::ForegroundRole) {
         // Highlight overdue readers in orange/red
         if (isReaderOverdue(reader)) {
-            return QColor("#F59E0B"); // Orange warning color
+            return QColor(245, 158, 11); // Orange warning color #F59E0B
         }
         // Highlight locked readers in red
         if (!reader->data.TrangThai) {
-            return QColor("#EF4444"); // Red color
+            return QColor(239, 68, 68); // Red color #EF4444
         }
     } else if (role == Qt::FontRole) {
         // Bold font for overdue readers
@@ -263,62 +260,141 @@ WidgetQuanLyDocGia::~WidgetQuanLyDocGia() {
 }
 
 void WidgetQuanLyDocGia::setupUI() {
-    // Apply modern gradient stylesheet
-    setStyleSheet(READER_WIDGET_STYLE);
+    // MASTER PLAN: Card-Based Design - No hardcoded styles
+    this->setProperty("class", "WidgetQuanLyDocGia");
     
+    // Layout chính - Clean Spacing
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
-    mainLayout->setSpacing(20);
-    mainLayout->setContentsMargins(32, 32, 32, 32);
+    mainLayout->setSpacing(25);
+    mainLayout->setContentsMargins(35, 35, 35, 35);
     
-    // Modern title with gradient effect
-    QLabel *titleLabel = new QLabel("👥 QUẢN LÝ ĐỘC GIẢ", this);
-    QFont titleFont;
-    titleFont.setPointSize(28);
-    titleFont.setBold(true);
-    titleFont.setLetterSpacing(QFont::AbsoluteSpacing, 1.5);
-    titleLabel->setFont(titleFont);
-    titleLabel->setStyleSheet("color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #60A5FA, stop:1 #A78BFA); padding: 8px 0; background: transparent;");
-    mainLayout->addWidget(titleLabel);
+    // --- CARD 1: HEADER & TÌM KIẾM ---
+    QFrame *headerCard = new QFrame(this);
+    headerCard->setProperty("class", "Card");
+    headerCard->setFrameShape(QFrame::NoFrame);
+    QVBoxLayout *headerLayout = new QVBoxLayout(headerCard);
+    headerLayout->setSpacing(15);
+    headerLayout->setContentsMargins(20, 20, 20, 20);
     
-    // Modern tab widget matching book widget style
-    tabWidget = new QTabWidget(this);
-    tabWidget->setDocumentMode(false);
-    tabWidget->setStyleSheet(
-        "QTabWidget::pane {"
-        "    border: 2px solid #475569;"
-        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1E293B, stop:1 #334155);"
-        "    border-radius: 12px;"
-        "    top: -1px;"
-        "}"
-        "QTabBar::tab {"
-        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #334155, stop:1 #1E293B);"
-        "    color: #CBD5E1;"
-        "    padding: 12px 24px;"
-        "    margin-right: 6px;"
-        "    border-top-left-radius: 10px;"
-        "    border-top-right-radius: 10px;"
-        "    border: 2px solid #475569;"
-        "    border-bottom: none;"
-        "    font-weight: 600;"
-        "    font-size: 14px;"
-        "}"
-        "QTabBar::tab:selected {"
-        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1E293B, stop:1 #334155);"
-        "    color: #60A5FA;"
-        "    font-weight: 700;"
-        "    border-color: #60A5FA;"
-        "}"
-        "QTabBar::tab:hover:!selected {"
-        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #475569, stop:1 #334155);"
-        "    color: #F1F5F9;"
-        "}"
-    );
+    // Dòng 1: Tiêu đề + Nút Thêm
+    QHBoxLayout *topRow = new QHBoxLayout();
     
-    // Setup 2 tabs
-    setupTabQuanLy();
-    setupTabQuaHan();
+    QLabel *titleLabel = new QLabel("👥 Quản Lý Độc Giả", headerCard);
+    titleLabel->setProperty("class", "PageTitle");
     
-    mainLayout->addWidget(tabWidget);
+    btnAdd = new QPushButton("+ Thêm Độc Giả", headerCard);
+    btnAdd->setProperty("class", "Primary");
+    btnAdd->setCursor(Qt::PointingHandCursor);
+    btnAdd->setMinimumHeight(40);
+    
+    topRow->addWidget(titleLabel);
+    topRow->addStretch();
+    topRow->addWidget(btnAdd);
+    headerLayout->addLayout(topRow);
+    
+    // Dòng 2: Tìm kiếm + Bộ lọc
+    QHBoxLayout *filterRow = new QHBoxLayout();
+    filterRow->setSpacing(10);
+    
+    searchTypeCombo = new QComboBox(headerCard);
+    searchTypeCombo->addItem("◈ Tìm kiếm", 0);
+    searchTypeCombo->setMinimumHeight(40);
+    searchTypeCombo->setMinimumWidth(120);
+    filterRow->addWidget(searchTypeCombo);
+    
+    searchEdit = new QLineEdit(headerCard);
+    searchEdit->setPlaceholderText("🔍 Tìm kiếm theo Mã thẻ, Họ tên...");
+    searchEdit->setMinimumHeight(40);
+    filterRow->addWidget(searchEdit, 1);
+    
+    filterStatusCombo = new QComboBox(headerCard);
+    filterStatusCombo->addItem("Tất cả trạng thái", -1);
+    filterStatusCombo->addItem("● Hoạt động", 1);
+    filterStatusCombo->addItem("● Khóa", 0);
+    filterStatusCombo->setMinimumHeight(40);
+    filterStatusCombo->setMinimumWidth(150);
+    filterRow->addWidget(filterStatusCombo);
+    
+    btnSearch = new QPushButton("Tìm kiếm", headerCard);
+    btnSearch->setProperty("class", "Secondary");
+    btnSearch->setMinimumHeight(40);
+    filterRow->addWidget(btnSearch);
+    
+    btnClearSearch = new QPushButton("× Xóa", headerCard);
+    btnClearSearch->setProperty("class", "Secondary");
+    btnClearSearch->setMinimumHeight(40);
+    filterRow->addWidget(btnClearSearch);
+    
+    headerLayout->addLayout(filterRow);
+    mainLayout->addWidget(headerCard);
+    
+    // --- CARD 2: BẢNG DỮ LIỆU ---
+    QFrame *tableCard = new QFrame(this);
+    tableCard->setProperty("class", "Card");
+    tableCard->setFrameShape(QFrame::NoFrame);
+    QVBoxLayout *tableLayout = new QVBoxLayout(tableCard);
+    tableLayout->setContentsMargins(1, 1, 1, 1);
+    
+    // Toolbar
+    toolbar = new QToolBar(tableCard);
+    toolbar->setIconSize(QSize(18, 18));
+    toolbar->addAction("◫ Export CSV");
+    toolbar->addSeparator();
+    QAction *actPrint = toolbar->addAction("▣ In Danh Sách");
+    actPrint->setShortcut(QKeySequence::Print);
+    tableLayout->addWidget(toolbar);
+    
+    tableView = new QTableView(tableCard);
+    readerModel = new ReaderTableModel(this);
+    tableView->setModel(readerModel);
+    
+    // Cấu hình bảng
+    tableView->setShowGrid(false);
+    tableView->verticalHeader()->setVisible(false);
+    tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
+    tableView->setSelectionMode(QAbstractItemView::SingleSelection);
+    tableView->setAlternatingRowColors(true);
+    tableView->horizontalHeader()->setStretchLastSection(true);
+    tableView->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
+    tableView->setSortingEnabled(true);
+    tableView->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    tableView->verticalHeader()->setDefaultSectionSize(45);
+    tableView->setMinimumHeight(400);
+    
+    tableLayout->addWidget(tableView);
+    
+    // Footer Actions
+    QHBoxLayout *footerLayout = new QHBoxLayout();
+    footerLayout->setContentsMargins(20, 10, 20, 20);
+    
+    statusLabel = new QLabel("Tổng số: 0 độc giả", tableCard);
+    statusLabel->setProperty("class", "SubText");
+    
+    btnEdit = new QPushButton("✎ Sửa", tableCard);
+    btnEdit->setProperty("class", "Secondary");
+    
+    btnDelete = new QPushButton("× Xóa", tableCard);
+    btnDelete->setProperty("class", "Danger");
+    
+    btnDetails = new QPushButton("◈ Chi Tiết", tableCard);
+    btnDetails->setProperty("class", "Success");
+    
+    btnUnlock = new QPushButton("🔓 Mở Khóa", tableCard);
+    btnUnlock->setProperty("class", "Success");
+    
+    btnBack = new QPushButton("← Quay Lại", tableCard);
+    btnBack->setProperty("class", "Secondary");
+    
+    footerLayout->addWidget(statusLabel);
+    footerLayout->addStretch();
+    footerLayout->addWidget(btnDetails);
+    footerLayout->addWidget(btnEdit);
+    footerLayout->addWidget(btnUnlock);
+    footerLayout->addWidget(btnDelete);
+    footerLayout->addWidget(btnBack);
+    
+    tableLayout->addLayout(footerLayout);
+    mainLayout->addWidget(tableCard);
 }
 
 void WidgetQuanLyDocGia::setupTabQuanLy() {
@@ -645,7 +721,7 @@ void WidgetQuanLyDocGia::applyFilters() {
     int totalCount = readerModel->rowCount();
     QString filterMsg;
     if (gioiTinh != "Tất cả" || trangThai != "Tất cả") {
-        filterMsg = QString(" (Lọc: %1, %2)").arg(gioiTinh, trangThai);
+        filterMsg = QString(" (Lọc: %1, %2)").arg(gioiTinh).arg(trangThai);
     }
     showMessage(QString("Hiển thị %1 độc giả%2").arg(totalCount).arg(filterMsg));
 }
@@ -696,6 +772,12 @@ void WidgetQuanLyDocGia::onSearchClicked() {
     static PTRDG searchResults[1000];
     int count = 0;
     
+    // Validate root pointer
+    if (!rootDocGia) {
+        showMessage("❌ Danh sách độc giả trống!", true);
+        return;
+    }
+    
     if (searchType == 0) {
         // Search by card number
         bool ok;
@@ -706,11 +788,18 @@ void WidgetQuanLyDocGia::onSearchClicked() {
             return;
         }
         
-        PTRDG reader = timDocGia(rootDocGia, maThe);
+        PTRDG reader = nullptr;
+        try {
+            reader = timDocGia(rootDocGia, maThe);
+        } catch (...) {
+            showMessage("❌ Lỗi khi tìm kiếm độc giả!", true);
+            return;
+        }
+        
         if (reader) {
             showMessage(QString("🎫 Tìm thấy độc giả: %1 %2")
-                .arg(QString::fromStdString(reader->data.Ho))
-                .arg(QString::fromStdString(reader->data.Ten)));
+                .arg(QString::fromStdString(reader->data.Ho),
+                     QString::fromStdString(reader->data.Ten)));
         } else {
             showMessage("❌ Không tìm thấy độc giả!", true);
         }
@@ -722,7 +811,13 @@ void WidgetQuanLyDocGia::onSearchClicked() {
             return;
         }
         
-        count = TimDocGiaTheoTen(rootDocGia, keyword.toStdString(), searchResults, 1000);
+        try {
+            count = TimDocGiaTheoTen(rootDocGia, keyword.toStdString(), searchResults, 1000);
+            if (count < 0 || count > 1000) count = 0;
+        } catch (...) {
+            showMessage("❌ Lỗi khi tìm kiếm!", true);
+            return;
+        }
         showMessage(QString("👤 Tìm thấy %1 độc giả có tên '%2'").arg(count).arg(keyword));
         
     } else if (searchType == 2) {
@@ -732,7 +827,13 @@ void WidgetQuanLyDocGia::onSearchClicked() {
             return;
         }
         
-        count = TimDocGiaTheoHo(rootDocGia, keyword.toStdString(), searchResults, 1000);
+        try {
+            count = TimDocGiaTheoHo(rootDocGia, keyword.toStdString(), searchResults, 1000);
+            if (count < 0 || count > 1000) count = 0;
+        } catch (...) {
+            showMessage("❌ Lỗi khi tìm kiếm!", true);
+            return;
+        }
         showMessage(QString("👥 Tìm thấy %1 độc giả có họ '%2'").arg(count).arg(keyword));
         
     } else if (searchType == 3) {
@@ -742,7 +843,13 @@ void WidgetQuanLyDocGia::onSearchClicked() {
             return;
         }
         
-        count = TimDocGiaTheoHoTen(rootDocGia, keyword.toStdString(), searchResults, 1000);
+        try {
+            count = TimDocGiaTheoHoTen(rootDocGia, keyword.toStdString(), searchResults, 1000);
+            if (count < 0 || count > 1000) count = 0;
+        } catch (...) {
+            showMessage("❌ Lỗi khi tìm kiếm!", true);
+            return;
+        }
         showMessage(QString("👤👥 Tìm thấy %1 độc giả có họ tên '%2'").arg(count).arg(keyword));
         
     } else if (searchType == 4) {
@@ -757,7 +864,13 @@ void WidgetQuanLyDocGia::onSearchClicked() {
         
         int status = item.left(1).toInt();
         
-        count = TimDocGiaTheoTrangThai(rootDocGia, status, searchResults, 1000);
+        try {
+            count = TimDocGiaTheoTrangThai(rootDocGia, status, searchResults, 1000);
+            if (count < 0 || count > 1000) count = 0;
+        } catch (...) {
+            showMessage("❌ Lỗi khi tìm kiếm!", true);
+            return;
+        }
         showMessage(QString("📊 Tìm thấy %1 độc giả '%2'").arg(count).arg(item.mid(4)));
     }
 }
@@ -886,7 +999,11 @@ void WidgetQuanLyDocGia::performSearch() {
         return;
     }
     if (searchTypeCombo->currentData().toInt() == 0) {
-        onSearchClicked();
+        try {
+            onSearchClicked();
+        } catch (...) {
+            showMessage("❌ Lỗi khi thực hiện tìm kiếm!", true);
+        }
     }
 }
 
@@ -958,7 +1075,7 @@ void WidgetQuanLyDocGia::onViewHistory() {
     }
     
     html += QString("<p><b>Tổng số giao dịch:</b> %1 | <b class='borrowing'>Đang mượn:</b> %2</p>")
-            .arg(total).arg(borrowing);
+            .arg(total, borrowing);
     
     if (total == 0) {
         html += "<p style='color: #95a5a6;'>Chưa có giao dịch nào.</p>";

@@ -1,6 +1,8 @@
 ﻿#include "models/DocGia.h"
+#include "utils/FilePathManager.h"
 #include "utils/BackupManager.h"
 #include <iostream>
+#include <fstream>
 #include <sstream>
 #include <cstdlib>
 #include <ctime>
@@ -146,8 +148,9 @@ void InsertDocGia(PTRDG &root, PTRDG node) {
 PTRDG taoDocGia(std::string ho, std::string ten, bool phai, int trangthai, PTRDG root) {
     PTRDG dg = new NodeDG;
     dg->data.MaThe = sinhMaTheNgauNhien(root);
-    dg->data.Ho = ho;
-    dg->data.Ten = ten;
+    // Normalize name fields
+    dg->data.Ho = ChuanHoaHoTen(ho);
+    dg->data.Ten = ChuanHoaHoTen(ten);
     dg->data.Phai = phai;
     dg->data.TrangThai = trangthai;
     dg->data.dsmt = nullptr;
@@ -159,8 +162,9 @@ PTRDG taoDocGia(std::string ho, std::string ten, bool phai, int trangthai, PTRDG
 PTRDG taoDocGia(std::string ho, std::string ten, bool phai, int trangthai, int mathe) {
     PTRDG dg = new NodeDG;
     dg->data.MaThe = mathe;
-    dg->data.Ho = ho;
-    dg->data.Ten = ten;
+    // Normalize name fields
+    dg->data.Ho = ChuanHoaHoTen(ho);
+    dg->data.Ten = ChuanHoaHoTen(ten);
     dg->data.Phai = phai;
     dg->data.TrangThai = trangthai;
     dg->data.dsmt = nullptr;
@@ -278,8 +282,10 @@ void hieuChinhDocGia(PTRDG root, const TheDocGia& new_data) {
     }
 
     // Chỉ cập nhật các trường được phép thay đổi
-    if (p->data.Ho != new_data.Ho) p->data.Ho = new_data.Ho;
-    if (p->data.Ten != new_data.Ten) p->data.Ten = new_data.Ten;
+    std::string hoChuan = ChuanHoaHoTen(new_data.Ho);
+    std::string tenChuan = ChuanHoaHoTen(new_data.Ten);
+    if (p->data.Ho != hoChuan) p->data.Ho = hoChuan;
+    if (p->data.Ten != tenChuan) p->data.Ten = tenChuan;
     if (p->data.Phai != new_data.Phai) p->data.Phai = new_data.Phai;
     if (p->data.TrangThai != new_data.TrangThai) p->data.TrangThai = new_data.TrangThai;
     // Không cập nhật MaThe, dsmt, soSachDangMuon
@@ -938,10 +944,11 @@ void saveDocGia(PTRDG root){
             std::cerr << "Canh bao backup: " << loiBackup << std::endl;
         }
         
-        std::ofstream file("E:/Qt/LibraryManagement/files/docgia.txt");
+        std::string filePath = FilePathManager::getDocGiaPathStd();
+        std::ofstream file(filePath);
 
     if(!file.is_open()){
-        std::cerr << "Loi: khong the mo file '../files/docgia.txt' de ghi!" << std::endl;
+        std::cerr << "Loi: khong the mo file '" << filePath << "' de ghi!" << std::endl;
         return;
     }
 
@@ -959,15 +966,16 @@ void saveDocGia(PTRDG root){
 //Load
 PTRDG loadDocGia(PTRDS dsDauSach[], int soLuongDS){
     try {
-        std::ifstream file("E:/Qt/LibraryManagement/files/docgia.txt");
+        std::string filePath = FilePathManager::getDocGiaPathStd();
+        std::ifstream file(filePath);
     if(!file.is_open()){
-        std::cerr << "Khong mo duoc file docgia.txt de doc!" << std::endl;
+        std::cerr << "Khong mo duoc file " << filePath << " de doc!" << std::endl;
         
         // Thu tao file moi neu khong ton tai
-        std::ofstream createFile("E:/Qt/LibraryManagement/files/docgia.txt");
+        std::ofstream createFile(filePath);
         if (createFile.is_open()) {
             createFile.close();
-            std::cout << "Da tao file moi: E:/Qt/LibraryManagement/files/docgia.txt" << std::endl;
+            std::cout << "Da tao file moi: " << filePath << std::endl;
         }
         return nullptr;
     }
@@ -1337,4 +1345,41 @@ int TimDocGiaTheoHoTen(PTRDG root, const std::string& hoTen, PTRDG ketQua[], int
     TimTheoHoTenRec(root, hoTenThuong, ketQua, count, maxKetQua);
     
     return count;
+}
+// One-off migration: create backup of docgia file and re-save normalized data
+void MigrateNormalizeDocGiaFile(PTRDG root) {
+    try {
+        std::string filePath = FilePathManager::getDocGiaPathStd();
+        std::string backupPath = filePath + ".bak";
+
+        // Create backup copy (overwrite if exists with timestamped copy)
+        std::ifstream src(filePath, std::ios::binary);
+        if (src.is_open()) {
+            std::ofstream dst(backupPath, std::ios::binary);
+            if (dst.is_open()) {
+                dst << src.rdbuf();
+                dst.close();
+                src.close();
+                std::cout << "Backup created: " << backupPath << std::endl;
+            } else {
+                src.close();
+                std::cerr << "Khong the tao file backup: " << backupPath << std::endl;
+            }
+        } else {
+            // No source file - nothing to migrate
+            std::cout << "No existing docgia file to backup/migrate." << std::endl;
+        }
+
+        // Now re-save using current in-memory tree (taoDocGia already normalizes names)
+        if (root != nullptr) {
+            saveDocGia(root);
+            std::cout << "Migration: docgia file rewritten with normalized names." << std::endl;
+        } else {
+            std::cout << "Migration: root is null, skipping save." << std::endl;
+        }
+    } catch (const std::exception &e) {
+        std::cerr << "Loi khi migrate docgia: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "Loi khong xac dinh khi migrate docgia" << std::endl;
+    }
 }

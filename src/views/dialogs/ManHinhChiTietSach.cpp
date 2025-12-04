@@ -48,12 +48,16 @@ void ManHinhChiTietSach::thietLapGiaoDien() {
         "   margin-top: 10px;"
         "   padding-top: 15px;"
         "   font-weight: bold;"
+        "   background-color: #ffffff;"
         "}"
         "QGroupBox::title {"
         "   subcontrol-origin: margin;"
+        "   subcontrol-position: top left;"
         "   left: 15px;"
+        "   top: -10px;"
         "   padding: 0 5px;"
         "   color: #3498db;"
+        "   background-color: #ffffff;"
         "}"
     );
     

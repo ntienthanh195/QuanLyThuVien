@@ -3,6 +3,7 @@
 
 #include <string>
 #include <iostream>
+#include <QString>
 #include "ThongBao.h"
 #include "DauSach.h"
 
@@ -12,6 +13,7 @@
 std::string ChuyenInThuong(const std::string& chuoi);
 std::string ChuyenInHoa(const std::string& chuoi); 
 std::string ChuyenThanhTitleCase(const std::string& chuoi);
+std::string ChuyenThanhTitleCaseUnicode(const std::string& chuoi);  // Ho tro UTF-8 tieng Viet
 
 // Cat va chuan hoa khoang trang
 std::string CatKhoangTrang(const std::string& chuoi);
@@ -35,6 +37,24 @@ std::string ChuanHoaViTri(const std::string& chuoiViTri);  // Chuan hoa vi tri k
 std::string ChuanHoaTenUnicode(const std::string& chuoiDauVao, size_t doDaiToiThieu, 
                                 size_t doDaiToiDa, std::string& chuoiKetQua);
 
+// Chuan hoa ho ten nguoi: trim/collapse spaces and apply Unicode title-case
+std::string ChuanHoaHoTen(const std::string& chuoiHoTen);
+
+// ===== HAM XU LY UNICODE HIEN DAI (SU DUNG QT) =====
+
+// Chuyen std::string UTF-8 <-> QString
+QString ChuyenSangQString(const std::string& chuoi);
+std::string ChuyenSangStdString(const QString& qstr);
+
+// Chuan hoa ho ten hien dai voi Qt (tot nhat cho tieng Viet)
+std::string ChuanHoaHoTenHienDai(const std::string& chuoiHoTen);
+
+// Kiem tra tinh hop le cua ho ten
+bool KiemTraHoTenHopLe(const std::string& hoTen, std::string& thongBaoLoi);
+
+// Chuan hoa ten Unicode hien dai (dung cho ten sach, tac gia, the loai)
+std::string ChuanHoaTenHienDai(const std::string& ten, size_t doDaiToiThieu, 
+                                 size_t doDaiToiDa, std::string& thongBaoLoi);
 // Chuan hoa ISBN
 std::string ChuanHoaISBNCore(const std::string& chuoiISBN, std::string& ketQua, 
                               bool tuDong, bool nhapThuCong, bool laDocFile);

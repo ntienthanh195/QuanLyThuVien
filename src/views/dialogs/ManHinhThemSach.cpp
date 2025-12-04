@@ -2,6 +2,7 @@
 #include "models/QuanLySach.h"
 #include "models/KiemTraDuLieu.h"
 #include "utils/AnimationHelper.h"
+#include "utils/Utf8Helper.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -51,12 +52,16 @@ void ManHinhThemSach::thietLapGiaoDien() {
         "   margin-top: 10px;"
         "   padding-top: 15px;"
         "   font-weight: bold;"
+        "   background-color: #ffffff;"
         "}"
         "QGroupBox::title {"
         "   subcontrol-origin: margin;"
+        "   subcontrol-position: top left;"
         "   left: 15px;"
+        "   top: -10px;"
         "   padding: 0 5px;"
         "   color: #3498db;"
+        "   background-color: #ffffff;"
         "}"
     );
     
@@ -430,14 +435,14 @@ void ManHinhThemSach::khiNhanLuu() {
     
     // Call backend function
     std::string result = ThemDauSachMoi(
-        isbn.toStdString(),
-        name.toStdString(),
+        Utf8Helper::toStdString(isbn),
+        Utf8Helper::toStdString(name),
         pages,
-        author.toStdString(),
+        Utf8Helper::toStdString(author),
         year,
-        genre.toStdString(),
+        Utf8Helper::toStdString(genre),
         copies,
-        location.toStdString()
+        Utf8Helper::toStdString(location)
     );
     
     if (result.empty()) {
@@ -453,8 +458,8 @@ void ManHinhThemSach::khiNhanLuu() {
         emit sachDaThem();
         accept();
     } else {
-        hienThiLoi(QString::fromStdString(result));
-        QMessageBox::warning(this, "Lỗi", QString::fromStdString(result));
+        hienThiLoi(Utf8Helper::fromStdString(result));
+        QMessageBox::warning(this, "Lỗi", Utf8Helper::fromStdString(result));
     }
 }
 

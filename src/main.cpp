@@ -1,5 +1,6 @@
 #include <QApplication>
 #include <QMessageBox>
+#include <QDir>
 #include <iostream>
 #include "views/MainWindow.h"
 #include "models/QuanLySach.h"
@@ -23,7 +24,46 @@ int main(int argc, char *argv[]) {
     app.setApplicationVersion("2.0.0");
     app.setOrganizationName("Library Management System");
     
+    // Set application icon
+    app.setWindowIcon(QIcon(":/icons/app_icon.ico"));
+    
     std::cout << "[main] Khoi tao ung dung Qt...\n";
+    
+    // Tìm thư mục project root chứa files/
+    QString exePath = QCoreApplication::applicationDirPath();
+    QString projectRoot = exePath;
+    
+    // Thử các đường dẫn có thể
+    QStringList possiblePaths = {
+        exePath,                                      // Chạy trực tiếp từ thư mục chứa exe
+        QDir(exePath + "/..").absolutePath(),         // debug/ hoặc release/
+        QDir(exePath + "/../..").absolutePath(),      // build/Desktop_Qt_*/
+        QDir(exePath + "/../../..").absolutePath(),   // build/Desktop_Qt_*/debug hoặc release
+        "E:/Qt/QuanLyThuVien"                         // Đường dẫn tuyệt đối backup
+    };
+    
+    // Tìm thư mục chứa files/dausach.txt
+    bool found = false;
+    for (const QString& path : possiblePaths) {
+        QString testPath = path + "/files/dausach.txt";
+        if (QFile::exists(testPath)) {
+            projectRoot = path;
+            found = true;
+            std::cout << "Found project root: " << projectRoot.toStdString() << "\n";
+            break;
+        }
+    }
+    
+    if (!found) {
+        std::cerr << "ERROR: Cannot find files/dausach.txt!\n";
+        std::cerr << "Searched paths:\n";
+        for (const QString& path : possiblePaths) {
+            std::cerr << "  - " << path.toStdString() << "/files/\n";
+        }
+    }
+    
+    QDir::setCurrent(projectRoot);
+    std::cout << "Working Directory: " << projectRoot.toStdString() << "\n";
     
     // Nap du lieu sach tu file
     std::cout << "Dang nap du lieu dau sach...\n";
@@ -42,6 +82,9 @@ int main(int argc, char *argv[]) {
     rootDocGia = loadDocGia(dsDauSach, soLuongDauSach);
     if (rootDocGia != nullptr) {
         std::cout << "Nap thanh cong du lieu doc gia.\n";
+        // One-off migration: rewrite file to normalize names permanently
+        std::cout << "Chay migration chuan hoa ten doc gia (backup -> rewrite)...\n";
+        MigrateNormalizeDocGiaFile(rootDocGia);
     } else {
         std::cout << "Khong nap duoc du lieu doc gia (file co the rong).\n";
     }

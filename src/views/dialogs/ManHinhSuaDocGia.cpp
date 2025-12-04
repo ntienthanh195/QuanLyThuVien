@@ -1,5 +1,6 @@
 #include "views/dialogs/ManHinhSuaDocGia.h"
 #include "models/DocGia.h"
+#include "utils/Utf8Helper.h"
 #include "models/KiemTraDuLieu.h"
 #include "utils/XuLyChuoi.h"
 #include <QVBoxLayout>
@@ -40,7 +41,7 @@ void ManHinhSuaDocGia::thietLapGiaoDien() {
     mainLayout->addWidget(titleLabel);
 
     // Form group
-    QGroupBox* formGroup = new QGroupBox("Thông Tin Độc Giả");
+    QGroupBox* formGroup = new QGroupBox("Thông Tin Độc Giả", this);
     formGroup->setObjectName("formGroup");
     QFormLayout* formLayout = new QFormLayout(formGroup);
     formLayout->setSpacing(12);
@@ -297,8 +298,8 @@ void ManHinhSuaDocGia::khiNhanLuu() {
     }
 
     // Get values
-    QString lastName = QString::fromStdString(ChuanHoaKhoangTrang(nhapHo->text().trimmed().toStdString()));
-    QString firstName = QString::fromStdString(ChuanHoaKhoangTrang(nhapTen->text().trimmed().toStdString()));
+    QString lastName = Utf8Helper::fromStdString(ChuyenThanhTitleCaseUnicode(Utf8Helper::toStdString(nhapHo->text().trimmed())));
+    QString firstName = Utf8Helper::fromStdString(ChuyenThanhTitleCaseUnicode(Utf8Helper::toStdString(nhapTen->text().trimmed())));
     int genderValue = chonGioiTinh->currentData().toInt();
     int statusValue = chonTrangThai->currentData().toInt();
 

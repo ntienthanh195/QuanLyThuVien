@@ -1,0 +1,21 @@
+<RCC>
+    <qresource prefix="/icons">
+        <file>icons/book.svg</file>
+        <file>icons/user.svg</file>
+        <file>icons/exchange.svg</file>
+        <file>icons/dashboard.svg</file>
+        <file>icons/search.svg</file>
+        <file>icons/plus.svg</file>
+        <file>icons/edit.svg</file>
+        <file>icons/trash.svg</file>
+        <file>icons/copy.svg</file>
+        <file>icons/info.svg</file>
+        <file>icons/refresh.svg</file>
+        <file>icons/lock.svg</file>
+        <file>icons/unlock.svg</file>
+        <file>icons/check.svg</file>
+        <file>icons/filter.svg</file>
+        <file>icons/stats.svg</file>
+        <file>icons/trophy.svg</file>
+    </qresource>
+</RCC>

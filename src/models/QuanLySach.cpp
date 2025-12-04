@@ -1353,20 +1353,22 @@ int LocSachTheoTrangThai(PTRDS ds[], int n, TrangThaiSach trangThai, PTRDS kq[])
     return count;
 }
 
-// tim sach theo tac gia (khong phan biet hoa/thuong) O(N)
+// tim sach theo tac gia (bo dau, khong phan biet hoa/thuong) O(N)
 int TimSachTheoTacGia(PTRDS ds[], int n, const std::string &tacGia, PTRDS kq[]) {
     if (!ds || !kq || n <= 0 || tacGia.empty()) return 0;
     
-    std::string tacGiaThuong = ChuyenInThuong(tacGia);
+    // Bo dau va chuyen thuong cho tu khoa tim kiem
+    std::string tacGiaBoDau = BoDauVaThuong(tacGia);
     
     int count = 0;
     for (int i = 0; i < n && i < MAX_DAUSACH; i++) {
         if (!ds[i]) continue;
         
-        std::string tacGiaSachThuong = ChuyenInThuong(ds[i]->tacGia);
+        // Bo dau va chuyen thuong cho du lieu
+        std::string tacGiaSachBoDau = BoDauVaThuong(ds[i]->tacGia);
         
         // kiem tra chua chuoi tim kiem
-        if (tacGiaSachThuong.find(tacGiaThuong) != std::string::npos) {
+        if (tacGiaSachBoDau.find(tacGiaBoDau) != std::string::npos) {
             kq[count++] = ds[i];
         }
     }

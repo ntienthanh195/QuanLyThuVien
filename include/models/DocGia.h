@@ -111,6 +111,8 @@ void NapGiaoDich(PTRDG docGia, std::ifstream& file, PTRDS dsDauSach[], int n);
 
 void saveDocGia(PTRDG root);
 PTRDG loadDocGia(PTRDS dsDauSach[], int soLuongDS);
+// One-off migration: normalize saved names by loading and re-saving file (creates backup)
+void MigrateNormalizeDocGiaFile(PTRDG root);
 
 // Prototype helper ham loc
 bool KiemTraBatDauBang(const std::string& fullString, const std::string& prefix);

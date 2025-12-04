@@ -99,62 +99,39 @@ MainWindow::~MainWindow() {
 }
 
 void MainWindow::setupSidebar() {
+    // MASTER PLAN: Sidebar width = 260px, objectName="Sidebar" để CSS nhận
     menuSidebar = new QListWidget(this);
+    menuSidebar->setObjectName("Sidebar"); // CSS selector: QListWidget#Sidebar
     
     // **RESPONSIVE**: Sidebar width scales with screen
     ResponsiveHelper::ScreenSize screenSize = ResponsiveHelper::detectScreenSize();
-    int minWidth = ResponsiveHelper::getScaledWidth(220, screenSize);
-    int maxWidth = ResponsiveHelper::getScaledWidth(280, screenSize);
+    int sidebarWidth = ResponsiveHelper::getScaledWidth(260, screenSize); // Master Plan: 260px
     
-    menuSidebar->setMaximumWidth(maxWidth);
-    menuSidebar->setMinimumWidth(minWidth);
+    menuSidebar->setFixedWidth(sidebarWidth);
     menuSidebar->setSpacing(2);
     
-    // **RESPONSIVE**: Font sizes scale with screen
-    int itemFontSize = ResponsiveHelper::getScaledFontSize(14, screenSize);
-    int itemPadding = ResponsiveHelper::getScaledSpacing(14, screenSize);
-    
-    menuSidebar->setStyleSheet(
-        QString(
-        "QListWidget {"
-        "    background-color: #1E1E2D;"
-        "    border-right: 1px solid #2B2B40;"
-        "    outline: none;"
-        "    padding: 8px 4px;"
-        "}"
-        "QListWidget::item {"
-        "    color: #B5B5C3;"
-        "    padding: %1px 20px;"
-        "    border: none;"
-        "    border-left: 3px solid transparent;"
-        "    margin: 2px 4px;"
-        "    border-radius: 0px;"
-        "    font-size: %2px;"
-        "    font-weight: 500;"
-        "    background-color: transparent;"
-        "}"
-        "QListWidget::item:hover {"
-        "    background-color: rgba(35, 35, 52, 0.5);"
-        "    color: #FFFFFF;"
-        "}"
-        "QListWidget::item:selected {"
-        "    background-color: rgba(43, 43, 64, 0.8);"
-        "    color: #FFFFFF;"
-        "    border-left: 3px solid #3699FF;"
-        "    font-weight: 600;"
-        "}"
-        ).arg(itemPadding).arg(itemFontSize)
-    );
+    // Không set styleSheet ở đây - để modern-dashboard.qss xử lý
+    menuSidebar->setFrameShape(QFrame::NoFrame);
+    menuSidebar->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    menuSidebar->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     
     // Thêm tiêu đề với icon chuyên nghiệp - Responsive font
-    QLabel *tieuDe = new QLabel("≡ THƯ VIỆN", menuSidebar);
+    QLabel *tieuDe = new QLabel("📚 THƯ VIỆN", menuSidebar);
     QFont fontTieuDe;
-    int titleFontSize = ResponsiveHelper::getScaledFontSize(16, screenSize);
+    int titleFontSize = ResponsiveHelper::getScaledFontSize(18, screenSize);
     fontTieuDe.setPointSize(titleFontSize);
     fontTieuDe.setBold(true);
+    fontTieuDe.setLetterSpacing(QFont::PercentageSpacing, 102);
     tieuDe->setFont(fontTieuDe);
     tieuDe->setAlignment(Qt::AlignCenter);
-    tieuDe->setStyleSheet("color: #FFFFFF; padding: 20px 16px 14px 16px; background-color: transparent;");
+    tieuDe->setStyleSheet(
+        "color: #FFFFFF; "
+        "padding: 24px 16px 18px 16px; "
+        "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
+        "stop:0 rgba(54, 153, 255, 0.08), stop:1 transparent); "
+        "border-bottom: 2px solid rgba(54, 153, 255, 0.2); "
+        "margin-bottom: 8px;"
+    );
     
     // Tạo widget container cho tiêu đề
     QListWidgetItem *itemTieuDe = new QListWidgetItem(menuSidebar);
@@ -163,14 +140,15 @@ void MainWindow::setupSidebar() {
     itemTieuDe->setFlags(Qt::NoItemFlags); // Không thể chọn
     menuSidebar->setItemWidget(itemTieuDe, tieuDe);
     
-    // Thêm các mục menu với Unicode icons chuyên nghiệp (đã gom các chức năng vào tabs)
+    // Thêm các mục menu với Unicode icons hiện đại (đã gom các chức năng vào tabs)
     QStringList danhSachMenu = {
-        "▣  Bảng điều khiển",     // Dashboard (có Top 10, Backup, About)
-        "▤  Quản lý sách",         // Books (có tabs: Danh Sách, Top 10, Thống Kê)
-        "◉  Quản lý độc giả",      // Readers (có tabs: Danh Sách, Quá Hạn)
-        "⇄  Mượn - Trả sách",      // Loan/Return
-        "",  // Separator
-        "×  Thoát"                 // Exit
+        "🏠  Trang Chủ",           // Dashboard (có Top 10, Backup, About)
+        "📖  Quản Lý Sách",        // Books (có tabs: Danh Sách, Top 10, Thống Kê)
+        "👥  Quản Lý Độc Giả",    // Readers (có tabs: Danh Sách, Quá Hạn)
+        "🔄  Mượn Trả Sách",       // Loan/Return
+        "",                        // Separator
+        "ℹ️  Giới Thiệu",         // About
+        "❌  Thoát"                // Exit
     };
     
     for (const QString &menu : danhSachMenu) {
@@ -187,58 +165,38 @@ void MainWindow::setupSidebar() {
         }
     }
     
-    // Style cho sidebar
-    menuSidebar->setStyleSheet(
-        "QListWidget {"
-        "  background-color: white;"
-        "  border-right: 1px solid #E2E8F0;"
-        "  outline: none;"
-        "}"
-        "QListWidget::item {"
-        "  padding: 12px 20px;"
-        "  border-radius: 8px;"
-        "  margin: 2px 8px;"
-        "  color: #64748B;"
-        "}"
-        "QListWidget::item:hover {"
-        "  background-color: #EFF6FF;"
-        "  color: #2563EB;"
-        "}"
-        "QListWidget::item:selected {"
-        "  background-color: #2563EB;"
-        "  color: white;"
-        "  font-weight: bold;"
-        "}"
-    );
-    
     // Kết nối signal
     connect(menuSidebar, &QListWidget::currentRowChanged, this, [this](int row) {
         // Bỏ qua separators và tiêu đề (row 0)
         if (row <= 0) return;
         
-        // Map row sang index (Đã gom các chức năng vào tabs)
-        // Row 1: Dashboard (0)
-        // Row 2: Books (1) - có tabs: Danh Sách, Top 10, Thống Kê
-        // Row 3: Readers (2) - có tabs: Danh Sách, Quá Hạn
-        // Row 4: Loans (3)
+        // Map row sang chức năng
+        // Row 1: Trang Chủ
+        // Row 2: Quản Lý Sách
+        // Row 3: Quản Lý Độc Giả  
+        // Row 4: Mượn Trả Sách
         // Row 5: separator
-        // Row 6: Exit
+        // Row 6: Giới Thiệu
+        // Row 7: Thoát
         
         switch(row) {
-            case 1: // Bảng điều khiển
+            case 1: // Trang Chủ
                 stackedWidget->setCurrentIndex(0);
                 if (bangDieuKhien) bangDieuKhien->capNhatThongKe();
                 break;
-            case 2: // Quản lý sách (có 3 tabs: Danh Sách, Top 10, Thống Kê)
+            case 2: // Quản lý sách
                 showBookManagement();
                 break;
-            case 3: // Quản lý độc giả (có 2 tabs: Danh Sách, Quá Hạn)
+            case 3: // Quản lý độc giả
                 showReaderManagement();
                 break;
-            case 4: // Mượn - Trả sách
+            case 4: // Mượn trả sách
                 showLoanManagement();
                 break;
-            case 6: // Thoát
+            case 6: // Giới thiệu
+                showAbout();
+                break;
+            case 7: // Thoát
                 close();
                 break;
         }

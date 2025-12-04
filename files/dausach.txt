@@ -1,70 +1,69 @@
 9786040000644|Ai Trong Doi Song|733|Pham Thao|2023|Tri Tue Nhan Tao
-9786040000675|An Ninh Mang|858|Nguyen Thanh|2021|An Toan Thong Tin
-9786040000392|An Toan Thong Tin|363|Bui Thi Lan|2008|An Toan Thong Tin
-9786040000491|An Toan Thong Tin|133|Bui Thi Lan|2018|An Toan Thong Tin
-9786040001023|Attack On Titan|850|Hajime Isayama|2009|Nhat Ban
-9786040000590|Bao Mat Mang|518|Ngo Duc Manh|2023|An Toan Thong Tin
-9786040000613|Blockchain Co Ban|603|Nguyen Hai|2020|Blockchain
-9786040000422|Cau Truc Du Lieu|474|Do Quang|2011|Cau Truc Du Lieu
-9786040000842|Cau Truc May Tinh|640|Ngo Thanh|2023|Kien Truc May Tinh
-9898798767656|Cha Oi|436|Cham Roch Thi|2025|Gia Dinh
-9786048679456|Chao Mung Ngay Moi|542|Cham Roch Thi|2025|Cuoc Song
-9786040001016|Chi Pheo|200|Nam Cao|1941|Viet Nam
-9786043450224|Chung Ta Cua Hien Tai|435|Cham Roch Thi|2025|Cuoc Song
-9786046414759|Chung Ta Cua Tuong Lai|435|Cham Roch Thi|2025|Cuoc Song
-9786040001009|Co Kiem Ky Dam|500|Thuong Hai|2010|Kiem Hiep
-9786040000453|Co So Du Lieu|585|Hoang Anh|2014|Co So Du Lieu
-9786040000781|Cong Nghe Iot|400|Nguyen Van C|2022|Iot
-9786048369156|Cuoc Gap Go Sau Khi Xa Nhau|426|Cham Roch Thi|2025|Cuoc Song
-9878798767|Cuoc Song Moi|234|Cham Roch Thi|2025|Cuoc Song
-9786044548159|Cuoc Song Sinh Vien|648|Cham Roch Thi|2025|Cuoc Song
-9786040000729|Deep Learning|160|Tran Thi Mai|2021|Hoc May
-9786040000750|Dien Toan Bien|280|Phan Trung|2024|Dien Toan
-9786040000606|Dien Toan Dam May|562|Hoang Yen|2024|Dien Toan Dam May
-9786040000699|Dien Toan Hieu Nang Cao|942|Dinh Van Son|2023|Dien Toan
-9786040000804|Dien Toan Tuong Lai|480|Pham Long|2024|Dien Toan
-9786040000859|Dien Toan Xanh|680|Nguyen Van Nam|2024|Dien Toan
-9786040001054|Dragon Ball|700|Akira Toriyama|1984|Nhat Ban
-9786040000439|Giai Thuat Thuc Hanh|511|Dang Khoa|2012|Thuat Toan
-9786040001047|God Of Highschool|900|Yongje Park|2011|Han Quoc
-9786040000446|He Dieu Hanh|548|Le Hoang|2013|He Dieu Hanh
-9786040000811|Hoc May Thuc Hanh|520|Nguyen Khanh|2020|Hoc May
-9786040000552|Hoc Sau|355|Le Thanh Binh|2024|Hoc May
-9786040000521|Khoa Hoc May Tinh|245|Tran Dinh Quang|2021|Khoa Hoc May Tinh
-9786040001030|Kiem Lai|600|Phong Ngu|2015|Kiem Hiep
-9786040000705|Ky Thuat Ao Hoa|985|Nguyen Van Hiep|2024|Ao Hoa
-9786040000569|Ky Thuat Lap Trinh|398|Nguyen Van Tung|2020|Lap Trinh
-9786040000651|Ky Thuat So|774|Nguyen Hoang|2024|Ky Thuat So
-9786040000415|Lap Trinh C Co Ban|437|Pham Minh Duc|2010|Lap Trinh
-9786040000668|Lap Trinh Di Dong|815|Le Van Khanh|2020|Lap Trinh
-9786040000514|Lap Trinh Python|210|Nguyen Thi Hoa|2020|Lap Trinh
-9786040000798|Ma Hoa Va Giai Ma|440|Le Minh|2023|Mat Ma Hoc
-9786040000538|Mang Khong Day|278|Pham Minh Tu|2022|Mang May Tinh
-9786040000460|Mang May Tinh|622|Phan Tuan|2015|Mang May Tinh
-9786040000507|May Hoc Ung Dung|170|Nguyen Van An|2019|Hoc May
-9786040000408|May Hoc Ung Dung|400|Nguyen Van An|2009|Hoc May
-9786040000637|Ngon Ngu Java|689|Do Thi Nhung|2022|Lap Trinh
-9786040000767|Nguyen Ly May Tinh|320|Nguyen Quoc Anh|2020|Khoa Hoc May Tinh
-9878767656545|Nho|243|Cham Roch Thi|2025|Tinh Yeu
-9789876543210|Nhung Nguoi Khon Kho|500|Victor Hugo|1862|Tieu Thuyet
-9786040000385|Phan Mem Huong Doi Tuong|326|Vu Thanh Hai|2007|Lap Trinh Huong Doi Tuong
-9786040000484|Phan Mem Huong Doi Tuong|696|Vu Thanh Hai|2017|Lap Trinh Huong Doi Tuong
-9786040000545|Phan Tich Du Lieu|312|Do Thao|2023|Khoa Hoc Du Lieu
-9786040000828|Phan Tich Log|560|Tran Huu|2021|An Toan Thong Tin
-9786040000743|Phan Tich Mang Xa Hoi|240|Nguyen Hoai An|2023|Khoa Hoc Du Lieu
-9786040000682|Phat Trien Game|901|Pham Ngoc|2022|Lap Trinh Game
-9786040000583|Phat Trien Ung Dung Web|476|Tran Quoc Huy|2022|Lap Trinh Web
-9780306406157|Song Het Doi Thanh Xuan|235|Cham Roch Thi|2025|Cuoc Song
-9786041219403|Song The Nao Cho Dang Gia|762|Cham Roch Thi|2025|Cuoc Song
-9876067873676|Song The Nao Cho Tron Ven|451|Cham Roch Thi|2025|Cuoc Song
-9876045324|The Gioi Co Em|342|Cham Roch Thi|2025|Tinh Yeu
-9786040000576|Thuat Toan Nang Cao|432|Pham Thu Hang|2021|Thuat Toan
-9786040000835|Thuat Toan Ung Dung|600|Pham Hung|2022|Thuat Toan
-9786040000712|Thuc Tap An Ninh|120|Ngo Hoai Nam|2020|An Toan Thong Tin
-9786040000477|Tri Tue Nhan Tao|659|Tran Thi B|2016|Tri Tue Nhan Tao
-9786040000378|Tri Tue Nhan Tao|289|Tran Thi B|2006|Tri Tue Nhan Tao
-9786040000774|Tri Tue Nhan Tao Nang Cao|360|Tran Thi Ha|2021|Tri Tue Nhan Tao
-9876046789465|Trong Nhung Nam Qua|736|Cham Roch Thi|2025|Cuoc Song
-9786040793225|Vi Em|453|Cham Roch Thi|2025|Tinh Yeu
-9786040000620|Xu Ly Anh|645|Tran Van Loc|2021|Xu Ly Anh
-9786040000736|Xu Ly Ngon Ngu Tu Nhien|200|Do Van Cuong|2022|Nlp
+9786040000613|Blockchain Cơ Bản|603|Nguyễn Hải|2020|Blockchain
+9786040000590|Bảo Mật Mạng|518|Ngô Đức Mạnh|2023|An Toàn Thông Tin
+9898798767656|Cha Ơi|436|Chăm Rốch Thi|2025|Gia Đình
+9786048679456|Chào Mừng Ngày Mới|542|Chăm Rốch Thi|2025|Cuộc Sống
+9786040001016|Chí Phèo|200|Nam Cao|1941|Việt Nam
+9786043450224|Chúng Ta Của Hiện Tại|435|Chăm Rốch Thi|2025|Cuộc Sống
+9786046414759|Chúng Ta Của Tương Lai|435|Chăm Rốch Thi|2025|Cuộc Sống
+9786048369156|Cuộc Gặp Gỡ Sau Khi Xa Nhau|426|Chăm Rốch Thi|2025|Cuộc Sống
+9878798767|Cuộc Sống Mới|234|Chăm Rốch Thi|2025|Cuộc Sống
+9786044548159|Cuộc Sống Sinh Viên|648|Chăm Rốch Thi|2025|Cuộc Sống
+9786040000675|Cô Gái Đến Từ Hôm Qua|320|Trần Thị Bích|2024|Tình Cảm
+9786040000781|Công Nghệ Iot|400|Nguyễn Văn C|2022|Iot
+9786040000453|Cơ Sở Dữ Liệu|585|Hoàng Anh|2014|Cơ Sở Dữ Liệu
+9786040000422|Cấu Trúc Dữ Liệu|474|Àquang|2011|Cấu Trúc Dữ Liệu
+9786040000842|Cấu Trúc Máy Tính|640|Ngô Thanh|2023|Kiến Trúc Máy Tính
+9786040001009|Cổ Kiếm Kỳ Đàm|500|Thương Hải|2010|Kiếm Hiệp
+9786040000729|Deep Learning|160|Trần Thị Mai|2021|Học Máy
+9786040001054|Dragon Ball|700|Akira Toriyama|1984|Nhật Bản
+9786040000491|Dữ Liệu Lớn|600|Phạm Thị Dung|2022|Khoa Học
+9786040000439|Giải Thuật Thực Hành|511|Àg Khoa|2012|Thuật Toán
+9786040001047|God Of Highschool|900|Yongje Park|2011|Hàn Quốc
+9786040000446|Hệ Điều Hành|548|Lê Hoàng|2013|Hệ Điều Hành
+9786040000811|Học Máy Thực Hành|520|Nguyễn Khánh|2020|Học Máy
+9786040000552|Học Sâu|355|Lê Thanh Bình|2024|Học Máy
+9786040000521|Khoa Học Máy Tính|245|Trần Đình Quang|2021|Khoa Học Máy Tính
+9786040001030|Kiếm Lai|600|Phong Ngữ|2015|Kiếm Hiệp
+9786040000569|Kỹ Thuật Lập Trình|398|Nguyễn Văn Tùng|2020|Lập Trình
+9786040000651|Kỹ Thuật Số|774|Nguyễn Hoàng|2024|Kỹ Thuật Số
+9786040000705|Kỹ Thuật Ảo Hóa|985|Nguyễn Văn Hiệp|2024|À Hóa
+9786040000415|Lập Trình C Cơ Bản|437|Phạm Minh Đức|2010|Lập Trình
+9786040000668|Lập Trình Di Động|815|Lê Văn Khánh|2020|Lập Trình
+9786040000514|Lập Trình Python|210|Nguyễn Thị Hoa|2020|Lập Trình
+9786040000392|Lập Trình Đỉnh Cao|450|Lê Quốc Cường|2023|Công Nghệ
+9786040000507|Máy Học Ứng Dụng|170|Nguyễn Văn An|2019|Học Máy
+9786040000408|Máy Học Ứng Dụng|400|Nguyễn Văn An|2009|Học Máy
+9786040000798|Mã Hóa Và Giải Mã|440|Lê Minh|2023|Mật Mã Học
+9786040000538|Mạng Không Dây|278|Phạm Minh Tú|2022|Mạng Máy Tính
+9786040000460|Mạng Máy Tính|622|Phan Tuấn|2015|Mạng Máy Tính
+9786040000767|Nguyên Lý Máy Tính|320|Nguyễn Quốc Anh|2020|Khoa Học Máy Tính
+9786040000637|Ngôn Ngữ Java|689|Àthị Nhung|2022|Lập Trình
+9878767656545|Nhớ|243|Chăm Rốch Thi|2025|Tình Yêu
+9789876543210|Những Người Khốn Khổ|500|Victor Hugo|1862|Tiểu Thuyết
+9786040000682|Phát Triển Game|901|Phạm Ngọc|2022|Lập Trình Game
+9786040000583|Phát Triển Ứng Dụng Web|476|Trần Quốc Huy|2022|Lập Trình Web
+9786040000545|Phân Tích Dữ Liệu|312|Àthảo|2023|Khoa Học Dữ Liệu
+9786040000828|Phân Tích Log|560|Trần Hữu|2021|An Toàn Thông Tin
+9786040000743|Phân Tích Mạng Xã Hội|240|Nguyễn Hoài An|2023|Khoa Học Dữ Liệu
+9786040000385|Phần Mềm Hướng Đối Tượng|326|Vũ Thanh Hải|2007|Lập Trình Hướng Đối Tượng
+9786040000484|Phần Mềm Hướng Đối Tượng|696|Vũ Thanh Hải|2017|Lập Trình Hướng Đối Tượng
+9780306406157|Sống Hết Đời Thanh Xuân|235|Chăm Rốch Thi|2025|Cuộc Sống
+9876067873676|Sống Thế Nào Cho Trọn Vẹn|451|Chăm Rốch Thi|2025|Cuộc Sống
+9786041219403|Sống Thế Nào Cho Đáng Giá|762|Chăm Rốch Thi|2025|Cuộc Sống
+9786040000576|Thuật Toán Nâng Cao|432|Phạm Thu Hằng|2021|Thuật Toán
+9786040000835|Thuật Toán Ứng Dụng|600|Phạm Hùng|2022|Thuật Toán
+9876045324|Thế Giới Có Em|342|Chăm Rốch Thi|2025|Tình Yêu
+9786040001023|Thế Giới Số|700|Võ Minh Đức|2021|Công Nghệ
+9786040000712|Thực Tập An Ninh|120|Ngô Hoài Nam|2020|An Toàn Thông Tin
+9876046789465|Trong Những Năm Qua|736|Chăm Rốch Thi|2025|Cuộc Sống
+9786040000378|Trí Tuệ Nhân Tạo|289|Trần Thị B|2006|Trí Tuệ Nhân Tạo
+9786040000477|Trí Tuệ Nhân Tạo|659|Trần Thị B|2016|Trí Tuệ Nhân Tạo
+9786040000774|Trí Tuệ Nhân Tạo Nâng Cao|360|Trần Thị Hà|2021|Trí Tuệ Nhân Tạo
+9786040793225|Vì Em|453|Chăm Rốch Thi|2025|Tình Yêu
+9786040000620|Xử Lý Ảnh|645|Trần Văn Lộc|2021|Xử Lý Ảnh
+9786040000750|Àn Toán Biên|280|Phan Trung|2024|Àn Toán
+9786040000699|Àn Toán Hiệu Năng Cao|942|Àvăn Sơn|2023|Àn Toán
+9786040000804|Àn Toán Tương Lai|480|Phạm Long|2024|Àn Toán
+9786040000859|Àn Toán Xanh|680|Nguyễn Văn Nam|2024|Àn Toán
+9786040000606|Àn Toán Đám Mây|562|Hoàng Yến|2024|Àn Toán Đám Mây

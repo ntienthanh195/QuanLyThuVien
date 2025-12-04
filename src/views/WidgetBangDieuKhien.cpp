@@ -75,24 +75,29 @@ WidgetBangDieuKhien::~WidgetBangDieuKhien() {
 }
 
 void WidgetBangDieuKhien::khoiTaoGiaoDien() {
-    // Nền tối hiện đại
-    setStyleSheet("WidgetBangDieuKhien { background: #1E1E2D; }");
+    // MASTER PLAN: Grid Layout Dashboard
+    this->setProperty("class", "WidgetBangDieuKhien");
     
     layoutChinh = new QVBoxLayout(this);
-    layoutChinh->setSpacing(24);
-    layoutChinh->setContentsMargins(32, 32, 32, 32);
+    layoutChinh->setSpacing(25);
+    layoutChinh->setContentsMargins(35, 35, 35, 35);
     
-    // Tiêu đề và bộ lọc
+    // Header
     taoTieuDeVaBoLoc();
     
-    // Tạo các khu vực
-    taoKhungCanhBao();
+    // MASTER PLAN: Hàng 1 - Grid 4 Metrics Cards
     taoKhungThongKe();
-    taoKhungTop10();
+    
+    // MASTER PLAN: Hàng 2 - Warning Cards
+    taoKhungCanhBao();
+    
+    // MASTER PLAN: Hàng 3 - Quick Actions
     taoKhungTacVuNhanh();
     
+    // MASTER PLAN: Hàng 4 - Top 10 / Charts
+    taoKhungTop10();
+    
     layoutChinh->addStretch();
-    setLayout(layoutChinh);
 }
 
 void WidgetBangDieuKhien::taoKhungCanhBao() {
@@ -113,7 +118,7 @@ void WidgetBangDieuKhien::taoKhungCanhBao() {
     cardSachQuaHan = new QWidget(this);
     cardSachQuaHan->setStyleSheet(
         "QWidget { "
-        "  background: white;"
+        "  background: #1E1E2D;"
         "  border-radius: 12px; "
         "  border-left: 4px solid #EF4444;"
         "}"
@@ -159,7 +164,7 @@ void WidgetBangDieuKhien::taoKhungCanhBao() {
     
     labelMoTaSachQuaHan = new QLabel("Đang kiểm tra dữ liệu...");
     labelMoTaSachQuaHan->setWordWrap(true);
-    labelMoTaSachQuaHan->setStyleSheet("color: #64748B; font-size: 12px; background: transparent;");
+    labelMoTaSachQuaHan->setStyleSheet("color: #A0A0B0; font-size: 12px; background: transparent;");
     
     btnXemSachQuaHan = new QPushButton("Xem chi tiết");
     btnXemSachQuaHan->setStyleSheet(
@@ -186,7 +191,7 @@ void WidgetBangDieuKhien::taoKhungCanhBao() {
     cardTheSapHet = new QWidget(this);
     cardTheSapHet->setStyleSheet(
         "QWidget { "
-        "  background: white;"
+        "  background: #1E1E2D;"
         "  border-radius: 12px; "
         "  border-left: 4px solid #F59E0B;"
         "}"
@@ -232,7 +237,7 @@ void WidgetBangDieuKhien::taoKhungCanhBao() {
     
     labelMoTaTheSapHet = new QLabel("Đang kiểm tra dữ liệu...");
     labelMoTaTheSapHet->setWordWrap(true);
-    labelMoTaTheSapHet->setStyleSheet("color: #64748B; font-size: 12px; background: transparent;");
+    labelMoTaTheSapHet->setStyleSheet("color: #A0A0B0; font-size: 12px; background: transparent;");
     
     btnXemTheSapHet = new QPushButton("Xem chi tiết");
     btnXemTheSapHet->setStyleSheet(
@@ -358,10 +363,10 @@ QWidget* WidgetBangDieuKhien::taoCardCanhBao(const QString &tieuDe, const QStrin
                                                QPushButton **btnHanhDong) {
     QWidget *card = new QWidget(this);
     
-    // Card với nền trắng và border màu
+    // Card với nền tối và border màu
     card->setStyleSheet(QString(
         "QWidget { "
-        "  background: white;"
+        "  background: #1E1E2D;"
         "  border-radius: 12px; "
         "  border-left: 4px solid %1;"
         "}"
@@ -419,7 +424,7 @@ QWidget* WidgetBangDieuKhien::taoCardCanhBao(const QString &tieuDe, const QStrin
     // Mô tả
     QLabel *labelMoTa = new QLabel(moTa, card);
     labelMoTa->setWordWrap(true);
-    labelMoTa->setStyleSheet("color: #64748B; font-size: 12px; background: transparent;");
+    labelMoTa->setStyleSheet("color: #A0A0B0; font-size: 12px; background: transparent;");
     
     // Nút hành động
     *btnHanhDong = new QPushButton(card);
@@ -457,12 +462,12 @@ QWidget* WidgetBangDieuKhien::taoCardThongKe(const QString &icon, const QString 
                                                const QString &giaTri, const QString &mauChu) {
     QWidget *card = new QWidget(this);
     
-    // Card với nền trắng
+    // Card với nền tối
     card->setStyleSheet(
         "QWidget {"
-        "  background: white;"
+        "  background: #1E1E2D;"
         "  border-radius: 12px;"
-        "  border: 1px solid #E5E7EB;"
+        "  border: 1px solid #2B2B40;"
         "}"
     );
     
@@ -524,7 +529,7 @@ QWidget* WidgetBangDieuKhien::taoCardThongKe(const QString &icon, const QString 
     fontTieuDe.setPointSize(11);
     fontTieuDe.setWeight(QFont::Medium);
     labelTieuDe->setFont(fontTieuDe);
-    labelTieuDe->setStyleSheet("color: #6B7280; background: transparent;");
+    labelTieuDe->setStyleSheet("color: #A0A0B0; background: transparent;");
     
     // Giá trị lớn
     QLabel *labelGiaTri = new QLabel(giaTri, card);

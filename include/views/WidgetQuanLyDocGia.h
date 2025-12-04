@@ -90,11 +90,14 @@ private:
     QComboBox *searchTypeCombo;
     QComboBox *filterGioiTinhCombo;
     QComboBox *filterTrangThaiCombo;
+    QComboBox *filterStatusCombo;
     QPushButton *btnSearch;
     QPushButton *btnClearSearch;
     QPushButton *btnAdd;
     QPushButton *btnEdit;
     QPushButton *btnDelete;
+    QPushButton *btnDetails;
+    QPushButton *btnUnlock;
     QPushButton *btnViewLoans;
     QPushButton *btnBack;
     QLabel *statusLabel;

@@ -1,0 +1,115 @@
+#ifndef BANGDIEUKHIEN_H
+#define BANGDIEUKHIEN_H
+
+#include <QWidget>
+#include <QLabel>
+#include <QPushButton>
+#include <QGridLayout>
+#include <QGroupBox>
+#include <QChart>
+#include <QChartView>
+#include <QGraphicsDropShadowEffect>
+#include <QTableWidget>
+#include <QSpinBox>
+
+/**
+ * @brief Lớp BangDieuKhien - Dashboard tổng quan hệ thống
+ * 
+ * Hiển thị:
+ * - Thống kê tổng quan (số sách, độc giả, sách đang mượn, quá hạn)
+ * - Biểu đồ trực quan
+ * - Thông báo nhanh
+ * - Truy cập nhanh các chức năng
+ */
+class BangDieuKhien : public QWidget {
+    Q_OBJECT
+
+public:
+    explicit BangDieuKhien(QWidget *cha = nullptr);
+    ~BangDieuKhien();
+    
+    // Cập nhật dữ liệu dashboard
+    void capNhatThongKe();
+    void capNhatBieuDo();
+
+public slots:
+    void capNhatRealtimeTuWidget(); // Nhận update realtime từ các widget khác
+
+signals:
+    void yeuCauChuyenDenQuanLySach();
+    void yeuCauChuyenDenQuanLyDocGia();
+    void yeuCauChuyenDenMuonTraSach();
+    void yeuCauXemBaoCao();
+
+private slots:
+    void xuLyNutQuanLySach();
+    void xuLyNutQuanLyDocGia();
+    void xuLyNutMuonTraSach();
+    void xuLyNutXemBaoCao();
+    void xuLyNutInThe();
+    void xuLyNutQuetMa();
+    void xuLyMoDialogInAn();
+    
+    // Print panel slots (kept for compatibility)
+    void xuLyInTheDocGiaHienTai();
+    void xuLyInHangLoatThe();
+    void xuLyInTemSachHienTai();
+    void xuLyInNhieuTem();
+    void xuLyInDanhSachDocGia();
+    void xuLyInDanhMucSach();
+    void xuLyInPhieuMuon();
+    void xuLyInPhieuTra();
+
+private:
+    void thieLapGiaoDien();
+    void taoTheThongKe(QVBoxLayout *boTri);
+    void taoBieuDoTronThongKe();
+    void taoThongBaoNhanh();
+    void taoNutTruyCapNhanh();
+    
+    QWidget* taoTheTongQuan(const QString &tieuDe, const QString &giaTri, 
+                            const QString &bieuTuong, const QColor &mauNen);
+    QWidget* taoTheNho(const QString &icon, const QString &soLieu, const QString &nhan, const QString &mau, QLabel **outLabelSoLieu = nullptr);
+    QWidget* taoBangHoatDongGanDay();
+    QWidget* taoPanelCanhBao();
+    
+    // Widgets
+    QGridLayout *boTriChinh;
+    
+    // Các thẻ thống kê - lưu trữ để cập nhật realtime
+    QGroupBox *nhomThongKe;
+    QLabel *nhanTongSach;
+    QLabel *nhanTongDocGia;
+    QLabel *nhanSachDangMuon;
+    QLabel *nhanSachQuaHan;
+    
+    // Widgets thẻ thống kê (để cập nhật nhanh)
+    QLabel *labelSoLieuTongSach;
+    QLabel *labelSoLieuTongDocGia;
+    QLabel *labelSoLieuDangMuon;
+    QLabel *labelSoLieuQuaHan;
+    
+    // Bảng hoạt động gần đây
+    QTableWidget *bangHoatDong;
+    
+    // Panel cảnh báo
+    QWidget *panelCanhBao;
+    
+    // Biểu đồ
+    QGroupBox *nhomBieuDo;
+    QChartView *khungBieuDo;
+    
+    // Thông báo
+    QGroupBox *nhomThongBao;
+    QLabel *nhanThongBaoGanDay;
+    
+    // Nút truy cập nhanh
+    QPushButton *nutQuanLySach;
+    QPushButton *nutQuanLyDocGia;
+    QPushButton *nutMuonTraSach;
+    QPushButton *nutXemBaoCao;
+    QPushButton *nutInThe;
+    QPushButton *nutQuetMa;
+};
+
+#endif // BANGDIEUKHIEN_H

@@ -21,12 +21,8 @@ extern PTRDG rootDocGia;
 extern PTRDS dsDauSach[MAX_DAUSACH];
 extern int soLuongDauSach;
 
-// Set modern stylesheet for loan widget
-static const QString LOAN_WIDGET_STYLE = R"(
-    WidgetMuonTraSach {
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #0F172A, stop:1 #1E293B);
-    }
-)";
+// Modern Card-based Design - No hardcoded styles
+// All styles are managed by modern-dashboard.qss
 
 // ============================================
 // LOAN TABLE MODEL - Hiển thị sách đang mượn
@@ -149,202 +145,225 @@ WidgetMuonTraSach::~WidgetMuonTraSach() {
 }
 
 void WidgetMuonTraSach::setupUI() {
-    // Apply modern gradient stylesheet
-    setStyleSheet(LOAN_WIDGET_STYLE);
+    // MASTER PLAN: State Machine với Split View Design
+    this->setProperty("class", "WidgetMuonTraSach");
     
-    // Main scroll area cho responsive
-    QScrollArea *scrollArea = new QScrollArea(this);
-    scrollArea->setWidgetResizable(true);
-    scrollArea->setFrameShape(QFrame::NoFrame);
-    scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    scrollArea->setStyleSheet("QScrollArea { background-color: transparent; border: none; }");
-    
-    QWidget *scrollContent = new QWidget();
-    scrollContent->setStyleSheet("background-color: transparent;");
-    QVBoxLayout *mainLayout = new QVBoxLayout(scrollContent);
-    mainLayout->setSpacing(24);
-    mainLayout->setContentsMargins(32, 32, 32, 32);
-    
-    // Modern title with gradient effect
-    QLabel *title = new QLabel("📖  MƯỢN - TRẢ SÁCH", scrollContent);
-    title->setProperty("class", "title");
-    QFont titleFont = title->font();
-    titleFont.setPointSize(28);
-    titleFont.setBold(true);
-    titleFont.setLetterSpacing(QFont::AbsoluteSpacing, 1.5);
-    title->setFont(titleFont);
-    title->setStyleSheet("color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #60A5FA, stop:1 #F59E0B); padding: 8px 0; background: transparent;");
-    mainLayout->addWidget(title);
-    
-    // Stacked widget cho state machine
-    stackedWidget = new QStackedWidget(scrollContent);
-    
-    // Setup 5 states
-    setupStateNhapMaThe();      // State 0
-    setupStateThongTinDocGia(); // State 1
-    setupStateMuonSach();       // State 2
-    setupStateTraSach();        // State 3
-    setupStateBaoMat();         // State 4
-    
-    mainLayout->addWidget(stackedWidget, 1);
-    
-    // Modern status bar with gradient
-    statusLabel = new QLabel(scrollContent);
-    statusLabel->setProperty("class", "caption");
-    statusLabel->setWordWrap(true);
-    statusLabel->setStyleSheet(
-        "color: #F1F5F9;"
-        "padding: 14px 20px;"
-        "background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #334155, stop:1 #475569);"
-        "border: 2px solid #475569;"
-        "border-radius: 10px;"
-        "font-size: 14px;"
-        "font-weight: 500;"
-    );
-    mainLayout->addWidget(statusLabel);
-    
-    scrollArea->setWidget(scrollContent);
+    // Stacked widget cho state machine (toàn bộ màn hình)
+    stackedWidget = new QStackedWidget(this);
     
     QVBoxLayout *containerLayout = new QVBoxLayout(this);
     containerLayout->setContentsMargins(0, 0, 0, 0);
-    containerLayout->addWidget(scrollArea);
+    containerLayout->addWidget(stackedWidget);
+    
+    // Setup 5 states - mỗi state là 1 màn hình độc lập
+    setupStateNhapMaThe();      // State 0: Login Card (Centered)
+    setupStateThongTinDocGia(); // State 1: Split View (ProfileCard + Workspace)
+    setupStateMuonSach();       // State 2: Split View + Mượn sách form
+    setupStateTraSach();        // State 3: Split View + Trả sách form
+    setupStateBaoMat();         // State 4: Split View + Báo mất form
+    
+    // Status label cần được tạo tại widget cha, không nằm trong stacked
+    statusLabel = new QLabel(this);
+    statusLabel->setWordWrap(true);
+    statusLabel->setProperty("class", "SubText");
+    statusLabel->setStyleSheet("padding: 14px 20px; border: 1px solid #2B2B40; border-radius: 8px; background: #1E1E2D;");
+    
+    // Thêm statusLabel vào layout chính nếu cần
+    containerLayout->addWidget(statusLabel);
 }
 
 // ============================================
 // SETUP STATES
 // ============================================
 
+// ============================================
+// STATE 0: LOGIN SCREEN (CENTERED CARD)
+// ============================================
+
 void WidgetMuonTraSach::setupStateNhapMaThe() {
-    widgetNhapMaThe = new QWidget(this);
-    widgetNhapMaThe->setStyleSheet("background: transparent;");
-    QVBoxLayout *layout = new QVBoxLayout(widgetNhapMaThe);
-    layout->setSpacing(24);
-    layout->setAlignment(Qt::AlignCenter);
-    layout->setContentsMargins(20, 40, 20, 40);
+    widgetNhapMaThe = new QWidget();
+    widgetNhapMaThe->setProperty("class", "WidgetMuonTraSach");
     
-    // Icon + Hướng dẫn với màu soft
-    lblHuongDan = new QLabel("◉ Nhập mã thẻ độc giả để bắt đầu", widgetNhapMaThe);
-    QFont font = lblHuongDan->font();
-    font.setPointSize(16);
-    font.setWeight(QFont::Medium);
-    lblHuongDan->setFont(font);
+    // Layout chính - Căn giữa màn hình
+    QVBoxLayout *centerLayout = new QVBoxLayout(widgetNhapMaThe);
+    centerLayout->setAlignment(Qt::AlignCenter);
+    centerLayout->setContentsMargins(0, 0, 0, 0);
+    
+    // MASTER PLAN: Login Card 500x450px, căn giữa
+    QFrame *loginCard = new QFrame();
+    loginCard->setFixedSize(500, 450);
+    loginCard->setProperty("class", "Card");
+    loginCard->setFrameShape(QFrame::NoFrame);
+    
+    QVBoxLayout *cardLayout = new QVBoxLayout(loginCard);
+    cardLayout->setSpacing(20);
+    cardLayout->setContentsMargins(40, 40, 40, 40);
+    
+    // Icon 64px
+    QLabel *iconLabel = new QLabel("👤");
+    iconLabel->setStyleSheet("font-size: 64px; color: #3699FF; background: transparent;");
+    iconLabel->setAlignment(Qt::AlignCenter);
+    
+    // Title
+    QLabel *titleLabel = new QLabel("Chào mừng");
+    titleLabel->setProperty("class", "CardTitle");
+    titleLabel->setAlignment(Qt::AlignCenter);
+    titleLabel->setStyleSheet("border: none; padding: 0; font-size: 24px; background: transparent;");
+    
+    // Subtitle
+    lblHuongDan = new QLabel("Vui lòng nhập mã thẻ độc giả để truy cập");
+    lblHuongDan->setProperty("class", "SubText");
     lblHuongDan->setAlignment(Qt::AlignCenter);
-    lblHuongDan->setStyleSheet("color: #475569; padding: 12px; background: transparent;");
-    layout->addWidget(lblHuongDan);
     
-    // Input group với card container
-    QWidget *cardContainer = new QWidget(widgetNhapMaThe);
-    cardContainer->setStyleSheet(
-        "background-color: white;"
-        "border: 1px solid #E2E8F0;"
-        "border-radius: 12px;"
-        "padding: 32px;"
-    );
-    QVBoxLayout *cardLayout = new QVBoxLayout(cardContainer);
-    cardLayout->setSpacing(16);
-    
-    QLabel *lblMaThe = new QLabel("Mã thẻ độc giả", cardContainer);
-    font = lblMaThe->font();
-    font.setPointSize(13);
-    font.setBold(true);
-    lblMaThe->setFont(font);
-    lblMaThe->setStyleSheet("color: #2D3748;");
-    cardLayout->addWidget(lblMaThe);
-    
-    editMaThe = new QLineEdit(cardContainer);
+    // Input Field - MASTER PLAN: 50px height, 16px font, bo tròn
+    editMaThe = new QLineEdit();
     editMaThe->setPlaceholderText("Nhập mã thẻ...");
-    editMaThe->setMinimumHeight(42);
-    editMaThe->setMaximumWidth(400);
-    font = editMaThe->font();
-    font.setPointSize(13);
-    editMaThe->setFont(font);
+    editMaThe->setAlignment(Qt::AlignCenter);
+    editMaThe->setMinimumHeight(50);
+    QFont fontInput;
+    fontInput.setPointSize(16);
+    editMaThe->setFont(fontInput);
+    
+    // Button - MASTER PLAN: Primary class, to, nổi bật
+    btnTimDocGia = new QPushButton("Truy Cập Hệ Thống");
+    btnTimDocGia->setProperty("class", "Primary");
+    btnTimDocGia->setMinimumHeight(50);
+    btnTimDocGia->setCursor(Qt::PointingHandCursor);
+    QFont fontButton;
+    fontButton.setPointSize(14);
+    fontButton.setBold(true);
+    btnTimDocGia->setFont(fontButton);
+    
+    cardLayout->addStretch();
+    cardLayout->addWidget(iconLabel);
+    cardLayout->addSpacing(10);
+    cardLayout->addWidget(titleLabel);
+    cardLayout->addWidget(lblHuongDan);
+    cardLayout->addSpacing(20);
     cardLayout->addWidget(editMaThe);
-    
-    btnTimDocGia = new QPushButton("▸  Tìm Độc Giả", cardContainer);
-    btnTimDocGia->setProperty("class", "btn-primary");
-    btnTimDocGia->setMinimumHeight(44);
-    btnTimDocGia->setMaximumWidth(400);
-    font = btnTimDocGia->font();
-    font.setPointSize(13);
-    font.setBold(true);
-    btnTimDocGia->setFont(font);
     cardLayout->addWidget(btnTimDocGia);
+    cardLayout->addStretch(2);
     
-    layout->addWidget(cardContainer);
-    layout->addStretch();
+    centerLayout->addWidget(loginCard);
     
     stackedWidget->addWidget(widgetNhapMaThe); // Index 0
 }
 
+// ============================================
+// STATE 1: MAIN WORKSPACE (SPLIT VIEW)
+// ============================================
+
 void WidgetMuonTraSach::setupStateThongTinDocGia() {
-    widgetThongTinDocGia = new QWidget(this);
-    QVBoxLayout *layout = new QVBoxLayout(widgetThongTinDocGia);
-    layout->setSpacing(20);
+    widgetThongTinDocGia = new QWidget();
     
-    // Thông tin độc giả card
-    QGroupBox *groupInfo = new QGroupBox("◉ THÔNG TIN ĐỘC GIẢ", widgetThongTinDocGia);
-    QVBoxLayout *infoLayout = new QVBoxLayout(groupInfo);
+    // MASTER PLAN: Split View - Left 320px (ProfileCard) + Right (Workspace)
+    QHBoxLayout *mainLayout = new QHBoxLayout(widgetThongTinDocGia);
+    mainLayout->setSpacing(0); // Dính sát nhau
+    mainLayout->setContentsMargins(0, 0, 0, 0);
     
-    lblThongTinDocGia = new QLabel(groupInfo);
-    QFont font = lblThongTinDocGia->font();
-    font.setPointSize(12);
-    lblThongTinDocGia->setFont(font);
-    lblThongTinDocGia->setStyleSheet("color: #2D3748; padding: 8px;");
-    infoLayout->addWidget(lblThongTinDocGia);
+    // ===== LEFT PANEL: PROFILE CARD (Fixed 320px) =====
+    QFrame *leftPanel = new QFrame();
+    leftPanel->setProperty("class", "ProfileCard");
+    leftPanel->setFixedWidth(320);
+    leftPanel->setFrameShape(QFrame::NoFrame);
     
-    lblSoSachDangMuon = new QLabel(groupInfo);
-    font.setBold(true);
-    lblSoSachDangMuon->setFont(font);
-    lblSoSachDangMuon->setStyleSheet("color: #5B7FFF; padding: 4px;");
-    infoLayout->addWidget(lblSoSachDangMuon);
+    QVBoxLayout *leftLayout = new QVBoxLayout(leftPanel);
+    leftLayout->setSpacing(20);
+    leftLayout->setContentsMargins(25, 30, 25, 30);
     
-    layout->addWidget(groupInfo);
+    // Avatar + Tên
+    QLabel *avatarLabel = new QLabel("👤");
+    avatarLabel->setStyleSheet("font-size: 80px; background: transparent; color: #3699FF;");
+    avatarLabel->setAlignment(Qt::AlignCenter);
+    leftLayout->addWidget(avatarLabel);
     
-    // Bảng sách đang mượn
-    QGroupBox *groupLoans = new QGroupBox("▤ SÁCH ĐANG MƯỢN", widgetThongTinDocGia);
-    QVBoxLayout *loansLayout = new QVBoxLayout(groupLoans);
+    lblThongTinDocGia = new QLabel();
+    lblThongTinDocGia->setWordWrap(true);
+    lblThongTinDocGia->setStyleSheet("color: #FFFFFF; font-size: 16px; font-weight: bold; background: transparent;");
+    lblThongTinDocGia->setAlignment(Qt::AlignCenter);
+    leftLayout->addWidget(lblThongTinDocGia);
     
-    tableSachDangMuon = new QTableView(groupLoans);
+    // Stats (Số sách đang mượn)
+    lblSoSachDangMuon = new QLabel();
+    lblSoSachDangMuon->setWordWrap(true);
+    lblSoSachDangMuon->setStyleSheet("color: #B5B5C3; font-size: 14px; background: transparent;");
+    lblSoSachDangMuon->setAlignment(Qt::AlignCenter);
+    leftLayout->addWidget(lblSoSachDangMuon);
+    
+    leftLayout->addStretch();
+    
+    // Logout Button - Use btnQuayLai (declared in header)
+    btnQuayLai = new QPushButton("🚪 Đăng Xuất");
+    btnQuayLai->setProperty("class", "Danger");
+    btnQuayLai->setMinimumHeight(45);
+    leftLayout->addWidget(btnQuayLai);
+    
+    mainLayout->addWidget(leftPanel);
+    
+    // ===== RIGHT PANEL: WORKSPACE =====
+    QWidget *rightPanel = new QWidget();
+    QVBoxLayout *rightLayout = new QVBoxLayout(rightPanel);
+    rightLayout->setSpacing(25);
+    rightLayout->setContentsMargins(30, 30, 30, 30);
+    
+    // Title
+    QLabel *workspaceTitle = new QLabel("📚 Sách Đang Mượn");
+    workspaceTitle->setProperty("class", "PageTitle");
+    rightLayout->addWidget(workspaceTitle);
+    
+    // Table Card
+    QFrame *tableCard = new QFrame();
+    tableCard->setProperty("class", "Card");
+    tableCard->setFrameShape(QFrame::NoFrame);
+    QVBoxLayout *tableLayout = new QVBoxLayout(tableCard);
+    tableLayout->setContentsMargins(1, 1, 1, 1);
+    
+    tableSachDangMuon = new QTableView();
     modelSachDangMuon = new LoanTableModel(this);
     tableSachDangMuon->setModel(modelSachDangMuon);
+    
+    // Cấu hình bảng
+    tableSachDangMuon->setShowGrid(false);
+    tableSachDangMuon->verticalHeader()->setVisible(false);
     tableSachDangMuon->setSelectionBehavior(QAbstractItemView::SelectRows);
     tableSachDangMuon->setSelectionMode(QAbstractItemView::SingleSelection);
     tableSachDangMuon->horizontalHeader()->setStretchLastSection(true);
-    tableSachDangMuon->setAlternatingRowColors(true);
-    tableSachDangMuon->setMinimumHeight(200);
-    loansLayout->addWidget(tableSachDangMuon);
+    tableSachDangMuon->setSortingEnabled(false);
+    tableSachDangMuon->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    tableSachDangMuon->verticalHeader()->setDefaultSectionSize(45);
+    tableSachDangMuon->setMinimumHeight(300);
     
-    layout->addWidget(groupLoans);
+    tableLayout->addWidget(tableSachDangMuon);
+    rightLayout->addWidget(tableCard);
     
-    // Action buttons
-    QHBoxLayout *btnLayout = new QHBoxLayout();
-    btnLayout->setSpacing(15);
+    // Action Buttons (To, nổi bật)
+    QHBoxLayout *actionLayout = new QHBoxLayout();
+    actionLayout->setSpacing(15);
     
-    btnMuonSachMoi = new QPushButton("+ Mượn Sách Mới", widgetThongTinDocGia);
-    btnMuonSachMoi->setProperty("class", "btn-primary");
-    btnMuonSachMoi->setMinimumHeight(42);
-    btnMuonSachMoi->setToolTip("Mượn sách mới (Ctrl+B)");
-    btnLayout->addWidget(btnMuonSachMoi);
+    btnMuonSachMoi = new QPushButton("📖 Mượn Sách");
+    btnMuonSachMoi->setProperty("class", "Primary");
+    btnMuonSachMoi->setMinimumHeight(55);
+    btnMuonSachMoi->setMinimumWidth(180);
     
-    btnTraSach = new QPushButton("✓ Trả Sách", widgetThongTinDocGia);
-    btnTraSach->setProperty("class", "btn-success");
-    btnTraSach->setMinimumHeight(42);
-    btnTraSach->setToolTip("Trả sách đã mượn (Ctrl+R)");
-    btnLayout->addWidget(btnTraSach);
+    btnTraSach = new QPushButton("✅ Trả Sách");
+    btnTraSach->setProperty("class", "Success");
+    btnTraSach->setMinimumHeight(55);
+    btnTraSach->setMinimumWidth(180);
     
-    btnBaoMat = new QPushButton("× Báo Mất Sách", widgetThongTinDocGia);
-    btnBaoMat->setProperty("class", "btn-danger");
-    btnBaoMat->setMinimumHeight(42);
-    btnBaoMat->setToolTip("Báo mất sách");
-    btnLayout->addWidget(btnBaoMat);
+    btnBaoMat = new QPushButton("⚠ Báo Mất");
+    btnBaoMat->setProperty("class", "Danger");
+    btnBaoMat->setMinimumHeight(55);
+    btnBaoMat->setMinimumWidth(180);
     
-    btnQuayLai = new QPushButton("← Quay Lại", widgetThongTinDocGia);
-    btnQuayLai->setProperty("class", "btn-secondary");
-    btnQuayLai->setMinimumHeight(45);
-    btnQuayLai->setToolTip("Quay lại nhập mã thẻ (ESC)");
-    btnLayout->addWidget(btnQuayLai);
+    actionLayout->addStretch();
+    actionLayout->addWidget(btnMuonSachMoi);
+    actionLayout->addWidget(btnTraSach);
+    actionLayout->addWidget(btnBaoMat);
+    actionLayout->addStretch();
     
-    layout->addLayout(btnLayout);
+    rightLayout->addLayout(actionLayout);
+    
+    mainLayout->addWidget(rightPanel, 1); // Giãn hết phần còn lại
     
     stackedWidget->addWidget(widgetThongTinDocGia); // Index 1
 }
@@ -994,7 +1013,24 @@ void WidgetMuonTraSach::timSachCoTheMuon(const QString& tuKhoa) {
     KetQuaTimKiem ketQua[100];
     int soKetQua = 0;
     
-    LayDanhSachTimKiem(tuKhoa.toStdString(), ketQua, soKetQua, 100);
+    try {
+        LayDanhSachTimKiem(tuKhoa.toStdString(), ketQua, soKetQua, 100);
+    } catch (...) {
+        lblKetQuaTimSach->setText("❌ Lỗi khi tìm kiếm sách!");
+        lblKetQuaTimSach->setStyleSheet("color: #DC2626;");
+        comboBanSao->clear();
+        sachTimThay = nullptr;
+        return;
+    }
+    
+    // Validate results
+    if (soKetQua < 0 || soKetQua > 100) {
+        lblKetQuaTimSach->setText("❌ Kết quả tìm kiếm không hợp lệ!");
+        lblKetQuaTimSach->setStyleSheet("color: #DC2626;");
+        comboBanSao->clear();
+        sachTimThay = nullptr;
+        return;
+    }
     
     if (soKetQua == 0) {
         lblKetQuaTimSach->setText("❌ Không tìm thấy sách nào phù hợp!");
@@ -1006,6 +1042,14 @@ void WidgetMuonTraSach::timSachCoTheMuon(const QString& tuKhoa) {
     
     // Lấy kết quả đầu tiên (priority cao nhất)
     sachTimThay = ketQua[0].sach;
+    
+    // Validate pointer
+    if (!sachTimThay) {
+        lblKetQuaTimSach->setText("❌ Dữ liệu sách không hợp lệ!");
+        lblKetQuaTimSach->setStyleSheet("color: #DC2626;");
+        comboBanSao->clear();
+        return;
+    }
     
     // ✅ Gọi backend function DemBanSaoCoTheMuon()
     int soLuongSan = DemBanSaoCoTheMuon(sachTimThay);

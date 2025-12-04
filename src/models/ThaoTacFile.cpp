@@ -22,7 +22,7 @@ static bool KiemTraSoTrangFile(int soTrang, std::ostream &out) {
 
 void NapDanhSachDauSach(const char *path, PTRDS dsDauSach[], int &soLuongDauSach, std::ostream &out) {
     try {
-        std::ifstream inp(path);                                                    // mo file dau sach
+        std::ifstream inp(path);
         if (!inp.is_open()) {                                                       // khong mo duoc file
             thongBao(out, "Loi: Khong the mo file dau sach: " + std::string(path), LOI);
             
@@ -42,11 +42,31 @@ void NapDanhSachDauSach(const char *path, PTRDS dsDauSach[], int &soLuongDauSach
     while (inp.getline(buffer, DUNG_LUONG_CACHE_MAC_DINH)) {                    // doc tung dong den het file
         dong = buffer;                                                          // chuyen buffer sang string
         ++soDong;                                                               // tang so thu tu dong
+        
+        // Kiem tra dong rong hoac chi chua khoang trang
+        if (dong.empty() || dong.find_first_not_of(" \t\r\n") == std::string::npos) {
+            ++boQua;
+            continue;
+        }
 
         std::string truong[SO_TRUONG_DAU_SACH];                                  // mang luu cac truong sau khi tach
         if (!TachTruong(dong, '|', truong, SO_TRUONG_DAU_SACH)) {               // tach bang dau '|'
             thongBao(out, thongBaoLoi(soDong, "Sai dinh dang dong: " + dong, true), CANH_BAO);
             ++boQua;                                                            // sai so truong -> bo qua
+            continue;
+        }
+        
+        // Kiem tra NULL bytes trong cac truong (phong chong du lieu bi hong)
+        bool coDuLieuLoi = false;
+        for (int i = 0; i < SO_TRUONG_DAU_SACH; ++i) {
+            if (truong[i].find('\0') != std::string::npos) {
+                thongBao(out, thongBaoLoi(soDong, "Du lieu chua ky tu NULL khong hop le", true), CANH_BAO);
+                coDuLieuLoi = true;
+                break;
+            }
+        }
+        if (coDuLieuLoi) {
+            ++boQua;
             continue;
         }
 
@@ -67,9 +87,15 @@ void NapDanhSachDauSach(const char *path, PTRDS dsDauSach[], int &soLuongDauSach
         }
 
         // ten sach: kiem do dai, ky tu
-        loi = ChuanHoaTenUnicode(truong[1], MIN_TEN_SACH, MAX_TEN_SACH, tenSach);
-        if (!loi.empty()) {                                                     // ten khong hop le
-            thongBao(out, thongBaoLoi(soDong, loi + " ('" + truong[1] + "')", true), CANH_BAO);
+        try {
+            loi = ChuanHoaTenUnicode(truong[1], MIN_TEN_SACH, MAX_TEN_SACH, tenSach);
+            if (!loi.empty()) {                                                     // ten khong hop le
+                thongBao(out, thongBaoLoi(soDong, loi + " ('" + truong[1] + "')", true), CANH_BAO);
+                ++boQua;
+                continue;
+            }
+        } catch (const std::exception& e) {
+            thongBao(out, thongBaoLoi(soDong, "Loi xu ly ten sach: " + std::string(e.what()), true), CANH_BAO);
             ++boQua;
             continue;
         }
@@ -82,9 +108,15 @@ void NapDanhSachDauSach(const char *path, PTRDS dsDauSach[], int &soLuongDauSach
         }
 
         // tac gia: kiem do dai, ky tu
-        loi = ChuanHoaTenUnicode(truong[3], MIN_TAC_GIA, MAX_TAC_GIA, tacGia);
-        if (!loi.empty()) {
-            thongBao(out, thongBaoLoi(soDong, loi + " ('" + truong[3] + "')", true), CANH_BAO);
+        try {
+            loi = ChuanHoaTenUnicode(truong[3], MIN_TAC_GIA, MAX_TAC_GIA, tacGia);
+            if (!loi.empty()) {
+                thongBao(out, thongBaoLoi(soDong, loi + " ('" + truong[3] + "')", true), CANH_BAO);
+                ++boQua;
+                continue;
+            }
+        } catch (const std::exception& e) {
+            thongBao(out, thongBaoLoi(soDong, "Loi xu ly tac gia: " + std::string(e.what()), true), CANH_BAO);
             ++boQua;
             continue;
         }
@@ -103,9 +135,15 @@ void NapDanhSachDauSach(const char *path, PTRDS dsDauSach[], int &soLuongDauSach
         }
 
         // the loai: kiem do dai, ky tu
-        loi = ChuanHoaTenUnicode(truong[5], MIN_THE_LOAI, MAX_THE_LOAI, theLoai);
-        if (!loi.empty()) {
-            thongBao(out, thongBaoLoi(soDong, loi + " ('" + truong[5] + "')", true), CANH_BAO);
+        try {
+            loi = ChuanHoaTenUnicode(truong[5], MIN_THE_LOAI, MAX_THE_LOAI, theLoai);
+            if (!loi.empty()) {
+                thongBao(out, thongBaoLoi(soDong, loi + " ('" + truong[5] + "')", true), CANH_BAO);
+                ++boQua;
+                continue;
+            }
+        } catch (const std::exception& e) {
+            thongBao(out, thongBaoLoi(soDong, "Loi xu ly the loai: " + std::string(e.what()), true), CANH_BAO);
             ++boQua;
             continue;
         }
@@ -136,11 +174,11 @@ void NapDanhSachDauSach(const char *path, PTRDS dsDauSach[], int &soLuongDauSach
 
 void NapDanhMucSach(const char *path, PTRDS dsDauSach[], int soLuongDauSach, std::ostream &out) {
     try {
-        std::ifstream inp(path);                                                    // mo file danh muc sach
-    if (!inp.is_open()) {
-        thongBao(out, "Loi: Khong the mo file danh muc sach: " + std::string(path), LOI);
-        return;
-    }
+        std::ifstream inp(path);
+        if (!inp.is_open()) {
+            thongBao(out, "Loi: Khong the mo file danh muc sach: " + std::string(path), LOI);
+            return;
+        }
 
     int soDong = 0, thanhCong = 0, boQua = 0;                                    // dem dong, thanh cong, bo qua
     std::string dong;                                                           // luu noi dung dong
@@ -149,6 +187,12 @@ void NapDanhMucSach(const char *path, PTRDS dsDauSach[], int soLuongDauSach, std
     while (inp.getline(buffer, DUNG_LUONG_CACHE_MAC_DINH)) {                    // doc tung dong
         dong = buffer;
         ++soDong;
+        
+        // Kiem tra dong rong hoac chi chua khoang trang
+        if (dong.empty() || dong.find_first_not_of(" \t\r\n") == std::string::npos) {
+            ++boQua;
+            continue;
+        }
 
         std::string truong[3];                                                  // mang luu: masach | trangthai | vitri
         if (!TachTruong(dong, '|', truong, 3)) {                                // sai so truong
@@ -216,7 +260,7 @@ bool GhiDanhSachDauSach(const char *path, PTRDS dsDauSach[], int soLuongDauSach,
             }
         }
         
-        std::ofstream outf(path);                                                   // mo file ghi dau sach
+        std::ofstream outf(path);
     if (!outf.is_open()) {                                                      // khong mo duoc
         if (!silent)
             thongBao(out, "Loi: Khong the mo file de ghi dau sach: " + std::string(path), LOI);
@@ -263,7 +307,7 @@ bool GhiDanhMucSach(const char *path, PTRDS dsDauSach[], int soLuongDauSach, boo
             }
         }
         
-        std::ofstream outf(path);                                                   // mo file ghi dms
+        std::ofstream outf(path);
         if (!outf.is_open()) {
             if (!silent)
                 thongBao(out, "Loi: Khong the mo file de ghi danh muc sach: " + std::string(path), LOI);

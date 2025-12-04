@@ -362,7 +362,6 @@ QFrame[class="card"] {
 
 QFrame[class="card-hover"]:hover {
     border-color: #2563EB;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
 /* ============================================

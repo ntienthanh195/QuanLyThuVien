@@ -35,7 +35,7 @@ void ManHinhThemBanSao::thietLapGiaoDien() {
     mainLayout->addWidget(titleLabel);
 
     // Book info group
-    QGroupBox* bookInfoGroup = new QGroupBox("Thông Tin Đầu Sách");
+    QGroupBox* bookInfoGroup = new QGroupBox("Thông Tin Đầu Sách", this);
     bookInfoGroup->setObjectName("formGroup");
     QFormLayout* infoLayout = new QFormLayout(bookInfoGroup);
     infoLayout->setSpacing(12);
@@ -59,7 +59,7 @@ void ManHinhThemBanSao::thietLapGiaoDien() {
     mainLayout->addWidget(bookInfoGroup);
 
     // Copy details group
-    QGroupBox* copyDetailsGroup = new QGroupBox("Thông Tin Bản Sao");
+    QGroupBox* copyDetailsGroup = new QGroupBox("Thông Tin Bản Sao", this);
     copyDetailsGroup->setObjectName("formGroup");
     QFormLayout* copyLayout = new QFormLayout(copyDetailsGroup);
     copyLayout->setSpacing(12);
