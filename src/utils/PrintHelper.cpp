@@ -14,9 +14,17 @@
 #include <QTime>
 #include <QFileDialog>
 #include <QDir>
+#include <QRegularExpression>
 
 // Static config
 PrintHelper::PrintConfig PrintHelper::s_config;
+
+// helper to ensure directories exist
+static bool ensureDirExists(const QString &path) {
+    QDir dir(path);
+    if (dir.exists()) return true;
+    return dir.mkpath(".");
+}
 
 // ==================== PUBLIC API ====================
 
@@ -44,13 +52,21 @@ bool PrintHelper::inTheDocGia(PTRDG docGia, QWidget* parent) {
         return inDocument(&doc, parent);
     } else if (clicked == btnPDF) {
         QString tenFileMacDinh = taoTenFileTheDocGia(docGia->data.MaThe);
+        PrintConfig cfg = getCauHinh();
+        QString defaultDir;
+        if (!cfg.pdfOutputDir.isEmpty()) {
+            defaultDir = QDir(cfg.pdfOutputDir).isAbsolute() ? cfg.pdfOutputDir : QApplication::applicationDirPath() + "/" + cfg.pdfOutputDir;
+        } else {
+            defaultDir = QApplication::applicationDirPath() + "/" + cfg.duongDanThuMucIn + "/" + cfg.thuMucPdf;
+        }
+        QDir().mkpath(defaultDir);
         QString filePath = QFileDialog::getSaveFileName(
             parent,
             "Lưu Thẻ Độc Giả",
-            QDir::homePath() + "/" + tenFileMacDinh,
+            QDir(defaultDir).filePath(tenFileMacDinh),
             "PDF Files (*.pdf)"
         );
-        
+
         if (!filePath.isEmpty()) {
             return xuatPDF(&doc, filePath, parent);
         }
@@ -99,14 +115,23 @@ bool PrintHelper::inA4NhieuThe(const QList<PTRDG>& danhSach, int soCot, QWidget*
         QString tenFileMacDinh = QString("TheDocGia_Batch_%1the_%2.pdf")
             .arg(danhSach.size())
             .arg(ngayFile);
-        
+
+        PrintConfig cfg = getCauHinh();
+        QString defaultDir;
+        if (!cfg.pdfOutputDir.isEmpty()) {
+            defaultDir = QDir(cfg.pdfOutputDir).isAbsolute() ? cfg.pdfOutputDir : QApplication::applicationDirPath() + "/" + cfg.pdfOutputDir;
+        } else {
+            defaultDir = QApplication::applicationDirPath() + "/" + cfg.duongDanThuMucIn + "/" + cfg.thuMucPdf;
+        }
+        QDir().mkpath(defaultDir);
+
         QString filePath = QFileDialog::getSaveFileName(
             parent,
             "Lưu Thẻ Độc Giả Hàng Loạt",
-            QDir::homePath() + "/" + tenFileMacDinh,
+            QDir(defaultDir).filePath(tenFileMacDinh),
             "PDF Files (*.pdf)"
         );
-        
+
         if (!filePath.isEmpty()) {
             return xuatPDF(&doc, filePath, parent);
         }
@@ -134,13 +159,21 @@ bool PrintHelper::inTemMaVachSach(const QString& maSach, const QString& tenSach,
         return inDocument(&doc, parent);
     } else if (clicked == btnPDF) {
         QString tenFileMacDinh = taoTenFileTemSach(maSach, 1);
+        PrintConfig cfg = getCauHinh();
+        QString defaultDir;
+        if (!cfg.pdfOutputDir.isEmpty()) {
+            defaultDir = QDir(cfg.pdfOutputDir).isAbsolute() ? cfg.pdfOutputDir : QApplication::applicationDirPath() + "/" + cfg.pdfOutputDir;
+        } else {
+            defaultDir = QApplication::applicationDirPath() + "/" + cfg.duongDanThuMucIn + "/" + cfg.thuMucPdf;
+        }
+        QDir().mkpath(defaultDir);
         QString filePath = QFileDialog::getSaveFileName(
             parent,
             "Lưu Tem Sách",
-            QDir::homePath() + "/" + tenFileMacDinh,
+            QDir(defaultDir).filePath(tenFileMacDinh),
             "PDF Files (*.pdf)"
         );
-        
+
         if (!filePath.isEmpty()) {
             return xuatPDF(&doc, filePath, parent);
         }
@@ -185,13 +218,21 @@ bool PrintHelper::inNhieuTemSach(PTRDS dauSach, int soLuong, QWidget* parent) {
         return inDocument(&doc, parent);
     } else if (clicked == btnPDF) {
         QString tenFileMacDinh = taoTenFileTemSach(QString::fromStdString(dauSach->ISBN), soLuong);
+        PrintConfig cfg = getCauHinh();
+        QString defaultDir;
+        if (!cfg.pdfOutputDir.isEmpty()) {
+            defaultDir = QDir(cfg.pdfOutputDir).isAbsolute() ? cfg.pdfOutputDir : QApplication::applicationDirPath() + "/" + cfg.pdfOutputDir;
+        } else {
+            defaultDir = QApplication::applicationDirPath() + "/" + cfg.duongDanThuMucIn + "/" + cfg.thuMucPdf;
+        }
+        QDir().mkpath(defaultDir);
         QString filePath = QFileDialog::getSaveFileName(
             parent,
             "Lưu Tem Sách Hàng Loạt",
-            QDir::homePath() + "/" + tenFileMacDinh,
+            QDir(defaultDir).filePath(tenFileMacDinh),
             "PDF Files (*.pdf)"
         );
-        
+
         if (!filePath.isEmpty()) {
             return xuatPDF(&doc, filePath, parent);
         }
@@ -335,6 +376,7 @@ bool PrintHelper::inPhieuMuonTuDong(PTRDG docGia, const QString& maSach, const Q
         ".footer { margin-top: 15px; text-align: center; font-size: 9pt; color: #888; }"
         "</style>"
         "</head><body>"
+        "%7"
         "<div class='header'>📚 PHIẾU MƯỢN SÁCH</div>"
         "<div class='section'>"
         "  <div><span class='label'>Họ tên:</span><span class='value'>%1</span></div>"
@@ -350,6 +392,14 @@ bool PrintHelper::inPhieuMuonTuDong(PTRDG docGia, const QString& maSach, const Q
         "<div class='footer'>Vui lòng giữ phiếu này để trả sách nhanh hơn</div>"
         "</body></html>"
     ).arg(hoTen).arg(maThe).arg(tenSach).arg(maSach).arg(ngayMuon).arg(qrCode);
+    // Insert logo if configured
+    QString logoHtml;
+    if (s_config.hienThiLogo && !s_config.duongDanLogo.isEmpty() && QFile::exists(s_config.duongDanLogo)) {
+        QString logoPath = QDir::toNativeSeparators(s_config.duongDanLogo);
+        logoHtml = QString("<div style='text-align:center; margin-bottom:6px;'><img src='file:///%1' style='height:36px;'/></div>");
+        logoHtml = logoHtml.arg(logoPath);
+    }
+    html = html.arg(logoHtml);
     
     QTextDocument doc;
     doc.setHtml(html);
@@ -373,14 +423,23 @@ bool PrintHelper::inPhieuMuonTuDong(PTRDG docGia, const QString& maSach, const Q
             .arg(maThe)
             .arg(maSach)
             .arg(ngayFile);
-        
+
+        PrintConfig cfg = getCauHinh();
+        QString defaultDir;
+        if (!cfg.pdfOutputDir.isEmpty()) {
+            defaultDir = QDir(cfg.pdfOutputDir).isAbsolute() ? cfg.pdfOutputDir : QApplication::applicationDirPath() + "/" + cfg.pdfOutputDir;
+        } else {
+            defaultDir = QApplication::applicationDirPath() + "/" + cfg.duongDanThuMucIn + "/" + cfg.thuMucPdf;
+        }
+        QDir().mkpath(defaultDir);
+
         QString filePath = QFileDialog::getSaveFileName(
             parent,
             "Lưu Phiếu Mượn",
-            QDir::homePath() + "/" + tenFile,
+            QDir(defaultDir).filePath(tenFile),
             "PDF Files (*.pdf)"
         );
-        
+
         if (!filePath.isEmpty()) {
             return xuatPDF(&doc, filePath, parent);
         }
@@ -448,34 +507,75 @@ QString PrintHelper::taoMaQRHTML(const QString& maSo, int size) {
     if (qrImage.isNull()) {
         return QString("<div style='color:red;'>Lỗi tạo QR code</div>");
     }
-    
-    // Lưu ảnh tạm thời
-    QString appDir = QApplication::applicationDirPath();
-    QString qrPath = appDir + "/temp_qr.png";
+    // Lưu ảnh vào thư mục cấu hình (ưu tiên s_config.qrOutputDir nếu có)
+    PrintConfig cfg = getCauHinh();
+    QString qrDir;
+    if (!cfg.qrOutputDir.isEmpty()) {
+        // nếu người dùng cung cấp đường dẫn tương đối -> hiểu là relative với app dir
+        if (QDir(cfg.qrOutputDir).isAbsolute()) qrDir = cfg.qrOutputDir;
+        else qrDir = QApplication::applicationDirPath() + "/" + cfg.qrOutputDir;
+    } else {
+        QString base = QApplication::applicationDirPath() + "/" + cfg.duongDanThuMucIn;
+        qrDir = base + "/" + cfg.thuMucQR;
+    }
+
+    if (!ensureDirExists(qrDir)) {
+        return QString("<div style='color:red;'>Lỗi tạo thư mục QR</div>");
+    }
+
+    // tạo tên file an toàn: qr_<maSo>_<timestamp>.png
+    QString safeMa = maSo;
+    safeMa.replace(QRegularExpression("[^A-Za-z0-9_-]"), "_");
+    QString timeStamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmsszzz");
+    QString qrPath = QDir(qrDir).filePath(QString("qr_%1_%2.png").arg(safeMa).arg(timeStamp));
+
     if (!qrImage.save(qrPath)) {
         return QString("<div style='color:red;'>Lỗi lưu QR code</div>");
     }
-    
-    // Trả về HTML tag
+
+    // Trả về HTML tag với đường dẫn tuyệt đối
     return QString("<img src='file:///%1' width='%2' height='%2' style='border:1px solid #ccc; padding:2px; background:white;'/>")
-               .arg(qrPath)
+               .arg(QDir::toNativeSeparators(qrPath))
                .arg(size);
 }
 
 bool PrintHelper::xuatPDF(QTextDocument* doc, const QString& tenFile, QWidget* parent) {
     if (!doc || tenFile.isEmpty()) return false;
-    
+    // Ensure target directory exists (if path relative to app dir and under files/pdf)
+    QString outPath = tenFile;
+    QFileInfo fi(outPath);
+    if (!fi.dir().exists()) {
+        if (!QDir().mkpath(fi.dir().absolutePath())) {
+            QMessageBox::warning(parent, "Lỗi", "Không thể tạo thư mục chứa file PDF.");
+            return false;
+        }
+    }
+
     QPrinter printer(QPrinter::HighResolution);
+    // Respect color setting from configuration
+    if (s_config.inMauSac) {
+        #if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
+        printer.setColorMode(QPrinter::Color);
+        #else
+        printer.setColorMode(QPrinter::Color);
+        #endif
+    } else {
+        #if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
+        printer.setColorMode(QPrinter::GrayScale);
+        #else
+        printer.setColorMode(QPrinter::GrayScale);
+        #endif
+    }
     printer.setOutputFormat(QPrinter::PdfFormat);
-    printer.setOutputFileName(tenFile);
+    printer.setOutputFileName(outPath);
     printer.setPageSize(QPageSize::A4);
     printer.setPageMargins(QMarginsF(10, 10, 10, 10), QPageLayout::Millimeter);
-    
+
     doc->print(&printer);
-    
-    QMessageBox::information(parent, "Thành Công", 
-        QString("Đã lưu file PDF:\n%1").arg(tenFile));
-    
+
+    QMessageBox::information(parent, "Thành Công",
+        QString("Đã lưu file PDF:\n%1").arg(outPath));
+
     return true;
 }
 
@@ -488,6 +588,15 @@ void PrintHelper::setCauHinh(const PrintConfig& config) {
     settings.setValue("Print/InMauSac", config.inMauSac);
     settings.setValue("Print/HienThiLogo", config.hienThiLogo);
     settings.setValue("Print/DuongDanLogo", config.duongDanLogo);
+    settings.setValue("Print/ThuMucIn", config.duongDanThuMucIn);
+    settings.setValue("Print/ThuMucQR", config.thuMucQR);
+    settings.setValue("Print/ThuMucPDF", config.thuMucPdf);
+    settings.setValue("Print/QROutputDir", config.qrOutputDir);
+    settings.setValue("Print/PDFOutputDir", config.pdfOutputDir);
+    settings.setValue("Print/TempDir", config.tempDir);
+    settings.setValue("Print/HeaderText", config.headerText);
+    settings.setValue("Print/FooterText", config.footerText);
+    settings.setValue("Print/Author", config.author);
 }
 
 PrintHelper::PrintConfig PrintHelper::getCauHinh() {
@@ -499,6 +608,15 @@ PrintHelper::PrintConfig PrintHelper::getCauHinh() {
     config.inMauSac = settings.value("Print/InMauSac", config.inMauSac).toBool();
     config.hienThiLogo = settings.value("Print/HienThiLogo", config.hienThiLogo).toBool();
     config.duongDanLogo = settings.value("Print/DuongDanLogo", config.duongDanLogo).toString();
+    config.duongDanThuMucIn = settings.value("Print/ThuMucIn", config.duongDanThuMucIn).toString();
+    config.thuMucQR = settings.value("Print/ThuMucQR", config.thuMucQR).toString();
+    config.thuMucPdf = settings.value("Print/ThuMucPDF", config.thuMucPdf).toString();
+    config.qrOutputDir = settings.value("Print/QROutputDir", config.qrOutputDir).toString();
+    config.pdfOutputDir = settings.value("Print/PDFOutputDir", config.pdfOutputDir).toString();
+    config.tempDir = settings.value("Print/TempDir", config.tempDir).toString();
+    config.headerText = settings.value("Print/HeaderText", config.headerText).toString();
+    config.footerText = settings.value("Print/FooterText", config.footerText).toString();
+    config.author = settings.value("Print/Author", config.author).toString();
     
     return config;
 }
@@ -512,6 +630,12 @@ QString PrintHelper::taoHTMLTheDocGia(PTRDG docGia) {
     QString maThe = QString::number(docGia->data.MaThe);
     QString maQR = taoMaQRHTML(maThe, 60); // Sử dụng QR code thay vì barcode
     
+    QString logoHtml;
+    if (s_config.hienThiLogo && !s_config.duongDanLogo.isEmpty() && QFile::exists(s_config.duongDanLogo)) {
+        QString logoPath = QDir::toNativeSeparators(s_config.duongDanLogo);
+        logoHtml = QString("<div style='text-align:center; margin-bottom:4px;'><img src='file:///%1' style='height:32px;'/></div>").arg(logoPath);
+    }
+
     return QString(
         "<html><head>"
         "<style>"
@@ -525,13 +649,14 @@ QString PrintHelper::taoHTMLTheDocGia(PTRDG docGia) {
         "</style>"
         "</head><body>"
         "<div class='card'>"
-        "  <div class='title'>%1</div>"
-        "  <div class='name'>%2</div>"
-        "  <div class='qrcode'>%3</div>"
-        "  <div class='id'>Mã thẻ: %4</div>"
+        "%1"
+        "  <div class='title'>%2</div>"
+        "  <div class='name'>%3</div>"
+        "  <div class='qrcode'>%4</div>"
+        "  <div class='id'>Mã thẻ: %5</div>"
         "</div>"
         "</body></html>"
-    ).arg(s_config.tenVietTat).arg(hoTen).arg(maQR).arg(maThe);
+    ).arg(logoHtml).arg(s_config.tenVietTat).arg(hoTen).arg(maQR).arg(maThe);
 }
 
 QString PrintHelper::taoHTMLA4NhieuThe(const QList<PTRDG>& danhSach, int soCot) {
@@ -556,6 +681,12 @@ QString PrintHelper::taoHTMLA4NhieuThe(const QList<PTRDG>& danhSach, int soCot) 
     
     int thePerPage = soCot * 5; // 2 cột x 5 hàng = 10 thẻ/trang
     
+    QString logoHtml;
+    if (s_config.hienThiLogo && !s_config.duongDanLogo.isEmpty() && QFile::exists(s_config.duongDanLogo)) {
+        QString logoPath = QDir::toNativeSeparators(s_config.duongDanLogo);
+        logoHtml = QString("<div style='text-align:center; margin-bottom:6px;'><img src='file:///%1' style='height:28px;'/></div>").arg(logoPath);
+    }
+
     for (int page = 0; page < (danhSach.size() + thePerPage - 1) / thePerPage; ++page) {
         if (page > 0) {
             html += "<div class='page-break'></div>";
@@ -577,13 +708,14 @@ QString PrintHelper::taoHTMLA4NhieuThe(const QList<PTRDG>& danhSach, int soCot) 
                     html += QString(
                         "<td>"
                         "<div class='card'>"
+                        "  %6"
                         "  <div class='title'>%1</div>"
                         "  <div class='name'>%2</div>"
                         "  <div class='qrcode'>%3</div>"
                         "  <div class='id'>Mã: %4</div>"
                         "</div>"
                         "</td>"
-                    ).arg(s_config.tenVietTat).arg(hoTen).arg(maQR).arg(maThe);
+                    ).arg(s_config.tenVietTat).arg(hoTen).arg(maQR).arg(maThe).arg(logoHtml);
                 } else {
                     html += "<td></td>"; // Ô trống
                 }
@@ -600,7 +732,12 @@ QString PrintHelper::taoHTMLA4NhieuThe(const QList<PTRDG>& danhSach, int soCot) 
 
 QString PrintHelper::taoHTMLTemSach(const QString& maSach, const QString& tenSach) {
     QString maQR = taoMaQRHTML(maSach, 50); // Sử dụng QR code
-    
+    QString logoHtml;
+    if (s_config.hienThiLogo && !s_config.duongDanLogo.isEmpty() && QFile::exists(s_config.duongDanLogo)) {
+        QString logoPath = QDir::toNativeSeparators(s_config.duongDanLogo);
+        logoHtml = QString("<div style='text-align:center; margin-bottom:4px;'><img src='file:///%1' style='height:20px;'/></div>").arg(logoPath);
+    }
+
     return QString(
         "<html><head>"
         "<style>"
@@ -613,29 +750,37 @@ QString PrintHelper::taoHTMLTemSach(const QString& maSach, const QString& tenSac
         "</style>"
         "</head><body>"
         "<div class='label'>"
-        "  <div class='title'>%1</div>"
-        "  <div class='qrcode'>%2</div>"
-        "  <div class='code'>%3</div>"
+        "%1"
+        "  <div class='title'>%2</div>"
+        "  <div class='qrcode'>%3</div>"
+        "  <div class='code'>%4</div>"
         "</div>"
         "</body></html>"
-    ).arg(tenSach.left(20)).arg(maQR).arg(maSach);
+    ).arg(logoHtml).arg(tenSach.left(20)).arg(maQR).arg(maSach);
 }
 
 QString PrintHelper::taoHTMLDanhSach(const QString& tieuDe, const QString& noiDungBang) {
+    QString logoHtml;
+    if (s_config.hienThiLogo && !s_config.duongDanLogo.isEmpty() && QFile::exists(s_config.duongDanLogo)) {
+        QString logoPath = QDir::toNativeSeparators(s_config.duongDanLogo);
+        logoHtml = QString("<div style='text-align:center; margin-bottom:8px;'><img src='file:///%1' style='height:36px;'/></div>").arg(logoPath);
+    }
+
     return QString(
         "<html><head>"
         "<style>"
         "body { font-family: 'Times New Roman', serif; margin: 20px; }"
-        ".header { text-align: center; font-size: 18pt; font-weight: bold; margin-bottom: 20px; }"
+        ".header { text-align: center; font-size: 18pt; font-weight: bold; margin-bottom: 10px; }"
         "table { width: 100%%; border-collapse: collapse; }"
         "th { background: #f0f0f0; font-weight: bold; }"
         "td, th { padding: 8px; border: 1px solid black; }"
         "</style>"
         "</head><body>"
-        "<div class='header'>%1</div>"
-        "%2"
+        "%1"
+        "<div class='header'>%2</div>"
+        "%3"
         "</body></html>"
-    ).arg(tieuDe).arg(noiDungBang);
+    ).arg(logoHtml).arg(tieuDe).arg(noiDungBang);
 }
 
 bool PrintHelper::inDocument(QTextDocument* doc, QWidget* parent) {

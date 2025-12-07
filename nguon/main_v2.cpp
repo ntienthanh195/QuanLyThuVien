@@ -88,7 +88,7 @@ int main(int argc, char *argv[]) {
             "1. Mở Projects (biểu tượng cặp táp)\n"
             "2. Chọn Run → Working Directory\n"
             "3. Đặt là: E:/Qt/QuanLyThuVien/\n\n"
-            "Hoặc copy thư mục 'files/' vào: %1"
+            "Hoặc copy thư mục 'data/' vào: %1"
             ).arg(QDir::currentPath()).arg(thuMucGoc));
         return -1;
     }

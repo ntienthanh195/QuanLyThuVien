@@ -15,15 +15,170 @@
 #include <QDebug>
 #include <QDateTime>
 #include <QInputDialog>
+#include <QTableView>
+#include <QAbstractTableModel>
 
 // Include responsive helpers
 #include "utils/ResponsiveHelper.h"
 #include "utils/AnimationHelper.h"
+#include "utils/EventBus.h"
+#include "utils/SafeGui.h"
+
+// Prefer DBBatcher snapshot API when available to avoid buffer overruns
+#if defined(__has_include)
+#  if __has_include("utils/DBBatcher.h")
+#    include "utils/DBBatcher.h"
+#  endif
+#endif
 
 WidgetMuonTraSach::WidgetMuonTraSach(QWidget *cha) 
     : QWidget(cha), docGiaHienTai(nullptr), sachDangChonMuon(nullptr), banSaoDangChon(nullptr) {
     thieLapGiaoDien();
+
+    // Realtime updates: refresh lists/details when data changes
+    connect(&EventBus::instance(), &EventBus::docGiaAdded, this, [this](int){ this->hienThiDanhSachDocGia(); });
+    connect(&EventBus::instance(), &EventBus::docGiaUpdated, this, [this](int){ this->hienThiDanhSachDocGia(); });
+    connect(&EventBus::instance(), &EventBus::docGiaRemoved, this, [this](int){ this->hienThiDanhSachDocGia(); });
+
+    connect(&EventBus::instance(), &EventBus::muonTraAdded, this, [this](int maThe, const QString &){
+        // If current reader affected, update their borrowed list
+        if (this->docGiaHienTai && this->docGiaHienTai->data.MaThe == maThe) this->capNhatBangSachDangMuon();
+        this->hienThiDanhSachDocGia();
+    });
+    connect(&EventBus::instance(), &EventBus::muonTraUpdated, this, [this](int maThe, const QString &){
+        if (this->docGiaHienTai && this->docGiaHienTai->data.MaThe == maThe) this->capNhatBangSachDangMuon();
+        this->hienThiDanhSachDocGia();
+    });
+    connect(&EventBus::instance(), &EventBus::muonTraRemoved, this, [this](int maThe, const QString &){
+        if (this->docGiaHienTai && this->docGiaHienTai->data.MaThe == maThe) this->capNhatBangSachDangMuon();
+        this->hienThiDanhSachDocGia();
+    });
+
+    // Refresh when global data changes (e.g. background loader finished)
+    connect(&EventBus::instance(), &EventBus::dataChanged, this, [this]() {
+        this->hienThiDanhSachDocGia();
+        this->capNhatBangSachDangMuon();
+    });
 }
+
+// Lightweight model to back the readers view (virtualized, paged)
+class DocGiaTableModel : public QAbstractTableModel {
+public:
+    DocGiaTableModel(std::vector<PTRDG> *data, QObject *parent = nullptr)
+        : QAbstractTableModel(parent), m_data(data), m_page(1), m_pageSize(10) {}
+
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override {
+        Q_UNUSED(parent)
+        if (!m_data) return 0;
+        int total = static_cast<int>(m_data->size());
+        int start = (m_page - 1) * m_pageSize;
+        if (start >= total) return 0;
+        return std::min(m_pageSize, total - start);
+    }
+
+    int columnCount(const QModelIndex &parent = QModelIndex()) const override {
+        Q_UNUSED(parent)
+        return 6; // STT, MaThe, HoTen, Phai, TrangThai, Sach
+    }
+
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override {
+        if (!m_data || !index.isValid() || role != Qt::DisplayRole) return QVariant();
+        int start = (m_page - 1) * m_pageSize;
+        int absIdx = start + index.row();
+        if (absIdx < 0 || absIdx >= (int)m_data->size()) return QVariant();
+        PTRDG docGia = (*m_data)[absIdx];
+        if (!docGia) return QVariant();
+
+        switch (index.column()) {
+        case 0: return QString::number(absIdx + 1); // STT (absolute)
+        case 1: return QString::number(docGia->data.MaThe);
+        case 2: return QString::fromStdString(std::string(docGia->data.Ho + std::string(" ")) + docGia->data.Ten);
+        case 3: return docGia->data.Phai ? QStringLiteral("Nữ") : QStringLiteral("Nam");
+        case 4: return docGia->data.TrangThai == 1 ? QStringLiteral("Hoạt động") : QStringLiteral("Khoá");
+        case 5: return QString("%1/3").arg(docGia->data.soSachDangMuon);
+        default: return QVariant();
+        }
+    }
+
+    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override {
+        if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
+            switch (section) {
+            case 0: return QStringLiteral("STT");
+            case 1: return QStringLiteral("Mã Thẻ");
+            case 2: return QStringLiteral("Họ Tên");
+            case 3: return QStringLiteral("Phái");
+            case 4: return QStringLiteral("Trạng Thái");
+            case 5: return QStringLiteral("Sách");
+            }
+        }
+        return QAbstractTableModel::headerData(section, orientation, role);
+    }
+
+    void refresh() { beginResetModel(); endResetModel(); }
+    void setPage(int p) { if (p < 1) p = 1; if (p != m_page) { m_page = p; refresh(); } }
+    void setPageSize(int s) { if (s < 1) s = 1; if (s != m_pageSize) { m_pageSize = s; refresh(); } }
+    int page() const { return m_page; }
+    int pageSize() const { return m_pageSize; }
+    int totalRows() const { return (int)(m_data ? m_data->size() : 0); }
+
+private:
+    std::vector<PTRDG> *m_data;
+    int m_page;
+    int m_pageSize;
+};
+
+// Model for sách đang mượn (small DTO list)
+class SachDangMuonModel : public QAbstractTableModel {
+public:
+    SachDangMuonModel(std::vector<ThongTinSachDangMuon_DTO> *data, QObject *parent = nullptr)
+        : QAbstractTableModel(parent), m_data(data) {}
+
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override {
+        Q_UNUSED(parent)
+        return m_data ? (int)m_data->size() : 0;
+    }
+
+    int columnCount(const QModelIndex &parent = QModelIndex()) const override {
+        Q_UNUSED(parent)
+        return 3; // maSach, tenSach, ngayMuon
+    }
+
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override {
+        if (!m_data || !index.isValid()) return QVariant();
+        int r = index.row();
+        if (r < 0 || r >= (int)m_data->size()) return QVariant();
+        const ThongTinSachDangMuon_DTO &dto = (*m_data)[r];
+
+        if (role == Qt::DisplayRole) {
+            switch (index.column()) {
+            case 0: return QString::fromStdString(dto.maSach);
+            case 1: return QString::fromStdString(dto.tenSach);
+            case 2: return QString::fromStdString(dto.ngayMuon);
+            }
+        }
+        if (role == Qt::FontRole) {
+            QFont f;
+            if (index.column() == 0 || index.column() == 1) { f.setBold(true); return f; }
+        }
+        return QVariant();
+    }
+
+    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override {
+        if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
+            switch (section) {
+            case 0: return QStringLiteral("Mã Sách");
+            case 1: return QStringLiteral("Tên Sách");
+            case 2: return QStringLiteral("Ngày Mượn");
+            }
+        }
+        return QAbstractTableModel::headerData(section, orientation, role);
+    }
+
+    void refresh() { beginResetModel(); endResetModel(); }
+
+private:
+    std::vector<ThongTinSachDangMuon_DTO> *m_data;
+};
 
 WidgetMuonTraSach::~WidgetMuonTraSach() {}
 
@@ -140,8 +295,10 @@ void WidgetMuonTraSach::thieLapTabMuonSach() {
     boTriTrai->addWidget(tieuDeTim);
     boTriTrai->addLayout(boTriTim);
     
-    // Bảng độc giả
-    bangDocGia = new QTableWidget();
+    // Bảng độc giả (view + model)
+    bangDocGia = new QTableView();
+    modelDocGia = new DocGiaTableModel(&danhSachDocGia, this);
+    bangDocGia->setModel(modelDocGia);
     thieLapBangDocGia();
     boTriTrai->addWidget(bangDocGia, 1);
     
@@ -196,9 +353,10 @@ void WidgetMuonTraSach::thieLapTabMuonSach() {
     nhanTieuDeSachDangMuon = nhomSachDangMuon;
     QVBoxLayout *boTriSachDangMuon = new QVBoxLayout(nhomSachDangMuon);
     
-    bangSachDangMuon = new QTableWidget();
-    bangSachDangMuon->setColumnCount(3);
-    bangSachDangMuon->setHorizontalHeaderLabels({"Mã Sách", "Tên Sách", "Ngày Mượn"});
+    // use model/view for sách đang mượn
+    bangSachDangMuon = new QTableView();
+    modelSachDangMuon = new SachDangMuonModel(&danhSachSachDangMuon, this);
+    bangSachDangMuon->setModel(modelSachDangMuon);
     bangSachDangMuon->horizontalHeader()->setStretchLastSection(true);
     bangSachDangMuon->setColumnWidth(0, 120);
     bangSachDangMuon->setColumnWidth(1, 200);
@@ -207,11 +365,11 @@ void WidgetMuonTraSach::thieLapTabMuonSach() {
     bangSachDangMuon->setEditTriggers(QAbstractItemView::NoEditTriggers);
     bangSachDangMuon->setMinimumHeight(280);
     bangSachDangMuon->setStyleSheet(
-        "QTableWidget { background-color: #1E1E2D; color: #FFFFFF; gridline-color: #2B2B40; "
+        "QTableView { background-color: #1E1E2D; color: #FFFFFF; gridline-color: #2B2B40; "
         "border: 1px solid #2B2B40; border-radius: 6px; font-size: 12px; }"
         "QHeaderView::section { background-color: #2B2B40; color: #B5B5C3; "
         "border: none; padding: 8px; font-weight: bold; }"
-        "QTableWidget::item:selected { background-color: #3699FF; color: white; }"
+        "QTableView::item:selected { background-color: #3699FF; color: white; }"
     );
     boTriSachDangMuon->addWidget(bangSachDangMuon);
     
@@ -338,58 +496,66 @@ void WidgetMuonTraSach::thieLapTabMuonSach() {
     connect(nutTimDocGia, &QPushButton::clicked, this, &WidgetMuonTraSach::xuLyTimKiem);
     connect(nutLamMoi, &QPushButton::clicked, this, &WidgetMuonTraSach::xuLyLamMoiDanhSach);
     connect(nutQuetMaDocGia, &QPushButton::clicked, this, &WidgetMuonTraSach::xuLyNutQuetMaDocGia);
-    connect(bangDocGia, &QTableWidget::cellClicked, this, &WidgetMuonTraSach::xuLyChonDocGia);
+    connect(bangDocGia, &QTableView::clicked, this, [this](const QModelIndex &idx){ this->xuLyChonDocGia(idx.row(), idx.column()); });
     connect(nutHuyChonDocGia, &QPushButton::clicked, this, &WidgetMuonTraSach::xuLyHuyChonDocGia);
-    connect(hopXacNhanMuon, &QCheckBox::stateChanged, this, &WidgetMuonTraSach::xuLyThayDoiCheckbox);
+    connect(hopXacNhanMuon, &QCheckBox::checkStateChanged, this, &WidgetMuonTraSach::xuLyThayDoiCheckbox);
     connect(nutQuetMaSach, &QPushButton::clicked, this, &WidgetMuonTraSach::xuLyNutQuetMaSach);
     connect(nutXacNhanMuon, &QPushButton::clicked, this, &WidgetMuonTraSach::xuLyNutXacNhanMuon);
     connect(nutXacNhanTra, &QPushButton::clicked, this, &WidgetMuonTraSach::xuLyNutXacNhanTra);
     connect(nutBaoMat, &QPushButton::clicked, this, &WidgetMuonTraSach::xuLyNutBaoMat);
     connect(nutInLaiPhieu, &QPushButton::clicked, this, &WidgetMuonTraSach::xuLyInLaiPhieu);
-    connect(bangSachDangMuon, &QTableWidget::cellClicked, this, &WidgetMuonTraSach::xuLyChonSachTra);
+    if (bangSachDangMuon->selectionModel()) {
+        connect(bangSachDangMuon->selectionModel(), &QItemSelectionModel::currentChanged,
+                this, [this](const QModelIndex &current, const QModelIndex &){ this->xuLyChonSachTra(current.row(), current.column()); });
+    }
     
     // Load dá»¯ liá»‡u ban Ä‘áº§u
     hienThiDanhSachDocGia();
 }
 
 void WidgetMuonTraSach::thieLapBangDocGia() {
-    bangDocGia->setColumnCount(6);
-    bangDocGia->setHorizontalHeaderLabels({"STT", "MÃ£ Tháº»", "Há» TÃªn", "PhÃ¡i", "Tráº¡ng ThÃ¡i", "SÃ¡ch"});
-    
-    // Cáº¥u hÃ¬nh cá»™t
-    bangDocGia->setColumnWidth(0, 50);   // STT
-    bangDocGia->setColumnWidth(1, 80);   // MÃ£ Tháº»
-    bangDocGia->setColumnWidth(2, 180);  // Há» TÃªn
-    bangDocGia->setColumnWidth(3, 70);   // PhÃ¡i
-    bangDocGia->setColumnWidth(4, 110);  // Tráº¡ng ThÃ¡i
-    bangDocGia->setColumnWidth(5, 70);   // SÃ¡ch
-    
-    // Style
+    // View already has model set (DocGiaTableModel). Configure visual aspects here.
     bangDocGia->setSelectionBehavior(QAbstractItemView::SelectRows);
     bangDocGia->setSelectionMode(QAbstractItemView::SingleSelection);
     bangDocGia->setEditTriggers(QAbstractItemView::NoEditTriggers);
     bangDocGia->horizontalHeader()->setStretchLastSection(true);
     bangDocGia->setAlternatingRowColors(true);
     bangDocGia->setMinimumHeight(350);
-    
+
+    // Default column widths
+    bangDocGia->setColumnWidth(0, 50);
+    bangDocGia->setColumnWidth(1, 80);
+    bangDocGia->setColumnWidth(2, 180);
+    bangDocGia->setColumnWidth(3, 70);
+    bangDocGia->setColumnWidth(4, 110);
+    bangDocGia->setColumnWidth(5, 70);
+
     bangDocGia->setStyleSheet(
-        "QTableWidget { background-color: #1E1E2D; color: #FFFFFF; gridline-color: #2B2B40; "
+        "QTableView { background-color: #1E1E2D; color: #FFFFFF; gridline-color: #2B2B40; "
         "border: 1px solid #2B2B40; border-radius: 8px; font-size: 13px; }"
         "QHeaderView::section { background-color: #2B2B40; color: #B5B5C3; "
         "border: none; padding: 10px; font-weight: bold; }"
-        "QTableWidget::item { padding: 8px; }"
-        "QTableWidget::item:selected { background-color: #3699FF; color: white; }"
-        "QTableWidget::item:alternate { background-color: #1A1A27; }"
+        "QTableView::item { padding: 8px; }"
+        "QTableView::item:selected { background-color: #3699FF; color: white; }"
+        "QTableView::item:alternate { background-color: #1A1A27; }"
     );
+
+    // Ensure header labels are shown (model provides them via headerData)
+    bangDocGia->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
 }
 
 void WidgetMuonTraSach::hienThiDanhSachDocGia() {
-    extern PTRDG rootDocGia;
-    
-    // Láº¥y toÃ n bá»™ Ä‘á»™c giáº£
+    // Lấy toàn bộ độc giả (use DBBatcher snapshot when available)
     PTRDG danhSach[1000];
     int tongSo = 0;
+#if defined(__has_include) && __has_include("utils/DBBatcher.h")
+    std::vector<PTRDG> _tmp = DBBatcher::snapshotDocGia();
+    int _cnt = static_cast<int>(std::min<size_t>(_tmp.size(), 1000));
+    for (int _i = 0; _i < _cnt; ++_i) danhSach[_i] = _tmp[_i];
+    tongSo = _cnt;
+#else
     DuyetCayRaMang(rootDocGia, danhSach, tongSo);
+#endif
     
     // LÆ°u danh sÃ¡ch Ä‘áº§y Ä‘á»§
     danhSachDocGia.clear();
@@ -402,72 +568,18 @@ void WidgetMuonTraSach::hienThiDanhSachDocGia() {
 }
 
 void WidgetMuonTraSach::hienThiTrang() {
-    bangDocGia->setRowCount(0);
-    
-    // Hiá»ƒn thá»‹ toÃ n bá»™ danh sÃ¡ch
-    for (size_t i = 0; i < danhSachDocGia.size(); i++) {
-        PTRDG docGia = danhSachDocGia[i];
-        int hang = bangDocGia->rowCount();
-        bangDocGia->insertRow(hang);
-        
-        // STT
-        QTableWidgetItem *itemSTT = new QTableWidgetItem(QString::number(i + 1));
-        itemSTT->setTextAlignment(Qt::AlignCenter);
-        bangDocGia->setItem(hang, 0, itemSTT);
-        
-        // MÃ£ Tháº»
-        QTableWidgetItem *itemMaThe = new QTableWidgetItem(QString::number(docGia->data.MaThe));
-        itemMaThe->setTextAlignment(Qt::AlignCenter);
-        bangDocGia->setItem(hang, 1, itemMaThe);
-        
-        // Há» TÃªn
-        QString hoTen = QString("%1 %2")
-            .arg(QString::fromStdString(docGia->data.Ho))
-            .arg(QString::fromStdString(docGia->data.Ten));
-        QTableWidgetItem *itemHoTen = new QTableWidgetItem(hoTen);
-        bangDocGia->setItem(hang, 2, itemHoTen);
-        
-        // Giá»›i tÃ­nh
-        QString gioiTinh = docGia->data.Phai ? "Ná»¯" : "Nam";
-        QTableWidgetItem *itemGioiTinh = new QTableWidgetItem(gioiTinh);
-        itemGioiTinh->setTextAlignment(Qt::AlignCenter);
-        if (docGia->data.Phai) {
-            itemGioiTinh->setForeground(QBrush(QColor(255, 105, 180))); // #FF69B4
-        } else {
-            itemGioiTinh->setForeground(QBrush(QColor(54, 153, 255))); // #3699FF
-        }
-        bangDocGia->setItem(hang, 3, itemGioiTinh);
-        
-        // Tráº¡ng thÃ¡i
-        QString trangThai = docGia->data.TrangThai == 1 ? "Hoáº¡t Ä‘á»™ng" : "KhÃ³a";
-        QTableWidgetItem *itemTrangThai = new QTableWidgetItem(trangThai);
-        itemTrangThai->setTextAlignment(Qt::AlignCenter);
-        if (docGia->data.TrangThai == 1) {
-            itemTrangThai->setForeground(QBrush(QColor(27, 197, 189))); // #1BC5BD
-            itemTrangThai->setBackground(QBrush(QColor(27, 197, 189, 30)));
-        } else {
-            itemTrangThai->setForeground(QBrush(QColor(246, 78, 96))); // #F64E60
-            itemTrangThai->setBackground(QBrush(QColor(246, 78, 96, 30)));
-        }
-        bangDocGia->setItem(hang, 4, itemTrangThai);
-        
-        // Sá»‘ sÃ¡ch Ä‘ang mÆ°á»£n
-        QString sachDangMuon = QString("%1/3").arg(docGia->data.soSachDangMuon);
-        QTableWidgetItem *itemSach = new QTableWidgetItem(sachDangMuon);
-        itemSach->setTextAlignment(Qt::AlignCenter);
-        if (docGia->data.soSachDangMuon == 0) {
-            itemSach->setForeground(QBrush(QColor(181, 181, 195))); // #B5B5C3
-        } else if (docGia->data.soSachDangMuon < 3) {
-            itemSach->setForeground(QBrush(QColor(255, 168, 0))); // #FFA800
-        } else {
-            itemSach->setForeground(QBrush(QColor(246, 78, 96))); // #F64E60
-            itemSach->setBackground(QBrush(QColor(246, 78, 96, 30)));
-        }
-        bangDocGia->setItem(hang, 5, itemSach);
+    // Recompute total pages and clamp current page
+    tongSoTrang = (danhSachDocGia.size() + soDocGiaTrenTrang - 1) / soDocGiaTrenTrang;
+    if (tongSoTrang < 1) tongSoTrang = 1;
+    if (trangHienTai > tongSoTrang) trangHienTai = tongSoTrang;
+
+    if (modelDocGia) {
+        modelDocGia->setPage(trangHienTai);
+        modelDocGia->setPageSize(soDocGiaTrenTrang);
+        modelDocGia->refresh();
     }
-    
-    // Cáº­p nháº­t tá»•ng sá»‘
-    nhanTongDocGia->setText(QString("Tá»•ng: %1 Ä‘á»™c giáº£").arg(danhSachDocGia.size()));
+
+    nhanTongDocGia->setText(QString("Tổng: %1 độc giả").arg(danhSachDocGia.size()));
 }
 
 void WidgetMuonTraSach::xuLyTimKiem() {
@@ -554,8 +666,8 @@ void WidgetMuonTraSach::xuLyChonDocGia(int hang, int) {
     .arg(docGiaHienTai->data.soSachDangMuon >= 3 ? "#F64E60" : "#FFA800")
     .arg(docGiaHienTai->data.soSachDangMuon);
     
-    nhanThongTinDocGia->setText(thongTin);
-    nhanThongTinDocGia->setStyleSheet(
+    SafeGui::safeSetText(nhanThongTinDocGia, thongTin);
+    SafeGui::safeSetStyleSheet(nhanThongTinDocGia,
         "color: #FFFFFF; font-size: 13px; padding: 15px; "
         "background-color: #1E1E2D; border-radius: 6px;"
     );
@@ -580,14 +692,16 @@ void WidgetMuonTraSach::xuLyHuyChonDocGia() {
     docGiaHienTai = nullptr;
     bangDocGia->clearSelection();
     
-    nhanThongTinDocGia->setText("* Click vÃ o danh sÃ¡ch Ä‘á»™c giáº£ Ä‘á»ƒ chá»n");
-    nhanThongTinDocGia->setStyleSheet(
+    SafeGui::safeSetText(nhanThongTinDocGia, "* Click vÃ o danh sÃ¡ch Ä‘á»™c giáº£ Ä‘á»ƒ chá»n");
+    SafeGui::safeSetStyleSheet(nhanThongTinDocGia,
         "color: #B5B5C3; font-size: 13px; padding: 15px; "
         "background-color: #1E1E2D; border-radius: 6px;"
     );
     
-    bangSachDangMuon->setRowCount(0);
-    nhanTieuDeSachDangMuon->setTitle("SÃCH ÄANG MÆ¯á»¢N (0/3)");
+    // Clear model-backed data for borrowed books
+    danhSachSachDangMuon.clear();
+    if (modelSachDangMuon) { if (auto m = dynamic_cast<SachDangMuonModel*>(modelSachDangMuon)) m->refresh(); }
+    SafeGui::safeSetTitle(nhanTieuDeSachDangMuon, "SÁCH ĐANG MƯỢN (0/3)");
     
     oNhapISBN->clear();
     oNhapISBN->setEnabled(false);
@@ -601,25 +715,24 @@ void WidgetMuonTraSach::xuLyHuyChonDocGia() {
 
 void WidgetMuonTraSach::capNhatBangSachDangMuon() {
     if (!docGiaHienTai) return;
-    
-    bangSachDangMuon->setRowCount(0);
-    
     extern PTRDS dsDauSach[];
     extern int soLuongDauSach;
-    
+
     ThongTinSachDangMuon_DTO dsSach[3];
     int soSach = LayDSSachDangMuon(docGiaHienTai, dsSach, 3, dsDauSach, soLuongDauSach);
-    
+
+    danhSachSachDangMuon.clear();
     for (int i = 0; i < soSach; i++) {
-        int hang = bangSachDangMuon->rowCount();
-        bangSachDangMuon->insertRow(hang);
-        
-        bangSachDangMuon->setItem(hang, 0, new QTableWidgetItem(QString::fromStdString(dsSach[i].maSach)));
-        bangSachDangMuon->setItem(hang, 1, new QTableWidgetItem(QString::fromStdString(dsSach[i].tenSach)));
-        bangSachDangMuon->setItem(hang, 2, new QTableWidgetItem(QString::fromStdString(dsSach[i].ngayMuon)));
+        danhSachSachDangMuon.push_back(dsSach[i]);
     }
-    
-    nhanTieuDeSachDangMuon->setTitle(QString("SÃCH ÄANG MÆ¯á»¢N (%1/3)").arg(soSach));
+
+    // Use uniform row height for performance
+    bangSachDangMuon->verticalHeader()->setDefaultSectionSize(36);
+
+    // refresh model
+    if (modelSachDangMuon) { if (auto m = dynamic_cast<SachDangMuonModel*>(modelSachDangMuon)) m->refresh(); }
+
+    nhanTieuDeSachDangMuon->setTitle(QString("SÁCH ĐANG MƯỢN (%1/3)").arg(soSach));
 }
 
 void WidgetMuonTraSach::xuLyThayDoiCheckbox(int trangThai) {
@@ -760,9 +873,9 @@ void WidgetMuonTraSach::xuLyNutXacNhanMuon() {
         nutXacNhanMuon->setEnabled(false);
         
         // Cáº­p nháº­t thÃ´ng tin Ä‘á»™c giáº£
-        int chiSo = (trangHienTai - 1) * soDocGiaTrenTrang + bangDocGia->currentRow();
+        int chiSo = (trangHienTai - 1) * soDocGiaTrenTrang + bangDocGia->currentIndex().row();
         if (chiSo >= 0 && chiSo < (int)danhSachDocGia.size()) {
-            xuLyChonDocGia(bangDocGia->currentRow(), 0);
+            xuLyChonDocGia(bangDocGia->currentIndex().row(), 0);
         }
     } else {
         QMessageBox::warning(this, "Lá»—i", QString::fromStdString(ketQua));
@@ -775,14 +888,19 @@ void WidgetMuonTraSach::xuLyNutXacNhanTra() {
         return;
     }
     
-    int dongChon = bangSachDangMuon->currentRow();
+    int dongChon = bangSachDangMuon->currentIndex().row();
     if (dongChon < 0) {
         QMessageBox::warning(this, "Cáº£nh BÃ¡o", "Vui lÃ²ng chá»n sÃ¡ch cáº§n tráº£!");
         return;
     }
-    
-    QString maSach = bangSachDangMuon->item(dongChon, 0)->text();
-    QString tenSach = bangSachDangMuon->item(dongChon, 1)->text();
+    if (dongChon < 0 || dongChon >= (int)danhSachSachDangMuon.size()) {
+        QMessageBox::warning(this, "Cảnh Báo", "Dữ liệu chọn không hợp lệ!");
+        return;
+    }
+
+    const ThongTinSachDangMuon_DTO &dto = danhSachSachDangMuon[dongChon];
+    QString maSach = QString::fromStdString(dto.maSach);
+    QString tenSach = QString::fromStdString(dto.tenSach);
     
     QMessageBox::StandardButton xacNhan = QMessageBox::question(this, "XÃ¡c Nháº­n Tráº£ SÃ¡ch",
         QString("XÃ¡c nháº­n tráº£ sÃ¡ch:\n\nMÃ£: %1\nTÃªn: %2")
@@ -817,9 +935,9 @@ void WidgetMuonTraSach::xuLyNutXacNhanTra() {
             nutInLaiPhieu->setEnabled(false);
             
             // Cập nhật thông tin độc giả
-            int chiSo = (trangHienTai - 1) * soDocGiaTrenTrang + bangDocGia->currentRow();
+            int chiSo = (trangHienTai - 1) * soDocGiaTrenTrang + bangDocGia->currentIndex().row();
             if (chiSo >= 0 && chiSo < (int)danhSachDocGia.size()) {
-                xuLyChonDocGia(bangDocGia->currentRow(), 0);
+                xuLyChonDocGia(bangDocGia->currentIndex().row(), 0);
             }
         } else {
             QMessageBox::warning(this, "Lá»—i", QString::fromStdString(ketQua));
@@ -833,14 +951,18 @@ void WidgetMuonTraSach::xuLyNutBaoMat() {
         return;
     }
     
-    int dongChon = bangSachDangMuon->currentRow();
+    int dongChon = bangSachDangMuon->currentIndex().row();
     if (dongChon < 0) {
         QMessageBox::warning(this, "Cáº£nh BÃ¡o", "Vui lÃ²ng chá»n sÃ¡ch cáº§n bÃ¡o máº¥t!");
         return;
     }
-    
-    QString maSach = bangSachDangMuon->item(dongChon, 0)->text();
-    QString tenSach = bangSachDangMuon->item(dongChon, 1)->text();
+    if (dongChon < 0 || dongChon >= (int)danhSachSachDangMuon.size()) {
+        QMessageBox::warning(this, "Cảnh Báo", "Dữ liệu chọn không hợp lệ!");
+        return;
+    }
+    const ThongTinSachDangMuon_DTO &dto = danhSachSachDangMuon[dongChon];
+    QString maSach = QString::fromStdString(dto.maSach);
+    QString tenSach = QString::fromStdString(dto.tenSach);
     
     QMessageBox::StandardButton xacNhan = QMessageBox::question(this, "âš ï¸ XÃC NHáº¬N BÃO Máº¤T SÃCH",
         QString("âš ï¸ BÃO Máº¤T SÃCH lÃ  thao tÃ¡c NGHIÃŠM TRá»ŒNG!\n\nÄá»™c giáº£ sáº½ bá»‹ khÃ³a tÃ i khoáº£n.\n\nMÃ£: %1\nTÃªn: %2\n\nBáº¡n cÃ³ cháº¯c cháº¯n?")
@@ -871,9 +993,9 @@ void WidgetMuonTraSach::xuLyNutBaoMat() {
             nutBaoMat->setEnabled(false);
             
             // Cáº­p nháº­t thÃ´ng tin Ä‘á»™c giáº£
-            int chiSo = (trangHienTai - 1) * soDocGiaTrenTrang + bangDocGia->currentRow();
+            int chiSo = (trangHienTai - 1) * soDocGiaTrenTrang + bangDocGia->currentIndex().row();
             if (chiSo >= 0 && chiSo < (int)danhSachDocGia.size()) {
-                xuLyChonDocGia(bangDocGia->currentRow(), 0);
+                xuLyChonDocGia(bangDocGia->currentIndex().row(), 0);
             }
             
         } else {
@@ -888,16 +1010,16 @@ void WidgetMuonTraSach::xuLyInLaiPhieu() {
         return;
     }
     
-    int dongChon = bangSachDangMuon->currentRow();
-    if (dongChon < 0) {
+    int dongChon = bangSachDangMuon->currentIndex().row();
+    if (dongChon < 0 || dongChon >= (int)danhSachSachDangMuon.size()) {
         QMessageBox::warning(this, "Cảnh Báo", "Vui lòng chọn sách để in lại phiếu!");
         return;
     }
-    
-    // Lấy thông tin sách từ bảng
-    QString maSach = bangSachDangMuon->item(dongChon, 0)->text();
-    QString tenSach = bangSachDangMuon->item(dongChon, 1)->text();
-    QString ngayMuon = bangSachDangMuon->item(dongChon, 2)->text();
+
+    const ThongTinSachDangMuon_DTO &dto = danhSachSachDangMuon[dongChon];
+    QString maSach = QString::fromStdString(dto.maSach);
+    QString tenSach = QString::fromStdString(dto.tenSach);
+    QString ngayMuon = QString::fromStdString(dto.ngayMuon);
     
     // In lại phiếu mượn với QR code
     PrintHelper::inPhieuMuonTuDong(docGiaHienTai, maSach, tenSach, ngayMuon, this);

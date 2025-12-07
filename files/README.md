@@ -16,7 +16,7 @@ Thư mục **DUY NHẤT** chứa toàn bộ file dữ liệu của hệ thống.
 Ứng dụng sẽ **đọc/ghi trực tiếp** từ thư mục này, không copy sang build output.
 
 ```
-E:\Qt\QuanLyThuVien\files\
+E:\Qt\QuanLyThuVien\data\
 ```
 
 ## 📝 Format dữ liệu
@@ -44,5 +44,5 @@ MaSach|MaThe|NgayMuon|NgayTra|TrangThai
 ## ⚠️ Lưu ý
 
 - **KHÔNG XÓA** các file dữ liệu khi đang chạy ứng dụng
-- Hệ thống tự động backup vào `files/backup/` khi có thay đổi
+- Hệ thống tự động backup vào `data/backup/` khi có thay đổi
 - Tất cả file dùng encoding **UTF-8** để hỗ trợ tiếng Việt

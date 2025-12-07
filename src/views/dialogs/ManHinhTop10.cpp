@@ -1,6 +1,8 @@
 #include "views/dialogs/ManHinhTop10.h"
 #include "models/QuanLySach.h"
 #include "models/DocGia.h"
+#include <QTableView>
+#include <QAbstractTableModel>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -13,12 +15,90 @@
 #include <algorithm>
 #include <vector>
 
-// Struct để lưu thông tin sách và số lượt mượn
-struct SachVaSoLuotMuon {
-    PTRDS sach;
-    int soLuotMuon;
-    int soLuotMuonTruoc;  // Số lượt mượn kỳ trước (để so sánh)
-    int thayDoi;  // Chênh lệch so với kỳ trước
+// Lightweight model for Top10 table
+class Top10TableModel : public QAbstractTableModel {
+public:
+    Top10TableModel(std::vector<SachVaSoLuotMuon> *data, QObject *parent = nullptr)
+        : QAbstractTableModel(parent), m_data(data) {}
+
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override {
+        Q_UNUSED(parent)
+        return m_data ? (int)m_data->size() : 0;
+    }
+
+    int columnCount(const QModelIndex &parent = QModelIndex()) const override {
+        Q_UNUSED(parent)
+        return 7;
+    }
+
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override {
+        if (!m_data || !index.isValid()) return QVariant();
+        int r = index.row();
+        if (r < 0 || r >= (int)m_data->size()) return QVariant();
+        const SachVaSoLuotMuon &item = (*m_data)[r];
+
+        if (role == Qt::DisplayRole) {
+            switch (index.column()) {
+            case 0: return QString::number(r + 1);
+            case 1: return QString::fromStdString(item.sach->ISBN);
+            case 2: return QString::fromStdString(item.sach->tenSach);
+            case 3: return QString::fromStdString(item.sach->tacGia);
+            case 4: return QString::number(item.soLuotMuon);
+            case 5: return QString::number(item.tyLe, 'f', 1) + "%";
+            case 6: {
+                if (item.thayDoi > 0) return QString("🔼 +%1").arg(item.thayDoi);
+                if (item.thayDoi < 0) return QString("🔽 %1").arg(item.thayDoi);
+                return QString("-");
+            }
+            }
+        }
+
+        // Styling roles
+        if (role == Qt::BackgroundRole) {
+            if (index.column() == 0 && r < 3) {
+                static QStringList mauHang = {"#FFD700", "#C0C0C0", "#CD7F32"};
+                return QColor(mauHang[r]);
+            }
+        }
+
+        if (role == Qt::FontRole) {
+            QFont f;
+            if (index.column() == 0 && r < 3) { f.setBold(true); return f; }
+            if (index.column() == 2 && r < 3) { f.setBold(true); return f; }
+            if (index.column() == 4) { f.setBold(true); return f; }
+        }
+
+        if (role == Qt::ForegroundRole) {
+            if (index.column() == 4) return QColor("#27ae60");
+            if (index.column() == 6) {
+                if (item.thayDoi > 0) return QColor("#27ae60");
+                if (item.thayDoi < 0) return QColor("#e74c3c");
+                return QColor("#95a5a6");
+            }
+        }
+
+        return QVariant();
+    }
+
+    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override {
+        if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
+            switch (section) {
+            case 0: return QStringLiteral("Hạng");
+            case 1: return QStringLiteral("ISBN");
+            case 2: return QStringLiteral("Tên Sách");
+            case 3: return QStringLiteral("Tác Giả");
+            case 4: return QStringLiteral("Số Lượt");
+            case 5: return QStringLiteral("Tỷ Lệ");
+            case 6: return QStringLiteral("Xu Hướng");
+            }
+        }
+        return QAbstractTableModel::headerData(section, orientation, role);
+    }
+
+    void refresh() { beginResetModel(); endResetModel(); }
+
+private:
+    std::vector<SachVaSoLuotMuon> *m_data;
 };
 
 ManHinhTop10::ManHinhTop10(PTRDS dsDauSach[], int soLuongDauSach, QWidget *parent)
@@ -137,14 +217,10 @@ void ManHinhTop10::thietLapGiaoDien() {
     nhanSoSanh->setWordWrap(true);
     mainLayout->addWidget(nhanSoSanh);
     
-    // Bảng Top 10 (7 cột: thêm "Xu hướng")
-    bangTop10 = new QTableWidget(this);
-    bangTop10->setColumnCount(7);
-    bangTop10->setHorizontalHeaderLabels({
-        "Hạng", "ISBN", "Tên Sách", "Tác Giả", 
-        "Số Lượt", "Tỷ Lệ", "Xu Hướng"
-    });
-    
+    // Bảng Top 10 (model/view)
+    bangTop10 = new QTableView(this);
+    modelTop10 = new Top10TableModel(&danhSachTop, this);
+    bangTop10->setModel(modelTop10);
     bangTop10->setSelectionBehavior(QAbstractItemView::SelectRows);
     bangTop10->setSelectionMode(QAbstractItemView::SingleSelection);
     bangTop10->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -153,7 +229,7 @@ void ManHinhTop10::thietLapGiaoDien() {
     bangTop10->horizontalHeader()->setStretchLastSection(true);
     bangTop10->setShowGrid(true);
     
-    // Đặt chiều rộng cột
+    // Đặt chiều rộng cột (vẫn áp dụng cho QTableView)
     bangTop10->setColumnWidth(0, 70);   // Hạng
     bangTop10->setColumnWidth(1, 100);  // ISBN
     bangTop10->setColumnWidth(2, 250);  // Tên sách
@@ -202,17 +278,17 @@ void ManHinhTop10::thietLapGiaoDien() {
 
 void ManHinhTop10::apDungPhongCach() {
     bangTop10->setStyleSheet(
-        "QTableWidget { "
+        "QTableView { "
         "    background-color: white; "
         "    alternate-background-color: #f8f9fa; "
         "    border: 2px solid #bdc3c7; "
         "    border-radius: 5px; "
         "    gridline-color: #ecf0f1; "
         "} "
-        "QTableWidget::item { "
+        "QTableView::item { "
         "    padding: 8px; "
         "} "
-        "QTableWidget::item:selected { "
+        "QTableView::item:selected { "
         "    background-color: #3498db; "
         "    color: white; "
         "} "
@@ -262,7 +338,8 @@ void ManHinhTop10::apDungPhongCach() {
 }
 
 void ManHinhTop10::capNhatBangTop10() {
-    bangTop10->setRowCount(0);
+    // Clear model-backed data (model will be refreshed after we repopulate danhSachTop)
+    // No direct setRowCount on QTableView.
     
     if (soLuong == 0) {
         nhanThongTin->setText("Chưa có dữ liệu sách trong hệ thống");
@@ -294,20 +371,17 @@ void ManHinhTop10::capNhatBangTop10() {
         coBoLoc = true;
     }
     
-    // Thu thập dữ liệu và tính số lượt mượn
-    std::vector<SachVaSoLuotMuon> danhSach;
+    // Thu thập dữ liệu và tính số lượt mượn -> populate member danhSachTop and refresh model
+    danhSachTop.clear();
     int tongLuotMuon = 0;
-    
+
     for (int i = 0; i < soLuong; i++) {
         if (danhSachDauSach[i]) {
             SachVaSoLuotMuon item;
             item.sach = danhSachDauSach[i];
-            
+
             if (coBoLoc) {
-                // Đếm lượt mượn trong khoảng thời gian
                 item.soLuotMuon = demLuotMuonTheoKhoangThoiGian(danhSachDauSach[i], tuNgay, denNgay);
-                
-                // Nếu có so sánh xu hướng, tính kỳ trước
                 if (checkSoSanh->isChecked()) {
                     int soNgay = tuNgay.daysTo(denNgay) + 1;
                     QDate tuNgayTruoc = tuNgay.addDays(-soNgay);
@@ -319,20 +393,19 @@ void ManHinhTop10::capNhatBangTop10() {
                     item.thayDoi = 0;
                 }
             } else {
-                // Tất cả thời gian
                 item.soLuotMuon = danhSachDauSach[i]->soLuotMuon;
                 item.soLuotMuonTruoc = 0;
                 item.thayDoi = 0;
             }
-            
+
             if (item.soLuotMuon > 0) {
-                danhSach.push_back(item);
+                danhSachTop.push_back(item);
                 tongLuotMuon += item.soLuotMuon;
             }
         }
     }
-    
-    if (danhSach.empty()) {
+
+    if (danhSachTop.empty()) {
         nhanThongTin->setText("Chưa có sách nào được mượn trong khoảng thời gian này");
         nhanThongTin->setStyleSheet(
             "color: #64748b; font-weight: bold; padding: 12px; "
@@ -343,99 +416,31 @@ void ManHinhTop10::capNhatBangTop10() {
     }
     
     // Sắp xếp theo số lượt mượn giảm dần
-    std::sort(danhSach.begin(), danhSach.end(), 
+    std::sort(danhSachTop.begin(), danhSachTop.end(), 
         [](const SachVaSoLuotMuon& a, const SachVaSoLuotMuon& b) {
             return a.soLuotMuon > b.soLuotMuon;
         });
-    
+
     // Lấy top 10
-    int soLuongHienThi = std::min(10, (int)danhSach.size());
-    bangTop10->setRowCount(soLuongHienThi);
+    int soLuongHienThi = std::min(10, (int)danhSachTop.size());
+    if ((int)danhSachTop.size() > soLuongHienThi) danhSachTop.resize(soLuongHienThi);
     
     // Màu cho huy chương
     QStringList mauHang = {"#FFD700", "#C0C0C0", "#CD7F32"};  // Vàng, Bạc, Đồng
     QStringList iconHang = {"🥇", "🥈", "🥉"};
     
     for (int i = 0; i < soLuongHienThi; i++) {
-        const SachVaSoLuotMuon& item = danhSach[i];
-        
-        // Hạng
-        QTableWidgetItem* itemHang = new QTableWidgetItem();
-        if (i < 3) {
-            itemHang->setText(iconHang[i] + " " + QString::number(i + 1));
-            QFont fontHang = itemHang->font();
-            fontHang.setBold(true);
-            itemHang->setFont(fontHang);
-            itemHang->setBackground(QColor(mauHang[i]));
-        } else {
-            itemHang->setText(QString::number(i + 1));
-        }
-        itemHang->setTextAlignment(Qt::AlignCenter);
-        bangTop10->setItem(i, 0, itemHang);
-        
-        // ISBN
-        QTableWidgetItem* itemISBN = new QTableWidgetItem(
-            QString::fromStdString(item.sach->ISBN));
-        itemISBN->setTextAlignment(Qt::AlignCenter);
-        bangTop10->setItem(i, 1, itemISBN);
-        
-        // Tên sách
-        QTableWidgetItem* itemTen = new QTableWidgetItem(
-            QString::fromStdString(item.sach->tenSach));
-        QFont fontTen = itemTen->font();
-        if (i < 3) fontTen.setBold(true);
-        itemTen->setFont(fontTen);
-        bangTop10->setItem(i, 2, itemTen);
-        
-        // Tác giả
-        QTableWidgetItem* itemTacGia = new QTableWidgetItem(
-            QString::fromStdString(item.sach->tacGia));
-        bangTop10->setItem(i, 3, itemTacGia);
-        
-        // Số lượt mượn
-        QTableWidgetItem* itemSoLuot = new QTableWidgetItem(
-            QString::number(item.soLuotMuon));
-        itemSoLuot->setTextAlignment(Qt::AlignCenter);
-        QFont fontSoLuot = itemSoLuot->font();
-        fontSoLuot.setBold(true);
-        itemSoLuot->setFont(fontSoLuot);
-        itemSoLuot->setForeground(QColor("#27ae60"));
-        bangTop10->setItem(i, 4, itemSoLuot);
-        
-        // Tỷ lệ
-        double tyLe = (tongLuotMuon > 0) ? 
-            (item.soLuotMuon * 100.0 / tongLuotMuon) : 0;
-        QTableWidgetItem* itemTyLe = new QTableWidgetItem(
-            QString::number(tyLe, 'f', 1) + "%");
-        itemTyLe->setTextAlignment(Qt::AlignCenter);
-        bangTop10->setItem(i, 5, itemTyLe);
-        
-        // Xu hướng (cột mới)
-        QTableWidgetItem* itemXuHuong = new QTableWidgetItem();
-        if (checkSoSanh->isChecked() && coBoLoc) {
-            if (item.thayDoi > 0) {
-                itemXuHuong->setText(QString("🔼 +%1").arg(item.thayDoi));
-                itemXuHuong->setForeground(QColor("#27ae60"));
-            } else if (item.thayDoi < 0) {
-                itemXuHuong->setText(QString("🔽 %1").arg(item.thayDoi));
-                itemXuHuong->setForeground(QColor("#e74c3c"));
-            } else {
-                itemXuHuong->setText("➖ 0");
-                itemXuHuong->setForeground(QColor("#95a5a6"));
-            }
-            QFont fontXH = itemXuHuong->font();
-            fontXH.setBold(true);
-            itemXuHuong->setFont(fontXH);
-        } else {
-            itemXuHuong->setText("-");
-        }
-        itemXuHuong->setTextAlignment(Qt::AlignCenter);
-        bangTop10->setItem(i, 6, itemXuHuong);
-        
-        // Đặt chiều cao hàng
-        bangTop10->setRowHeight(i, 45);
+        const SachVaSoLuotMuon& item = danhSachTop[i];
+        // compute and store percentage
+        double tyLe = (tongLuotMuon > 0) ? (item.soLuotMuon * 100.0 / tongLuotMuon) : 0;
+        danhSachTop[i].tyLe = tyLe;
+        // Use uniform row height for visuals (avoid per-row calls)
+        Q_UNUSED(i);
     }
-    
+    // Ensure uniform row height
+    bangTop10->verticalHeader()->setDefaultSectionSize(45);
+    // Refresh model
+    if (modelTop10) { if (auto m = dynamic_cast<Top10TableModel*>(modelTop10)) m->refresh(); }
     // Cập nhật thông tin
     QString khoangTG = coBoLoc ? 
         QString("từ %1 đến %2").arg(tuNgay.toString("dd/MM/yyyy")).arg(denNgay.toString("dd/MM/yyyy")) :
@@ -444,7 +449,7 @@ void ManHinhTop10::capNhatBangTop10() {
     nhanThongTin->setText(
         QString("Khoảng: <b>%1</b> | %2 đầu sách | Tổng lượt: %3 | Hiển thị top %4")
             .arg(khoangTG)
-            .arg(danhSach.size())
+            .arg(danhSachTop.size())
             .arg(tongLuotMuon)
             .arg(soLuongHienThi)
     );
@@ -533,12 +538,15 @@ int ManHinhTop10::demLuotMuonTheoKhoangThoiGian(PTRDS dauSach, QDate tuNgay, QDa
 void ManHinhTop10::hienThiSoSanhXuHuong() {
     // Tính tổng xu hướng
     int tongTang = 0, tongGiam = 0, tongKhongDoi = 0;
-    
-    for (int row = 0; row < bangTop10->rowCount(); row++) {
-        QString xuHuong = bangTop10->item(row, 6)->text();
-        if (xuHuong.contains("🔼")) tongTang++;
-        else if (xuHuong.contains("🔽")) tongGiam++;
-        else tongKhongDoi++;
+    QAbstractItemModel *m = modelTop10;
+    if (m) {
+        for (int row = 0; row < m->rowCount(); row++) {
+            QModelIndex idx = m->index(row, 6);
+            QString xuHuong = m->data(idx, Qt::DisplayRole).toString();
+            if (xuHuong.contains("🔼")) tongTang++;
+            else if (xuHuong.contains("🔽")) tongGiam++;
+            else tongKhongDoi++;
+        }
     }
     
     QString thongBao;
@@ -609,11 +617,14 @@ void ManHinhTop10::onExportReport() {
     html += "<table>";
     html += "<tr><th>Hạng</th><th>ISBN</th><th>Tên Sách</th><th>Tác Giả</th><th>Số Lượt</th><th>Tỷ Lệ</th><th>Xu Hướng</th></tr>";
     
-    for (int row = 0; row < bangTop10->rowCount(); row++) {
+    QAbstractItemModel *m = modelTop10;
+    int rows = m ? m->rowCount() : 0;
+    for (int row = 0; row < rows; row++) {
         QString rankClass = (row == 0) ? "rank1" : (row == 1) ? "rank2" : (row == 2) ? "rank3" : "";
         html += QString("<tr class='%1'>").arg(rankClass);
         for (int col = 0; col < 7; col++) {
-            QString text = bangTop10->item(row, col)->text();
+            QModelIndex idx = m->index(row, col);
+            QString text = m->data(idx, Qt::DisplayRole).toString();
             html += QString("<td>%1</td>").arg(text);
         }
         html += "</tr>";

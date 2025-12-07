@@ -2,7 +2,7 @@
 #define CONSTANTS_H
 
 // gioi han kich thuoc
-constexpr int MAX_DAUSACH = 1000;         // gioi han so dau sach
+constexpr int MAX_DAUSACH = 10000;         // gioi han so dau sach
 constexpr int MAX_BAN_SAO = 100;          // ioi han so ban sao moi dau sach
 constexpr int MAX_KET_QUA_TIM_KIEM = 100; // so ket qua tim kiem toi da hien thi
 constexpr int MAX_VI_TRI_KE = 50;         // do dai vi tri ke toi da
@@ -31,6 +31,8 @@ constexpr int SO_LAN_THU_TOI_DA = 3;       // so lan thu nhap sai toi da
 // cau hinh xu ly noi bo
 constexpr int SO_VONG_LAP_DMS_MAX = 1000;  // gioi han vong lap de tranh treo khi duyet DSLK loi
 constexpr int MAX_LAN_THU_SINH_MA = 100;   // so lan thu sinh ma ngau nhien (neu can)
+// Gioi han vong lap khi duyet lich su muon-tra (muontra linked list)
+constexpr int SO_VONG_LAP_MT_MAX = 10000; // safety cap to avoid crashes on corrupted lists
 
 // cau hinh doc/Ghi File
 constexpr int DUNG_LUONG_CACHE_MAC_DINH = 256; // kich thuoc buffer doc file

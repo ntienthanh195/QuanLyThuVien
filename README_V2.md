@@ -43,7 +43,7 @@ QuanLyThuVien/
 │   ├── fonts/                 # Phông chữ
 │   └── icons/                 # Biểu tượng
 │
-├── files/                      # Dữ liệu (KHÔNG THAY ĐỔI)
+├── data/                       # Dữ liệu (KHÔNG THAY ĐỔI)
 │   ├── dausach.txt
 │   ├── danhmucsach.txt
 │   ├── docgia.txt
@@ -223,7 +223,7 @@ struct TheDocGia {
 
 ## 🛠️ Troubleshooting
 
-### Lỗi "Cannot find files/dausach.txt"
+### Lỗi "Cannot find data/dausach.txt"
 
 **Nguyên nhân**: Working directory không đúng
 

@@ -8,12 +8,116 @@
 #include "utils/ResponsiveHelper.h"
 #include "utils/AnimationHelper.h"
 #include "utils/ConfirmationDialog.h"
+#include "utils/EventBus.h"
+#include "utils/SafeGui.h"
+// DBBatcher integration is optional for the legacy `nguon/` build;
+// use local fallbacks where DBBatcher header is not available.
+// If DBBatcher is present in the include path, include it so callers
+// (below) can use `DBBatcher::...`. We guard with __has_include to
+// avoid breaking older toolchains that don't provide this header.
+#if defined(__has_include)
+#  if __has_include("utils/DBBatcher.h")
+#    include "utils/DBBatcher.h"
+#  endif
+#endif
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QMessageBox>
 #include <QDebug>
 #include <QGraphicsDropShadowEffect>
+#include <QFileDialog>
+#include <QProcess>
+#include <QDialog>
+#include <QTextEdit>
+#include <QLabel>
+#include <QPushButton>
+#include <QDesktopServices>
+#include <QUrl>
+#include <QFileSystemWatcher>
+#include <QProgressDialog>
+#include <QTableView>
+#include <QAbstractTableModel>
+#include <algorithm>
+
+// Lightweight legacy model for the old UI (reads from global arrays)
+class LegacyBookModel : public QAbstractTableModel {
+public:
+    LegacyBookModel(QObject *parent = nullptr) : QAbstractTableModel(parent) {}
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override {
+        Q_UNUSED(parent);
+        return LaySoLuongDauSach();
+    }
+    int columnCount(const QModelIndex &parent = QModelIndex()) const override {
+        Q_UNUSED(parent);
+        return 9;
+    }
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override {
+        if (!index.isValid()) return QVariant();
+        PTRDS *arr = LayDanhSachDauSach();
+        int n = LaySoLuongDauSach();
+        int r = index.row();
+        if (r < 0 || r >= n) return QVariant();
+        PTRDS d = arr ? arr[r] : nullptr;
+        if (!d) return QVariant();
+        if (role == Qt::DisplayRole) {
+            switch (index.column()) {
+                case 0: return QString::number(r + 1);
+                case 1: return QString::fromStdString(d->ISBN);
+                case 2: return QString::fromStdString(d->tenSach);
+                case 3: return QString::fromStdString(d->tacGia);
+                case 4: return QString::fromStdString(d->theLoai);
+                case 5: return d->namXuatBan;
+                case 6: return d->soTrang;
+                case 7: {
+                    int tong = d->tongBanSao;
+                    int daMuon = 0, thanhLy = 0;
+                    PTRDMS p = d->dms; int dem = 0;
+                    while (p && dem < 10000) { if (p->trangThai == DANG_MUON) daMuon++; else if (p->trangThai == THANH_LY) thanhLy++; p = p->next; dem++; }
+                    int conLai = tong - daMuon - thanhLy;
+                    return QString("%1/%2").arg(conLai).arg(tong);
+                }
+                case 8: return QString("...");
+            }
+        }
+        return QVariant();
+    }
+    QVariant headerData(int section, Qt::Orientation orientation, int role) const override {
+        if (role != Qt::DisplayRole) return QVariant();
+        if (orientation == Qt::Horizontal) {
+            switch (section) {
+                case 0: return "STT";
+                case 1: return "ISBN";
+                case 2: return "Tên Sách";
+                case 3: return "Tác Giả";
+                case 4: return "Thể Loại";
+                case 5: return "Năm XB";
+                case 6: return "Số Trang";
+                case 7: return "Trạng Thái";
+                case 8: return "Thao Tác";
+            }
+        }
+        return QVariant();
+    }
+    // Public refresh helper that properly resets the model
+    void refresh() {
+        beginResetModel();
+        endResetModel();
+    }
+};
+
+// Local helper fallback: lấy danh sách PTRDMS cho một ISBN bằng API cũ.
+// Việc này giúp file trong `nguon/` biên dịch độc lập khi include chung chưa sẵn sàng.
+static std::vector<PTRDMS> local_layBanSaoTheoISBN_fallback(const std::string &isbn) {
+    std::vector<PTRDMS> out;
+    // dự đoán số lượng tối đa
+    PTRDMS buf[MAX_BAN_SAO];
+    int cnt = LayDanhSachBanSaoSapXep(isbn, buf, MAX_BAN_SAO);
+    if (cnt <= 0) return out;
+    out.reserve(cnt);
+    for (int i = 0; i < cnt; ++i) if (buf[i]) out.push_back(buf[i]);
+    return out;
+}
 
 WidgetQuanLySach::WidgetQuanLySach(QWidget *cha) 
     : QWidget(cha), dauSachDangChon(nullptr) {
@@ -26,6 +130,41 @@ WidgetQuanLySach::WidgetQuanLySach(QWidget *cha)
     setObjectName("WidgetQuanLySach");
     thieLapGiaoDien();
     taiLaiDanhSach();
+    // Realtime: refresh when book data changes
+    connect(&EventBus::instance(), &EventBus::dauSachAdded, this, [this](const QString&){ this->taiLaiDanhSach(); });
+    connect(&EventBus::instance(), &EventBus::dauSachUpdated, this, [this](const QString&){ this->taiLaiDanhSach(); });
+    connect(&EventBus::instance(), &EventBus::dauSachRemoved, this, [this](const QString&){ this->taiLaiDanhSach(); });
+    // Update when loans change (affects availability counters)
+    connect(&EventBus::instance(), &EventBus::muonTraAdded, this, [this](int, const QString&){ this->taiLaiDanhSach(); });
+    connect(&EventBus::instance(), &EventBus::muonTraUpdated, this, [this](int, const QString&){ this->taiLaiDanhSach(); });
+    connect(&EventBus::instance(), &EventBus::muonTraRemoved, this, [this](int, const QString&){ this->taiLaiDanhSach(); });
+
+    // Watch data directory and library.db for external changes (imports, backups)
+    try {
+        FilePathManager::initialize();
+        QString filesDir = FilePathManager::getFilesDirectory();
+        QString dbPath = QDir(filesDir).filePath("files/library.db");
+        fsWatcher = new QFileSystemWatcher(this);
+        // watch directory always, watch DB file if exists
+        if (QDir(filesDir).exists()) fsWatcher->addPath(filesDir);
+        if (QFile::exists(dbPath)) fsWatcher->addPath(dbPath);
+        connect(fsWatcher, &QFileSystemWatcher::fileChanged, this, &WidgetQuanLySach::onWatchedFileChanged);
+        connect(fsWatcher, &QFileSystemWatcher::directoryChanged, this, &WidgetQuanLySach::onWatchedFileChanged);
+
+        fsDebounceTimer = new QTimer(this);
+        fsDebounceTimer->setSingleShot(true);
+        fsDebounceTimer->setInterval(700);
+        connect(fsDebounceTimer, &QTimer::timeout, this, [this]() { this->taiLaiDanhSach();
+            // re-add db path if it was replaced
+            QString filesDir2 = FilePathManager::getFilesDirectory();
+            QString dbPath2 = QDir(filesDir2).filePath("library.db");
+            if (QFile::exists(dbPath2) && !fsWatcher->files().contains(dbPath2)) {
+                fsWatcher->addPath(dbPath2);
+            }
+        });
+    } catch (...) {
+        // ignore watcher setup failures
+    }
 }
 
 WidgetQuanLySach::~WidgetQuanLySach() {}
@@ -127,6 +266,11 @@ void WidgetQuanLySach::thieLapHeaderBar() {
     connect(nutXoaSach, &QPushButton::clicked, this, &WidgetQuanLySach::xuLyNutXoaSach);
     connect(nutXemChiTiet, &QPushButton::clicked, this, &WidgetQuanLySach::xuLyNutXemChiTiet);
     connect(nutNhapFile, &QPushButton::clicked, this, &WidgetQuanLySach::xuLyNhapDuLieuTu);
+}
+
+void WidgetQuanLySach::onWatchedFileChanged(const QString &path) {
+    Q_UNUSED(path);
+    if (fsDebounceTimer) fsDebounceTimer->start();
 }
 
 void WidgetQuanLySach::thieLapTimKiem() {
@@ -244,6 +388,12 @@ void WidgetQuanLySach::thieLapTimKiem() {
     
     boTriChinh->addWidget(searchBar);
     
+    // Result label for search feedback
+    nhanKetQuaTimKiem = new QLabel("");
+    nhanKetQuaTimKiem->setStyleSheet("color: #CFCFCF; font-size: 12px; padding-left: 6px;");
+    nhanKetQuaTimKiem->setFixedHeight(20);
+    boTriChinh->addWidget(nhanKetQuaTimKiem);
+    
     // Tải danh sách thể loại
     taiDanhSachTheLoai();
     
@@ -255,11 +405,9 @@ void WidgetQuanLySach::thieLapTimKiem() {
 }
 
 void WidgetQuanLySach::thieLapBangSach() {
-    bangSach = new QTableWidget();
-    bangSach->setColumnCount(9);
-    bangSach->setHorizontalHeaderLabels({
-        "STT", "ISBN", "Tên Sách", "Tác Giả", "Thể Loại", "Năm XB", "Số Trang", "Trạng Thái", "Thao Tác"
-    });
+    bangSach = new QTableView();
+    LegacyBookModel *legacyModel = new LegacyBookModel(this);
+    bangSach->setModel(legacyModel);
     bangSach->setSelectionBehavior(QAbstractItemView::SelectRows);
     bangSach->setSelectionMode(QAbstractItemView::SingleSelection);
     bangSach->setAlternatingRowColors(true);
@@ -317,6 +465,7 @@ void WidgetQuanLySach::thieLapBangSach() {
     
     // Set column widths
     bangSach->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
+    bangSach->horizontalHeader()->setDefaultSectionSize(150);
     bangSach->setColumnWidth(0, 50);   // STT
     bangSach->setColumnWidth(1, 130);  // ISBN
     bangSach->setColumnWidth(2, 260);  // Tên Sách
@@ -330,31 +479,32 @@ void WidgetQuanLySach::thieLapBangSach() {
     // Row height
     bangSach->verticalHeader()->setDefaultSectionSize(45);
     bangSach->verticalHeader()->setVisible(false);
-    
-    // Table height
     bangSach->setMinimumHeight(500);
-    
     boTriChinh->addWidget(bangSach, 1);
-    
-    connect(bangSach, &QTableWidget::cellClicked, this, &WidgetQuanLySach::xuLyChonDong);
-    
+
+    // Selection handling
+    connect(bangSach->selectionModel(), &QItemSelectionModel::currentRowChanged, this, [this](const QModelIndex &current, const QModelIndex&) {
+        if (!current.isValid()) return;
+        int row = current.row();
+        extern PTRDS* LayDanhSachDauSach();
+        extern int LaySoLuongDauSach();
+        PTRDS *arr = LayDanhSachDauSach();
+        int n = LaySoLuongDauSach();
+        if (row < 0 || row >= n) return;
+        dauSachDangChon = arr ? arr[row] : nullptr;
+    });
+
     // Double-click to show detail
-    connect(bangSach, &QTableWidget::cellDoubleClicked, this, [this](int row, int) {
-        if (row >= 0 && row < bangSach->rowCount()) {
-            QString isbn = bangSach->item(row, 1)->text();
-            dauSachDangChon = nullptr;
-            extern PTRDS dsDauSach[];
-            extern int soLuongDauSach;
-            for (int i = 0; i < soLuongDauSach; i++) {
-                if (dsDauSach[i] && dsDauSach[i]->ISBN == isbn.toStdString()) {
-                    dauSachDangChon = dsDauSach[i];
-                    break;
-                }
-            }
-            if (dauSachDangChon) {
-                xuLyNutXemChiTiet();
-            }
-        }
+    connect(bangSach, &QTableView::doubleClicked, this, [this](const QModelIndex &index) {
+        if (!index.isValid()) return;
+        int row = index.row();
+        extern PTRDS* LayDanhSachDauSach();
+        extern int LaySoLuongDauSach();
+        PTRDS *arr = LayDanhSachDauSach();
+        int n = LaySoLuongDauSach();
+        if (row < 0 || row >= n) return;
+        dauSachDangChon = arr ? arr[row] : nullptr;
+        if (dauSachDangChon) xuLyNutXemChiTiet();
     });
 }
 
@@ -518,190 +668,17 @@ void WidgetQuanLySach::capNhatBang() {
 }
 
 void WidgetQuanLySach::hienThiDanhSachSach() {
-    // Maximum performance optimization
-    bangSach->setUpdatesEnabled(false);
-    bangSach->setSortingEnabled(false);
-    bangSach->verticalHeader()->setSectionResizeMode(QHeaderView::Fixed);
-    
-    extern PTRDS dsDauSach[];
-    extern int soLuongDauSach;
-    
-    // Kiểm tra dữ liệu hợp lệ với logging chi tiết
-    if (soLuongDauSach < 0 || soLuongDauSach > MAX_DAUSACH) {
-        qWarning() << "Số lượng đầu sách không hợp lệ:" << soLuongDauSach;
-        bangSach->setUpdatesEnabled(true);
-        bangSach->setSortingEnabled(true);
-        return;
-    }
-    
-    qDebug() << "Hiển thị" << soLuongDauSach << "đầu sách";
-    
-    // Pre-allocate all rows at once
-    bangSach->setRowCount(soLuongDauSach);
-    
-    for (int i = 0; i < soLuongDauSach; i++) {
-        if (dsDauSach[i] != nullptr) {
-            int hang = i;
-            
-            // Tính số sách còn lại và đang mượn - KIỂM TRA AN TOÀN
-            int tongBanSao = dsDauSach[i]->tongBanSao;
-            int daMuon = 0;
-            int thanhLy = 0;
-            
-            // Duyệt qua danh sách bản sao để đếm - KIỂM TRA CON TRỎ
-            PTRDMS p = dsDauSach[i]->dms;
-            int dem = 0; // Giới hạn vòng lặp để tránh infinite loop
-            while (p != nullptr && dem < 10000) {
-                if (p->trangThai == DANG_MUON) {
-                    daMuon++;
-                } else if (p->trangThai == THANH_LY) {
-                    thanhLy++;
-                }
-                p = p->next;
-                dem++;
-            }
-            
-            if (dem >= 10000) {
-                qWarning() << "Phát hiện vòng lặp vô hạn tại sách:" << QString::fromStdString(dsDauSach[i]->ISBN);
-            }
-            
-            int conLai = tongBanSao - daMuon - thanhLy;
-            
-            // STT column
-            QTableWidgetItem *itemSTT = new QTableWidgetItem(QString::number(i + 1));
-            itemSTT->setTextAlignment(Qt::AlignCenter);
-            itemSTT->setForeground(QBrush(QColor("#B5B5C3")));
-            bangSach->setItem(hang, 0, itemSTT);
-            
-            // Basic info columns
-            bangSach->setItem(hang, 1, new QTableWidgetItem(QString::fromStdString(dsDauSach[i]->ISBN)));
-            bangSach->setItem(hang, 2, new QTableWidgetItem(QString::fromStdString(dsDauSach[i]->tenSach)));
-            bangSach->setItem(hang, 3, new QTableWidgetItem(QString::fromStdString(dsDauSach[i]->tacGia)));
-            bangSach->setItem(hang, 4, new QTableWidgetItem(QString::fromStdString(dsDauSach[i]->theLoai)));
-            
-            // Centered numeric columns
-            QTableWidgetItem *namXB = new QTableWidgetItem(QString::number(dsDauSach[i]->namXuatBan));
-            namXB->setTextAlignment(Qt::AlignCenter);
-            bangSach->setItem(hang, 5, namXB);
-            
-            QTableWidgetItem *soTrang = new QTableWidgetItem(QString::number(dsDauSach[i]->soTrang));
-            soTrang->setTextAlignment(Qt::AlignCenter);
-            bangSach->setItem(hang, 6, soTrang);
-            
-            // Status badges column with natural colors
-            QWidget *badgeWidget = new QWidget();
-            badgeWidget->setStyleSheet("background: transparent;");
-            QHBoxLayout *badgeLayout = new QHBoxLayout(badgeWidget);
-            badgeLayout->setContentsMargins(8, 2, 8, 2);
-            badgeLayout->setSpacing(12);
-
-            // Create badges text with larger size and more spacing
-            auto createBadge = [](const QString &icon, int value, const QString &color, const QString &bg, const QString &border) -> QLabel* {
-                QLabel *label = new QLabel(QString("<span style='color:%1; background:%2; border:1.5px solid %3; padding:5px 14px; border-radius:12px; font-size:15px; font-weight:700;'>%4 %5</span>")
-                    .arg(color, bg, border, icon, QString::number(value)));
-                label->setTextFormat(Qt::RichText);
-                label->setAlignment(Qt::AlignCenter);
-                return label;
-            };
-            if (conLai > 0) {
-                badgeLayout->addWidget(createBadge("●", conLai, "#10B981", "rgba(16,185,129,0.18)", "rgba(16,185,129,0.35)"));
-            }
-            if (daMuon > 0) {
-                badgeLayout->addWidget(createBadge("◐", daMuon, "#F59E0B", "rgba(245,158,11,0.18)", "rgba(245,158,11,0.35)"));
-            }
-            if (thanhLy > 0) {
-                badgeLayout->addWidget(createBadge("✖", thanhLy, "#EF4444", "rgba(239,68,68,0.18)", "rgba(239,68,68,0.35)"));
-            }
-            badgeLayout->addStretch();
-            bangSach->setCellWidget(hang, 7, badgeWidget);
-            
-            // Action buttons column - Single widget with all buttons
-            QWidget *actionWidget = new QWidget();
-            actionWidget->setStyleSheet("background: transparent;");
-            QHBoxLayout *actionLayout = new QHBoxLayout(actionWidget);
-            actionLayout->setContentsMargins(8, 4, 8, 4);
-            actionLayout->setSpacing(6);
-            
-            QString btnStyle = 
-                "QPushButton {"
-                "    background-color: #2d3140;"
-                "    color: #E0E0E0;"
-                "    border: 1px solid #3E4451;"
-                "    border-radius: 4px;"
-                "}"
-                "QPushButton:hover {"
-                "    background-color: #0078D4;"
-                "    color: white;"
-                "    border: 1px solid #0078D4;"
-                "}";
-            
-            QString delStyle = 
-                "QPushButton {"
-                "    background-color: #2d3140;"
-                "    color: #E0E0E0;"
-                "    border: 1px solid #3E4451;"
-                "    border-radius: 4px;"
-                "}"
-                "QPushButton:hover {"
-                "    background-color: #C42B1C;"
-                "    color: white;"
-                "    border: 1px solid #C42B1C;"
-                "}";
-            
-            // Edit button
-            QPushButton *btnEdit = new QPushButton("✏");
-            btnEdit->setFixedSize(33, 33);
-            btnEdit->setCursor(Qt::PointingHandCursor);
-            btnEdit->setStyleSheet(btnStyle + "QPushButton { font-size: 20px; }");
-            btnEdit->setProperty("isbn", QString::fromStdString(dsDauSach[i]->ISBN));
-            connect(btnEdit, &QPushButton::clicked, [this, hang]() {
-                bangSach->selectRow(hang);
-                xuLyNutSuaSach();
-            });
-            
-            // Delete button
-            QPushButton *btnDelete = new QPushButton("🗑");
-            btnDelete->setFixedSize(33, 33);
-            btnDelete->setCursor(Qt::PointingHandCursor);
-            btnDelete->setStyleSheet(delStyle + "QPushButton { font-size: 20px; }");
-            btnDelete->setProperty("isbn", QString::fromStdString(dsDauSach[i]->ISBN));
-            connect(btnDelete, &QPushButton::clicked, [this, hang]() {
-                bangSach->selectRow(hang);
-                xuLyNutXoaSach();
-            });
-            
-            // Info button
-            QPushButton *btnInfo = new QPushButton("ⓘ");
-            btnInfo->setFixedSize(33, 33);
-            btnInfo->setCursor(Qt::PointingHandCursor);
-            btnInfo->setStyleSheet(btnStyle + "QPushButton { font-size: 22px; font-weight: bold; }");
-            btnInfo->setProperty("isbn", QString::fromStdString(dsDauSach[i]->ISBN));
-            connect(btnInfo, &QPushButton::clicked, [this, hang]() {
-                bangSach->selectRow(hang);
-                xuLyNutXemChiTiet();
-            });
-            
-            actionLayout->addWidget(btnEdit);
-            actionLayout->addWidget(btnDelete);
-            actionLayout->addWidget(btnInfo);
-            actionLayout->addStretch();
-            bangSach->setCellWidget(hang, 8, actionWidget);
-        }
-    }
-    
-    // Re-enable updates and sorting
-    bangSach->verticalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
-    bangSach->setSortingEnabled(true);
-    bangSach->setUpdatesEnabled(true);
-    bangSach->viewport()->update();
-    
-    emit thongBaoCapNhat(QString("Đã tải %1 đầu sách").arg(soLuongDauSach));
+    // Ask the model to refresh itself (it will call beginResetModel()/endResetModel())
+    auto legacy = dynamic_cast<LegacyBookModel*>(bangSach->model());
+    if (legacy) legacy->refresh();
+    emit thongBaoCapNhat(QString("Đã tải %1 đầu sách").arg(LaySoLuongDauSach()));
 }
 
 void WidgetQuanLySach::xuLyChonDong(int dong, int) {
     if (dong < 0) return;
-    
-    QString isbn = bangSach->item(dong, 0)->text();
+    auto m = bangSach->model();
+    if (!m) return;
+    QString isbn = m->data(m->index(dong, 1), Qt::DisplayRole).toString();
     
     extern PTRDS dsDauSach[];
     extern int soLuongDauSach;
@@ -844,58 +821,40 @@ void WidgetQuanLySach::xuLyNutXemChiTiet() {
 void WidgetQuanLySach::xuLyTimKiem(const QString &tuKhoa) {
     QString tuKhoaLowerCase = tuKhoa.trimmed().toLower();
     int soKetQua = 0;
-    
-    for (int i = 0; i < bangSach->rowCount(); i++) {
+    QAbstractItemModel *m = qobject_cast<QAbstractItemModel*>(bangSach->model());
+    if (!m) return;
+    int rows = m->rowCount();
+    for (int i = 0; i < rows; ++i) {
         bool hienThi = true;
-        
-        // Filter theo từ khóa
         if (!tuKhoaLowerCase.isEmpty()) {
-            QString isbn = bangSach->item(i, 0)->text().toLower();
-            QString tenSach = bangSach->item(i, 1)->text().toLower();
-            QString tacGia = bangSach->item(i, 2)->text().toLower();
-            
-            hienThi = isbn.contains(tuKhoaLowerCase) || 
-                     tenSach.contains(tuKhoaLowerCase) || 
-                     tacGia.contains(tuKhoaLowerCase);
+            QString isbn = m->data(m->index(i, 1), Qt::DisplayRole).toString().toLower();
+            QString tenSach = m->data(m->index(i, 2), Qt::DisplayRole).toString().toLower();
+            QString tacGia = m->data(m->index(i, 3), Qt::DisplayRole).toString().toLower();
+            hienThi = isbn.contains(tuKhoaLowerCase) || tenSach.contains(tuKhoaLowerCase) || tacGia.contains(tuKhoaLowerCase);
         }
-        
-        // Filter theo thể loại
         if (hienThi && hopChonTheLoai->currentIndex() > 0) {
             QString theLoaiChon = hopChonTheLoai->currentText();
-            QString theLoaiDong = bangSach->item(i, 3)->text();
-            if (theLoaiDong != theLoaiChon) {
-                hienThi = false;
-            }
+            QString theLoaiDong = m->data(m->index(i, 4), Qt::DisplayRole).toString();
+            if (theLoaiDong != theLoaiChon) hienThi = false;
         }
-        
-        // Filter theo trạng thái
         if (hienThi && hopChonTrangThai->currentIndex() > 0) {
             QString trangThaiChon = hopChonTrangThai->currentText();
-            QString trangThaiDong = bangSach->item(i, 8)->text();
-            
+            QString trangThaiDong = m->data(m->index(i, 7), Qt::DisplayRole).toString();
             bool khop = false;
-            if (trangThaiChon == "Sẵn sàng" && trangThaiDong.contains("[S]")) {
-                khop = true;
-            } else if (trangThaiChon == "Đang mượn hết" && trangThaiDong.contains("[M]")) {
-                khop = true;
-            } else if (trangThaiChon == "Đã thanh lý" && trangThaiDong.contains("[T]")) {
-                khop = true;
-            }
-            
-            if (!khop) {
-                hienThi = false;
-            }
+            if (trangThaiChon == "Sẵn sàng" && trangThaiDong.contains("Có sẵn")) khop = true;
+            else if (trangThaiChon == "Đang mượn hết" && trangThaiDong.contains("Đang mượn")) khop = true;
+            else if (trangThaiChon == "Đã thanh lý" && trangThaiDong.contains("Đã thanh lý")) khop = true;
+            if (!khop) hienThi = false;
         }
-        
         bangSach->setRowHidden(i, !hienThi);
-        if (hienThi) soKetQua++;
+        if (hienThi) ++soKetQua;
     }
     
     // Hiển thị kết quả
     if (tuKhoaLowerCase.isEmpty() && hopChonTheLoai->currentIndex() == 0 && hopChonTrangThai->currentIndex() == 0) {
-        nhanKetQuaTimKiem->setText("");
+        SafeGui::safeSetText(nhanKetQuaTimKiem, "");
     } else {
-        nhanKetQuaTimKiem->setText(QString("📋 Tìm thấy <b>%1</b> kết quả").arg(soKetQua));
+        SafeGui::safeSetText(nhanKetQuaTimKiem, QString("📋 Tìm thấy <b>%1</b> kết quả").arg(soKetQua));
     }
 }
 
@@ -931,8 +890,164 @@ void WidgetQuanLySach::taiDanhSachTheLoai() {
         hopChonTheLoai->addItem(theLoai);
     }
 }
-void WidgetQuanLySach::xuLyNhapDuLieuTu() {}
-void WidgetQuanLySach::hienThiBanSao(PTRDS) {}
+void WidgetQuanLySach::xuLyNhapDuLieuTu() {
+    // Ask user to choose an Excel file
+    QString file = QFileDialog::getOpenFileName(this, tr("Chọn file Excel để nhập"), QDir::currentPath(), tr("Excel Files (*.xlsx);;All Files (*)"));
+    if (file.isEmpty()) return;
+
+    // Find the import script in tools/
+    // Prefer repository-relative tools/import_from_excel.py
+    QString repoTools = QDir(FilePathManager::getRootPath()).filePath("tools/import_from_excel.py");
+    QString pythonExe = "python";
+    QString scriptToRun = repoTools;
+    if (!QFile::exists(scriptToRun)) {
+        // fallback: script next to executable
+        scriptToRun = QDir(QCoreApplication::applicationDirPath()).filePath("tools/import_from_excel.py");
+        if (!QFile::exists(scriptToRun)) {
+            QMessageBox::warning(this, tr("Không tìm thấy script"), tr("Không thể tìm thấy file tools/import_from_excel.py"));
+            return;
+        }
+    }
+
+    // Run preview
+    QProcess proc;
+    QStringList args;
+    args << scriptToRun << "--file" << file << "--preview" << "--out" << "tools";
+    proc.start(pythonExe, args);
+    bool started = proc.waitForStarted(10000);
+    if (!started) {
+        QMessageBox::critical(this, tr("Lỗi"), tr("Không thể khởi chạy python. Hãy đảm bảo Python có trong PATH."));
+        return;
+    }
+    proc.waitForFinished(-1);
+    QString stdoutStr = QString::fromUtf8(proc.readAllStandardOutput());
+    QString stderrStr = QString::fromUtf8(proc.readAllStandardError());
+
+    // Build preview dialog
+    QDialog dlg(this);
+    dlg.setWindowTitle(tr("Kết quả Import (Preview)"));
+    dlg.setModal(true);
+    QVBoxLayout *lay = new QVBoxLayout(&dlg);
+
+    QLabel *lbl = new QLabel(tr("Kết quả preview từ script import:"));
+    lay->addWidget(lbl);
+
+    QTextEdit *out = new QTextEdit();
+    out->setReadOnly(true);
+    out->setPlainText(stdoutStr + (stderrStr.isEmpty() ? QString() : QString("\n--- ERRORS ---\n") + stderrStr));
+    out->setMinimumSize(700, 380);
+    lay->addWidget(out);
+
+    QHBoxLayout *btnLay = new QHBoxLayout();
+    btnLay->addStretch();
+    QPushButton *btnApply = new QPushButton(tr("Áp dụng (ghi file import)"));
+    QPushButton *btnOpenPreviews = new QPushButton(tr("Mở file preview"));
+    QPushButton *btnClose = new QPushButton(tr("Đóng"));
+    btnLay->addWidget(btnOpenPreviews);
+    btnLay->addWidget(btnApply);
+    btnLay->addWidget(btnClose);
+    lay->addLayout(btnLay);
+
+    connect(btnClose, &QPushButton::clicked, &dlg, &QDialog::reject);
+
+    connect(btnOpenPreviews, &QPushButton::clicked, this, [this]() {
+        // Open the generated preview CSVs in the OS default viewer
+        QString base = QDir(FilePathManager::getRootPath()).filePath("tools");
+        QString p1 = QDir(base).filePath("preview_dausach.csv");
+        QString p2 = QDir(base).filePath("preview_bansao.csv");
+        if (QFile::exists(p1)) QDesktopServices::openUrl(QUrl::fromLocalFile(p1));
+        if (QFile::exists(p2)) QDesktopServices::openUrl(QUrl::fromLocalFile(p2));
+    });
+
+    connect(btnApply, &QPushButton::clicked, this, [this, &dlg, pythonExe, scriptToRun, file]() {
+        // Ask user whether to apply directly into DB
+        QMessageBox::StandardButton reply = QMessageBox::question(this, tr("Áp dụng import"),
+            tr("Bạn muốn áp dụng trực tiếp vào SQLite DB (recommended)?\n"
+               "Chọn Yes để ghi vào database (tạo backup tự động).\n"
+               "Chọn No để chỉ ghi các file import vào thư mục data/ (không thay đổi DB)."),
+            QMessageBox::Yes|QMessageBox::No|QMessageBox::Cancel, QMessageBox::Yes);
+
+        if (reply == QMessageBox::Cancel) return;
+
+        QProcess *applyProc = new QProcess(this);
+        QStringList applyArgs;
+        if (reply == QMessageBox::Yes) {
+            // Apply directly to DB
+            applyArgs << scriptToRun << "--file" << file << "--to-db" << "--mode" << "merge";
+        } else {
+            // Write import files only
+            applyArgs << scriptToRun << "--file" << file << "--apply" << "--out" << "data";
+        }
+
+        QProgressDialog *progress = new QProgressDialog(tr("Đang áp dụng import..."), QString(), 0, 0, this);
+        progress->setWindowModality(Qt::WindowModal);
+        progress->setCancelButton(nullptr);
+        progress->setMinimumDuration(200);
+        progress->setWindowTitle(tr("Vui lòng chờ"));
+
+        connect(applyProc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, [this, applyProc, progress, &dlg]() {
+            QString outStr = QString::fromUtf8(applyProc->readAllStandardOutput());
+            QString errStr = QString::fromUtf8(applyProc->readAllStandardError());
+            QString msg = outStr;
+            if (!errStr.isEmpty()) msg += "\n--- ERRORS ---\n" + errStr;
+            QMessageBox::information(this, tr("Hoàn thành"), msg);
+            progress->close();
+            applyProc->deleteLater();
+            // reload UI data
+            this->taiLaiDanhSach();
+            dlg.accept();
+        });
+
+        applyProc->start(pythonExe, applyArgs);
+        if (!applyProc->waitForStarted(10000)) {
+            QMessageBox::critical(this, tr("Lỗi"), tr("Không thể khởi chạy python để áp dụng import."));
+            applyProc->deleteLater();
+            progress->close();
+            return;
+        }
+        progress->show();
+    });
+
+    dlg.exec();
+}
+void WidgetQuanLySach::hienThiBanSao(PTRDS dauSach) {
+    // Clear existing cache
+    danhSachBanSaoVec.clear();
+
+    if (!dauSach) {
+        SafeGui::safeSetText(nhanThongTinChon, "");
+        // try to notify model (best-effort)
+        if (modelBanSao) QMetaObject::invokeMethod(modelBanSao, "refresh", Qt::QueuedConnection);
+        return;
+    }
+
+    // Sử dụng DBBatcher để lấy danh sách bản sao cho ISBN một cách an toàn
+    // (trả về vector<PTRDMS> để dễ xử lý trong UI và không cần cấp buffer tay)
+    // Try to use DBBatcher if available at compile time, otherwise use local fallback
+#if defined(__has_include) && __has_include("utils/DBBatcher.h")
+    std::vector<PTRDMS> tmp = DBBatcher::layBanSaoTheoISBN(dauSach->ISBN);
+#else
+    std::vector<PTRDMS> tmp = local_layBanSaoTheoISBN_fallback(dauSach->ISBN);
+#endif
+    int count = static_cast<int>(tmp.size());
+    if (count > 0) {
+        danhSachBanSaoVec.reserve(count);
+        for (int i = 0; i < count; ++i) danhSachBanSaoVec.push_back(tmp[i]);
+    }
+
+    // Update small info label (if present)
+    if (nhanThongTinChon) {
+        int available = 0;
+        for (auto &p : danhSachBanSaoVec) if (p && p->trangThai == CHO_MUON_DUOC) ++available;
+        SafeGui::safeSetText(nhanThongTinChon, QString("Bản sao: %1 (Có thể mượn: %2)").arg(count).arg(available));
+    }
+
+    // Best-effort: if the concrete model exposes a public refresh() method (as in BanSaoTableModel), try to call it.
+    if (modelBanSao) {
+        // invokeMethod will fail silently if no such invokable method exists; use queued connection to be safe.
+        QMetaObject::invokeMethod(modelBanSao, "refresh", Qt::QueuedConnection);
+    }
+}
 
 QString WidgetQuanLySach::layTrangThaiSach(TrangThaiSach trangThai) const {
     switch(trangThai) {

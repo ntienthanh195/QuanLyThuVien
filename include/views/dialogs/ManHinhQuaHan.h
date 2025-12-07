@@ -2,7 +2,9 @@
 #define MANHINHQUAHAN_H
 
 #include <QDialog>
-#include <QTableWidget>
+#include <QTableView>
+#include <QAbstractItemModel>
+#include <vector>
 #include <QPushButton>
 #include <QLabel>
 #include <QGroupBox>
@@ -36,7 +38,9 @@ private:
     int soLuong;
     
     // UI Components
-    QTableWidget *bangQuaHan;
+    QTableView *bangQuaHan;
+    QAbstractItemModel *modelQuaHan;
+    std::vector<DocGiaQuaHan> danhSachQuaHan;
     QLabel *nhanTieuDe;
     QLabel *nhanThongTin;
     QLabel *nhanDoanhThu;  // Revenue statistics panel

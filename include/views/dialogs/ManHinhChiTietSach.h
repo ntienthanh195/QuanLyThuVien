@@ -2,7 +2,9 @@
 #define MANHINH_CHI_TIET_SACH_H
 
 #include <QDialog>
-#include <QTableWidget>
+#include <QTableView>
+#include <QAbstractItemModel>
+#include <vector>
 #include <QPushButton>
 #include <QLabel>
 #include "models/DauSach.h"
@@ -19,14 +21,18 @@ signals:
 
 private slots:
     void khiNhanThanhLy();
+    void khiNhanXoaBanSao();
     void khiNhanLamMoi();
     void khiNhanDong();
-    void khiChonBanSao(int row, int column);
+    void khiChonBanSao(const QModelIndex &index);
 
 private:
     PTRDS sachDuocChon;
-    QTableWidget *bangBanSao;
+    QTableView *bangBanSao;
+    QAbstractItemModel *modelBanSao;
+    std::vector<PTRDMS> danhSachBanSaoVec;
     QPushButton *nutThanhLy;
+    QPushButton *nutXoaBanSao;
     QPushButton *nutLamMoi;
     QPushButton *nutDong;
     QLabel *nhanTongQuat;

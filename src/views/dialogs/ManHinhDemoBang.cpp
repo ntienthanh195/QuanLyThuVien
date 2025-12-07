@@ -296,7 +296,8 @@ void ManHinhDemoBang::kichXoa() {
     }
     
     int row = selected.first().row();
-    QString tenSach = model->item(row, 1)->text();
+    QStandardItem *itTen = model->item(row, 1);
+    QString tenSach = itTen ? itTen->text() : QString();
     
     QMessageBox::StandardButton reply = QMessageBox::question(this, 
         "Xác nhận xóa",

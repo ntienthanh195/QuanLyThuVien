@@ -2,9 +2,18 @@
 #define MANHINHTOP10DOCGIA_H
 
 #include <QDialog>
-#include <QTableWidget>
+#include <QTableView>
+#include <QAbstractItemModel>
 #include <QPushButton>
 #include <QLabel>
+#include <vector>
+#include "models/DocGia.h"
+
+struct DocGiaVaSoLuot {
+    PTRDG docGia;
+    int soLuotMuon;
+    int soDangMuon;
+};
 
 class ManHinhTop10DocGia : public QDialog {
     Q_OBJECT
@@ -17,7 +26,9 @@ private:
     void apDungPhongCachHienDai();
     void taiDuLieuTop10();
 
-    QTableWidget* bangKetQua;
+    QTableView* bangKetQua;
+    QAbstractItemModel* modelKetQua;
+    std::vector<DocGiaVaSoLuot> danhSachTop;
     QPushButton* nutLamMoi;
     QPushButton* nutDong;
 };

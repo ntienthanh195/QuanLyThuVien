@@ -15,6 +15,8 @@
 
 extern PTRDG rootDocGia;
 
+#include "utils/EventBus.h"
+
 ManHinhThemDocGia::ManHinhThemDocGia(QWidget *parent)
     : QDialog(parent) {
     setWindowTitle("Thêm Độc Giả Mới 👤");
@@ -90,8 +92,8 @@ void ManHinhThemDocGia::thietLapGiaoDien() {
     // Gender
     chonGioiTinh = new QComboBox();
     chonGioiTinh->setObjectName("inputField");
-    chonGioiTinh->addItem("👨 Nam", 0);
-    chonGioiTinh->addItem("👩 Nữ", 1);
+    chonGioiTinh->addItem("Nam", 0);
+    chonGioiTinh->addItem("Nữ", 1);
     chonGioiTinh->setToolTip("Chọn giới tính của độc giả");
     formLayout->addRow("Giới Tính:", chonGioiTinh);
 
@@ -330,23 +332,29 @@ void ManHinhThemDocGia::khiNhanLuu() {
 
     // Create reader
     try {
-        int maThe = maDuocTao.toInt();
+        // Use backend generator to create a safe unique MaThe (avoid int overflow)
         std::string lastNameStd = lastName.toStdString();
         std::string firstNameStd = firstName.toStdString();
-        
-        PTRDG newReader = taoDocGia(lastNameStd, firstNameStd, genderValue, 1, maThe);
+
+        extern PTRDG rootDocGia; // ensure we use current tree for uniqueness
+        PTRDG newReader = taoDocGia(lastNameStd, firstNameStd, genderValue, 1, rootDocGia);
         
         if (newReader) {
             InsertDocGia(rootDocGia, newReader);
+            // Global notification for realtime update
+            try {
+                EventBus::instance().docGiaAdded(newReader->data.MaThe);
+            } catch(...) {}
             emit docGiaDaThem();
             
             QString genderStr = genderValue == 0 ? "Nam" : "Nữ";
+            QString maTheStr = (newReader != nullptr) ? QString::number(newReader->data.MaThe) : maDuocTao;
             QMessageBox::information(this, "Thành Công 🎉",
                 QString("✅ Đã thêm độc giả thành công!\n\n"
                        "🎫 Mã thẻ: %1\n"
                        "👤 Họ tên: %2 %3\n"
                        "⚧ Giới tính: %4")
-                    .arg(maDuocTao)
+                    .arg(maTheStr)
                     .arg(lastName)
                     .arg(firstName)
                     .arg(genderStr));

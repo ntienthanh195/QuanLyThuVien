@@ -23,6 +23,21 @@ public:
         bool inMauSac = false;
         bool hienThiLogo = true;
         QString duongDanLogo = "";
+        // Thư mục lưu trữ tệp liên quan đến in ấn (QR, PDF, temp)
+        QString duongDanThuMucIn = "data/print_assets";
+        // Thư mục con cho QR images
+        QString thuMucQR = "qr";
+        // Thư mục con cho PDF xuất ra
+        QString thuMucPdf = "pdf";
+            // Thư mục lưu trữ
+            QString qrOutputDir = "data/qrcodes"; // nơi lưu QR tạm/đã sinh
+            QString pdfOutputDir = "data";       // nơi lưu PDF xuất ra
+            QString tempDir = "data/temp";       // thư mục tạm (ảnh, etc.)
+
+            // Header / Footer tuỳ chỉnh
+            QString headerText = "";
+            QString footerText = "";
+            QString author = ""; // metadata PDF
     };
 
     // ===== IN THẺ ĐỘC GIẢ =====

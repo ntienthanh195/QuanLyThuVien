@@ -233,6 +233,3 @@ Educational project - Free to use for learning purposes.
 
 **🎉 Chúc bạn sử dụng app vui vẻ!**
 
-*Built with ❤️ using Qt 6.10.1*
-#   Q u a n L y T h u V i e n  
- 

@@ -2,7 +2,7 @@
 #define MANHINHTOP10_H
 
 #include <QDialog>
-#include <QTableWidget>
+#include <QTableView>
 #include <QPushButton>
 #include <QLabel>
 #include <QDateEdit>
@@ -10,6 +10,16 @@
 #include <QGroupBox>
 #include <QCheckBox>
 #include "models/DauSach.h"
+#include <vector>
+
+// Struct để lưu thông tin sách và số lượt mượn
+struct SachVaSoLuotMuon {
+    PTRDS sach;
+    int soLuotMuon;
+    int soLuotMuonTruoc;  // Số lượt mượn kỳ trước (để so sánh)
+    int thayDoi;  // Chênh lệch so với kỳ trước
+    double tyLe; // tỷ lệ phần trăm
+};
 
 class ManHinhTop10 : public QDialog {
     Q_OBJECT
@@ -27,7 +37,9 @@ private:
     int soLuong;
     
     // UI Components
-    QTableWidget *bangTop10;
+    QTableView *bangTop10;
+    QAbstractItemModel *modelTop10;
+    std::vector<SachVaSoLuotMuon> danhSachTop;
     QLabel *nhanTieuDe;
     QLabel *nhanThongTin;
     QLabel *nhanSoSanh;  // Nhãn so sánh xu hướng

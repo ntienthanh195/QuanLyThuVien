@@ -65,9 +65,11 @@ void ManHinhThemSach::thietLapGiaoDien() {
         "}"
     );
     
-    QFormLayout *formLayout = new QFormLayout(formGroup);
-    formLayout->setSpacing(12);
-    formLayout->setLabelAlignment(Qt::AlignRight);
+    // Use grid layout for consistent column widths and better alignment
+    QGridLayout *formLayout = new QGridLayout();
+    formLayout->setHorizontalSpacing(16);
+    formLayout->setVerticalSpacing(12);
+    formLayout->setContentsMargins(12, 8, 12, 12);
     
     // ISBN field
     nhapISBN = new QLineEdit(this);
@@ -76,7 +78,9 @@ void ManHinhThemSach::thietLapGiaoDien() {
     nhapISBN->setToolTip("ISBN phải có 10 hoặc 13 chữ số\nVí dụ: 9781234567890");
     QLabel *isbnLabel = new QLabel("ISBN *:", this);
     isbnLabel->setStyleSheet("font-weight: bold;");
-    formLayout->addRow(isbnLabel, nhapISBN);
+    isbnLabel->setMinimumWidth(110);
+    formLayout->addWidget(isbnLabel, 0, 0, Qt::AlignRight);
+    formLayout->addWidget(nhapISBN, 0, 1);
     
     // Book name field
     nhapTenSach = new QLineEdit(this);
@@ -85,7 +89,9 @@ void ManHinhThemSach::thietLapGiaoDien() {
     nhapTenSach->setToolTip("Nhập tên đầy đủ của sách (bắt buộc)\nTối đa 100 ký tự");
     QLabel *nameLabel = new QLabel("Tên sách *:", this);
     nameLabel->setStyleSheet("font-weight: bold;");
-    formLayout->addRow(nameLabel, nhapTenSach);
+    nameLabel->setMinimumWidth(110);
+    formLayout->addWidget(nameLabel, 1, 0, Qt::AlignRight);
+    formLayout->addWidget(nhapTenSach, 1, 1);
     
     // Author field
     nhapTacGia = new QLineEdit(this);
@@ -94,7 +100,9 @@ void ManHinhThemSach::thietLapGiaoDien() {
     nhapTacGia->setToolTip("Nhập tên tác giả (bắt buộc)\nVí dụ: Nguyễn Nhật Ánh");
     QLabel *authorLabel = new QLabel("Tác giả *:", this);
     authorLabel->setStyleSheet("font-weight: bold;");
-    formLayout->addRow(authorLabel, nhapTacGia);
+    authorLabel->setMinimumWidth(110);
+    formLayout->addWidget(authorLabel, 2, 0, Qt::AlignRight);
+    formLayout->addWidget(nhapTacGia, 2, 1);
     
     // Genre combo
     chonTheLoai = new QComboBox(this);
@@ -103,7 +111,9 @@ void ManHinhThemSach::thietLapGiaoDien() {
     diemDayTheLoai();
     QLabel *genreLabel = new QLabel("Thể loại *:", this);
     genreLabel->setStyleSheet("font-weight: bold;");
-    formLayout->addRow(genreLabel, chonTheLoai);
+    genreLabel->setMinimumWidth(110);
+    formLayout->addWidget(genreLabel, 3, 0, Qt::AlignRight);
+    formLayout->addWidget(chonTheLoai, 3, 1);
     
     // Year spinner
     nhapNamXuatBan = new QSpinBox(this);
@@ -113,7 +123,9 @@ void ManHinhThemSach::thietLapGiaoDien() {
     nhapNamXuatBan->setToolTip("Năm xuất bản sách (1000 - hiện tại)");
     QLabel *yearLabel = new QLabel("Năm xuất bản *:", this);
     yearLabel->setStyleSheet("font-weight: bold;");
-    formLayout->addRow(yearLabel, nhapNamXuatBan);
+    yearLabel->setMinimumWidth(110);
+    formLayout->addWidget(yearLabel, 4, 0, Qt::AlignRight);
+    formLayout->addWidget(nhapNamXuatBan, 4, 1);
     
     // Pages spinner
     nhapSoTrang = new QSpinBox(this);
@@ -123,7 +135,9 @@ void ManHinhThemSach::thietLapGiaoDien() {
     nhapSoTrang->setToolTip("Số trang của sách (1-10000)");
     QLabel *pagesLabel = new QLabel("Số trang *:", this);
     pagesLabel->setStyleSheet("font-weight: bold;");
-    formLayout->addRow(pagesLabel, nhapSoTrang);
+    pagesLabel->setMinimumWidth(110);
+    formLayout->addWidget(pagesLabel, 5, 0, Qt::AlignRight);
+    formLayout->addWidget(nhapSoTrang, 5, 1);
     
     // Copies spinner
     nhapSoBanSao = new QSpinBox(this);
@@ -133,7 +147,9 @@ void ManHinhThemSach::thietLapGiaoDien() {
     nhapSoBanSao->setToolTip("Số lượng bản sao muốn thêm cùng lúc (1-100)");
     QLabel *copiesLabel = new QLabel("Số bản sao:", this);
     copiesLabel->setStyleSheet("font-weight: bold;");
-    formLayout->addRow(copiesLabel, nhapSoBanSao);
+    copiesLabel->setMinimumWidth(110);
+    formLayout->addWidget(copiesLabel, 6, 0, Qt::AlignRight);
+    formLayout->addWidget(nhapSoBanSao, 6, 1);
     
     // Location field
     nhapViTri = new QLineEdit(this);
@@ -142,7 +158,14 @@ void ManHinhThemSach::thietLapGiaoDien() {
     nhapViTri->setToolTip("Vị trí đặt sách trong thư viện (không bắt buộc)\nVí dụ: Kệ A1, Tầng 2");
     QLabel *locationLabel = new QLabel("Vị trí:", this);
     locationLabel->setStyleSheet("font-weight: bold;");
-    formLayout->addRow(locationLabel, nhapViTri);
+    locationLabel->setMinimumWidth(110);
+    formLayout->addWidget(locationLabel, 7, 0, Qt::AlignRight);
+    formLayout->addWidget(nhapViTri, 7, 1);
+
+    // Add spacer row to keep form compact when dialog resizes
+    formLayout->setRowStretch(8, 1);
+
+    formGroup->setLayout(formLayout);
     
     mainLayout->addWidget(formGroup);
     
@@ -163,7 +186,7 @@ void ManHinhThemSach::thietLapGiaoDien() {
     
     nutXoaForm = new QPushButton("🔄 Xóa Form", this);
     nutXoaForm->setMinimumWidth(120);
-    nutXoaForm->setMinimumHeight(40);
+    nutXoaForm->setFixedHeight(42);
     nutXoaForm->setToolTip("Xóa tất cả dữ liệu đã nhập");
     nutXoaForm->setStyleSheet(
         "QPushButton {"
@@ -188,7 +211,7 @@ void ManHinhThemSach::thietLapGiaoDien() {
     
     nutLuu = new QPushButton("💾 Lưu", this);
     nutLuu->setMinimumWidth(120);
-    nutLuu->setMinimumHeight(40);
+    nutLuu->setFixedHeight(42);
     nutLuu->setToolTip("Lưu thông tin sách mới (Ctrl+S)");
     nutLuu->setStyleSheet(
         "QPushButton {"
@@ -213,7 +236,7 @@ void ManHinhThemSach::thietLapGiaoDien() {
     
     nutHuy = new QPushButton("❌ Hủy", this);
     nutHuy->setMinimumWidth(120);
-    nutHuy->setMinimumHeight(40);
+    nutHuy->setFixedHeight(42);
     nutHuy->setToolTip("Hủy và đóng cửa sổ (ESC)");
     nutHuy->setStyleSheet(
         "QPushButton {"
@@ -233,16 +256,19 @@ void ManHinhThemSach::thietLapGiaoDien() {
         "}"
     );
     
+    // Ensure buttons have equal width visually
+    nutLuu->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    nutHuy->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
     buttonLayout->addWidget(nutLuu);
     buttonLayout->addWidget(nutHuy);
     mainLayout->addLayout(buttonLayout);
     
-    // Set field styles
-    QString fieldStyle = 
+    // Centralized field style for consistent visuals
+    QString fieldStyle =
         "QLineEdit, QSpinBox, QComboBox {"
         "   padding: 8px;"
         "   border: 2px solid #bdc3c7;"
-        "   border-radius: 5px;"
+        "   border-radius: 6px;"
         "   font-size: 10pt;"
         "}"
         "QLineEdit:focus, QSpinBox:focus, QComboBox:focus {"
@@ -251,15 +277,19 @@ void ManHinhThemSach::thietLapGiaoDien() {
         "QLineEdit:disabled, QSpinBox:disabled, QComboBox:disabled {"
         "   background-color: #ecf0f1;"
         "}";
-    
-    nhapISBN->setStyleSheet(fieldStyle);
-    nhapTenSach->setStyleSheet(fieldStyle);
-    nhapTacGia->setStyleSheet(fieldStyle);
-    chonTheLoai->setStyleSheet(fieldStyle);
-    nhapNamXuatBan->setStyleSheet(fieldStyle);
-    nhapSoTrang->setStyleSheet(fieldStyle);
-    nhapSoBanSao->setStyleSheet(fieldStyle);
-    nhapViTri->setStyleSheet(fieldStyle);
+
+    formGroup->setStyleSheet(fieldStyle);
+
+    // Make input heights uniform for better visual rhythm
+    const int inputH = 36;
+    nhapISBN->setFixedHeight(inputH);
+    nhapTenSach->setFixedHeight(inputH);
+    nhapTacGia->setFixedHeight(inputH);
+    chonTheLoai->setFixedHeight(inputH);
+    nhapNamXuatBan->setFixedHeight(inputH);
+    nhapSoTrang->setFixedHeight(inputH);
+    nhapSoBanSao->setFixedHeight(inputH);
+    nhapViTri->setFixedHeight(inputH);
 }
 
 void ManHinhThemSach::thietLapKetNoi() {
@@ -273,9 +303,21 @@ void ManHinhThemSach::thietLapKetNoi() {
 
 void ManHinhThemSach::thietLapKiemTra() {
     // ISBN validator: only digits
-    QRegularExpressionValidator *isbnValidator = 
+    QRegularExpressionValidator *isbnValidator =
         new QRegularExpressionValidator(QRegularExpression("^[0-9]{0,13}$"), this);
     nhapISBN->setValidator(isbnValidator);
+
+    // Improve speed: debounce validation updates to avoid frequent repaint/logic
+    connect(nhapISBN, &QLineEdit::textChanged, this, [this](const QString &){
+        static QTimer *debounce = nullptr;
+        if (!debounce) {
+            debounce = new QTimer(this);
+            debounce->setSingleShot(true);
+            debounce->setInterval(200);
+            connect(debounce, &QTimer::timeout, this, &ManHinhThemSach::kiemTraISBN);
+        }
+        debounce->start();
+    });
 }
 
 void ManHinhThemSach::diemDayTheLoai() {
@@ -315,8 +357,8 @@ void ManHinhThemSach::kiemTraISBN() {
         return;
     }
     
-    // Check if already exists
-    if (TimDauSachTheoISBN(LayDanhSachDauSach(), LaySoLuongDauSach(), isbn.toStdString()) != nullptr) {
+    // Check if already exists: dùng service layer TimDauSach() thay vì truy xuất mảng toàn cục
+    if (TimDauSach(isbn.toStdString()) != nullptr) {
         datPhongCachTruong(nhapISBN, false);
         hienThiLoi("ISBN này đã tồn tại trong hệ thống");
         return;

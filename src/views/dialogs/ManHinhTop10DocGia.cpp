@@ -1,20 +1,96 @@
 #include "views/dialogs/ManHinhTop10DocGia.h"
-#include "models/DocGia.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QHeaderView>
 #include <QMessageBox>
-#include <vector>
+#include <QAbstractTableModel>
+#include <QFont>
 #include <algorithm>
 
 extern PTRDG rootDocGia;
 
-// Struct để lưu thông tin độc giả và số lượt mượn
-struct DocGiaVaSoLuot {
-    PTRDG docGia;
-    int soLuotMuon;
-    int soDangMuon;
+// Model for Top10 độc giả (vector-backed)
+class Top10DocGiaModel : public QAbstractTableModel {
+public:
+    Top10DocGiaModel(std::vector<DocGiaVaSoLuot> *data, QObject *parent = nullptr)
+        : QAbstractTableModel(parent), m_data(data) {}
+
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override {
+        Q_UNUSED(parent)
+        return m_data ? (int)m_data->size() : 0;
+    }
+
+    int columnCount(const QModelIndex &parent = QModelIndex()) const override {
+        Q_UNUSED(parent)
+        return 6; // Rank, ID, Name, Gender, Total, Current
+    }
+
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override {
+        if (!m_data || !index.isValid()) return QVariant();
+        int r = index.row();
+        if (r < 0 || r >= (int)m_data->size()) return QVariant();
+        const DocGiaVaSoLuot &item = (*m_data)[r];
+        PTRDG dg = item.docGia;
+        if (!dg) return QVariant();
+
+        if (role == Qt::DisplayRole) {
+            switch (index.column()) {
+            case 0: // rank
+                return (r < 3) ? QStringLiteral("🥇🥈🥉").mid(r,1) : QString::number(r + 1);
+            case 1: return QString::number(dg->data.MaThe);
+            case 2: return QString::fromStdString(std::string(dg->data.Ho + std::string(" ")) + dg->data.Ten);
+            case 3: return dg->data.Phai ? QStringLiteral("Nam") : QStringLiteral("Nữ");
+            case 4: return QString::number(item.soLuotMuon);
+            case 5: return QString::number(item.soDangMuon);
+            }
+        }
+
+        if (role == Qt::FontRole) {
+            QFont f;
+            if (index.column() == 0) f.setBold(true);
+            if (index.column() == 4 || index.column() == 5) f.setBold(true);
+            return f;
+        }
+
+        if (role == Qt::ForegroundRole && index.column() == 4) {
+            return QBrush(QColor(5,150,105));
+        }
+
+        if (role == Qt::ForegroundRole && index.column() == 5) {
+            return QBrush(item.soDangMuon > 0 ? QColor(234,88,12) : QColor(107,114,128));
+        }
+
+        if (role == Qt::BackgroundRole && index.column() == 0) {
+            QColor c;
+            if (r == 0) c = QColor(255,215,0);
+            else if (r == 1) c = QColor(192,192,192);
+            else if (r == 2) c = QColor(205,127,50);
+            else c = QColor(52,73,94);
+            return QBrush(c.lighter(180));
+        }
+
+        return QVariant();
+    }
+
+    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override {
+        if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
+            switch (section) {
+            case 0: return QStringLiteral("Hạng");
+            case 1: return QStringLiteral("Mã Thẻ");
+            case 2: return QStringLiteral("Họ và Tên");
+            case 3: return QStringLiteral("Giới Tính");
+            case 4: return QStringLiteral("Tổng Mượn");
+            case 5: return QStringLiteral("Đang Mượn");
+            }
+        }
+        return QAbstractTableModel::headerData(section, orientation, role);
+    }
+
+    void refresh() { beginResetModel(); endResetModel(); }
+
+private:
+    std::vector<DocGiaVaSoLuot> *m_data;
 };
 
 ManHinhTop10DocGia::ManHinhTop10DocGia(QWidget *parent)
@@ -63,18 +139,10 @@ void ManHinhTop10DocGia::thietLapGiaoDien() {
     );
     mainLayout->addWidget(infoLabel);
 
-    // Table
-    bangKetQua = new QTableWidget(this);
-    bangKetQua->setColumnCount(6);
-    bangKetQua->setHorizontalHeaderLabels({
-        "Hạng",
-        "Mã Thẻ", 
-        "Họ và Tên",
-        "Giới Tính",
-        "Tổng Mượn",
-        "Đang Mượn"
-    });
-    
+    // Table (model/view)
+    bangKetQua = new QTableView(this);
+    modelKetQua = new Top10DocGiaModel(&danhSachTop, this);
+    bangKetQua->setModel(modelKetQua);
     bangKetQua->setSelectionBehavior(QAbstractItemView::SelectRows);
     bangKetQua->setSelectionMode(QAbstractItemView::SingleSelection);
     bangKetQua->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -82,7 +150,6 @@ void ManHinhTop10DocGia::thietLapGiaoDien() {
     bangKetQua->horizontalHeader()->setStretchLastSection(false);
     bangKetQua->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
     bangKetQua->verticalHeader()->setVisible(false);
-    
     // Set column widths
     bangKetQua->setColumnWidth(0, 60);  // Rank
     bangKetQua->setColumnWidth(1, 100); // ID
@@ -90,7 +157,6 @@ void ManHinhTop10DocGia::thietLapGiaoDien() {
     bangKetQua->setColumnWidth(3, 100); // Gender
     bangKetQua->setColumnWidth(4, 120); // Total
     bangKetQua->setColumnWidth(5, 120); // Current
-    
     mainLayout->addWidget(bangKetQua);
 
     // Buttons
@@ -120,7 +186,7 @@ void ManHinhTop10DocGia::apDungPhongCachHienDai() {
             background-color: #ffffff;
         }
         
-        QTableWidget {
+        QTableView {
             background-color: white;
             border: 2px solid #bdc3c7;
             border-radius: 8px;
@@ -128,12 +194,12 @@ void ManHinhTop10DocGia::apDungPhongCachHienDai() {
             font-size: 13px;
         }
         
-        QTableWidget::item {
+        QTableView::item {
             padding: 8px;
             border-bottom: 1px solid #ecf0f1;
         }
         
-        QTableWidget::item:selected {
+        QTableView::item:selected {
             background-color: #047857;
             color: white;
         }
@@ -201,7 +267,8 @@ void ManHinhTop10DocGia::apDungPhongCachHienDai() {
 }
 
 void ManHinhTop10DocGia::taiDuLieuTop10() {
-    bangKetQua->setRowCount(0);
+    // Build vector of results
+    danhSachTop.clear();
 
     if (!rootDocGia) {
         QMessageBox::information(this, "Thông Báo",
@@ -209,121 +276,42 @@ void ManHinhTop10DocGia::taiDuLieuTop10() {
         return;
     }
 
-    // Thu thập tất cả độc giả và đếm số lượt mượn
-    std::vector<DocGiaVaSoLuot> danhSach;
-    
     std::function<void(PTRDG)> duyetCay = [&](PTRDG node) {
         if (!node) return;
-        
         duyetCay(node->left);
-        
-        // Đếm tổng số lượt mượn và số đang mượn
-        DocGiaVaSoLuot item;
-        item.docGia = node;
-        item.soLuotMuon = 0;
-        item.soDangMuon = 0;
-        
+
+        DocGiaVaSoLuot it;
+        it.docGia = node;
+        it.soLuotMuon = 0;
+        it.soDangMuon = 0;
         MUONTRA mt = node->data.dsmt;
         while (mt) {
-            item.soLuotMuon++;
-            if (mt->data.TrangThai == 0) { // Đang mượn
-                item.soDangMuon++;
-            }
+            it.soLuotMuon++;
+            if (mt->data.TrangThai == 0) it.soDangMuon++;
             mt = mt->next;
         }
-        
-        if (item.soLuotMuon > 0) {
-            danhSach.push_back(item);
-        }
-        
+        if (it.soLuotMuon > 0) danhSachTop.push_back(it);
+
         duyetCay(node->right);
     };
-    
+
     duyetCay(rootDocGia);
 
-    if (danhSach.empty()) {
+    if (danhSachTop.empty()) {
         QMessageBox::information(this, "Thông Báo",
             "Chưa có độc giả nào mượn sách.");
         return;
     }
 
-    // Sắp xếp theo số lượt mượn giảm dần
-    std::sort(danhSach.begin(), danhSach.end(), 
-        [](const DocGiaVaSoLuot& a, const DocGiaVaSoLuot& b) {
-            return a.soLuotMuon > b.soLuotMuon;
-        });
+    std::sort(danhSachTop.begin(), danhSachTop.end(), [](const DocGiaVaSoLuot &a, const DocGiaVaSoLuot &b){
+        return a.soLuotMuon > b.soLuotMuon;
+    });
 
-    // Lấy top 10
-    int count = std::min(10, (int)danhSach.size());
-    bangKetQua->setRowCount(count);
-    
-    for (int i = 0; i < count; i++) {
-        const DocGiaVaSoLuot& item = danhSach[i];
+    if ((int)danhSachTop.size() > 10) danhSachTop.resize(10);
 
-        // Rank with medal icons
-        QString rankIcon;
-        QColor rankColor;
-        if (i == 0) {
-            rankIcon = "🥇";
-            rankColor = QColor(255, 215, 0); // Gold
-        } else if (i == 1) {
-            rankIcon = "🥈";
-            rankColor = QColor(192, 192, 192); // Silver
-        } else if (i == 2) {
-            rankIcon = "🥉";
-            rankColor = QColor(205, 127, 50); // Bronze
-        } else {
-            rankIcon = QString::number(i + 1);
-            rankColor = QColor(52, 73, 94);
-        }
+    // refresh model
+    if (modelKetQua) { if (auto m = dynamic_cast<Top10DocGiaModel*>(modelKetQua)) m->refresh(); }
 
-        QTableWidgetItem* rankItem = new QTableWidgetItem(rankIcon);
-        rankItem->setTextAlignment(Qt::AlignCenter);
-        rankItem->setFont(QFont("Arial", 14, QFont::Bold));
-        rankItem->setBackground(QBrush(rankColor.lighter(180)));
-        bangKetQua->setItem(i, 0, rankItem);
-
-        // Mã thẻ
-        QTableWidgetItem* idItem = new QTableWidgetItem(
-            QString::number(item.docGia->data.MaThe)
-        );
-        idItem->setTextAlignment(Qt::AlignCenter);
-        bangKetQua->setItem(i, 1, idItem);
-
-        // Họ tên
-        QString hoTen = QString::fromStdString(item.docGia->data.Ho + " " + item.docGia->data.Ten);
-        QTableWidgetItem* nameItem = new QTableWidgetItem(hoTen);
-        bangKetQua->setItem(i, 2, nameItem);
-
-        // Giới tính
-        QString gioiTinh = item.docGia->data.Phai ? "Nam" : "Nữ";
-        QTableWidgetItem* genderItem = new QTableWidgetItem(gioiTinh);
-        genderItem->setTextAlignment(Qt::AlignCenter);
-        bangKetQua->setItem(i, 3, genderItem);
-
-        // Tổng lượt mượn
-        QTableWidgetItem* totalItem = new QTableWidgetItem(
-            QString::number(item.soLuotMuon)
-        );
-        totalItem->setTextAlignment(Qt::AlignCenter);
-        totalItem->setFont(QFont("Arial", 12, QFont::Bold));
-        totalItem->setForeground(QBrush(QColor(5, 150, 105))); // Green
-        bangKetQua->setItem(i, 4, totalItem);
-
-        // Đang mượn
-        QTableWidgetItem* currentItem = new QTableWidgetItem(
-            QString::number(item.soDangMuon)
-        );
-        currentItem->setTextAlignment(Qt::AlignCenter);
-        currentItem->setFont(QFont("Arial", 11, QFont::Bold));
-        if (item.soDangMuon > 0) {
-            currentItem->setForeground(QBrush(QColor(234, 88, 12))); // Orange
-        } else {
-            currentItem->setForeground(QBrush(QColor(107, 114, 128))); // Gray
-        }
-        bangKetQua->setItem(i, 5, currentItem);
-
-        // Set row height
-        bangKetQua->setRowHeight(i, 45);
-    }
+    // Use uniform row height for better performance
+    bangKetQua->verticalHeader()->setDefaultSectionSize(45);
 }

@@ -114,7 +114,7 @@ HEADERS += include/utils/Utf8Helper.h
 ### Test Case 2: File I/O
 1. Thêm sách có tên tiếng Việt: "Đắc Nhân Tâm"
 2. Thoát ứng dụng
-3. Mở file `files/dausach.txt` bằng Notepad → Xem có hiển thị đúng
+3. Mở file `data/dausach.txt` bằng Notepad → Xem có hiển thị đúng
 4. Khởi động lại ứng dụng → Kiểm tra dữ liệu load đúng
 
 ### Test Case 3: Search

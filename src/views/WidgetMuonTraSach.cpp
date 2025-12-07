@@ -3,6 +3,11 @@
 #include "models/QuanLySach.h"
 #include "utils/NgayThang.h"
 #include "utils/AnimationHelper.h"
+#include "utils/DBBatcher.h"
+#include <QFuture>
+#include <QFutureWatcher>
+#include <QtConcurrent>
+#include <algorithm>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -135,10 +140,18 @@ WidgetMuonTraSach::WidgetMuonTraSach(QWidget *parent)
     searchTimer->setSingleShot(true);
     searchTimer->setInterval(300); // 300ms debounce
     
-    setupUI();
-    setupConnections();
-    setupKeyboardShortcuts();
-    chuyenSangState(STATE_NHAP_MA_THE);
+        // Initialize async watchers
+        bookSearchWatcher = new QFutureWatcher<std::vector<KetQuaTimKiem>>(this);
+        banSaoWatcher = new QFutureWatcher<std::vector<PTRDMS>>(this);
+        connect(bookSearchWatcher, &QFutureWatcher<std::vector<KetQuaTimKiem>>::finished,
+            this, &WidgetMuonTraSach::onBookSearchFinished);
+        connect(banSaoWatcher, &QFutureWatcher<std::vector<PTRDMS>>::finished,
+            this, &WidgetMuonTraSach::onBanSaoFinished);
+
+        setupUI();
+        setupConnections();
+        setupKeyboardShortcuts();
+        chuyenSangState(STATE_NHAP_MA_THE);
 }
 
 WidgetMuonTraSach::~WidgetMuonTraSach() {
@@ -461,7 +474,7 @@ void WidgetMuonTraSach::setupStateTraSach() {
     QHBoxLayout *filterLayout = new QHBoxLayout();
     filterLayout->setSpacing(12);
     
-    QLabel *filterLabel = new QLabel("🔎 Lọc:", widgetTraSach);
+    QLabel *filterLabel = new QLabel("Lọc:", widgetTraSach);
     filterLabel->setStyleSheet("font-weight: bold; color: #64B5F6;");
     filterLayout->addWidget(filterLabel);
     
@@ -818,7 +831,17 @@ void WidgetMuonTraSach::onTimSachMuonClicked() {
         return;
     }
     
-    timSachCoTheMuon(tuKhoa);
+    // Run book search asynchronously to avoid blocking UI
+    try {
+        btnTimSach->setEnabled(false);
+        lblKetQuaTimSach->setText("⏳ Đang tìm sách...");
+        QFuture<std::vector<KetQuaTimKiem>> future = QtConcurrent::run(&DBBatcher::timKiemDauSach, tuKhoa.toStdString(), 100);
+        bookSearchWatcher->setFuture(future);
+    } catch (...) {
+        lblKetQuaTimSach->setText("❌ Lỗi khi tìm kiếm sách!");
+        lblKetQuaTimSach->setStyleSheet("color: #DC2626;");
+        btnTimSach->setEnabled(true);
+    }
 }
 
 void WidgetMuonTraSach::onChonBanSaoChanged(int index) {
@@ -860,6 +883,8 @@ void WidgetMuonTraSach::onXacNhanMuonClicked() {
             .arg(docGiaHienTai->data.soSachDangMuon));
         
         // Refresh và quay lại state 1
+        // Notify auto-save / persistence and update UI
+        try { emit duLieuThayDoi(); } catch(...) {}
         capNhatDanhSachSachDangMuon();
         hienThiThongBao("✓ Đã mượn sách thành công", false);
         chuyenSangState(STATE_HIEN_THONG_TIN);
@@ -892,12 +917,13 @@ void WidgetMuonTraSach::onXacNhanTraClicked() {
     std::string result = TraSach(docGiaHienTai, sachTra.maSach, dsDauSach, soLuongDauSach);
     
     if (result.empty()) {
-        QMessageBox::information(this, "Thành Công ✅",
+        QMessageBox::information(this, "Thành Công",
             QString("Đã trả sách:\n%1\n\nĐộc giả còn: %2 sách đang mượn")
             .arg(QString::fromStdString(sachTra.tenSach))
             .arg(docGiaHienTai->data.soSachDangMuon));
         
         // Refresh và quay lại state 1
+        try { emit duLieuThayDoi(); } catch(...) {}
         capNhatDanhSachSachDangMuon();
         chuyenSangState(STATE_HIEN_THONG_TIN);
     } else {
@@ -935,6 +961,7 @@ void WidgetMuonTraSach::onXacNhanBaoMatClicked() {
             .arg(QString::fromStdString(sachMat.tenSach)));
         
         // Refresh và quay lại state 1
+        try { emit duLieuThayDoi(); } catch(...) {}
         capNhatDanhSachSachDangMuon();
         chuyenSangState(STATE_HIEN_THONG_TIN);
     } else {
@@ -995,81 +1022,55 @@ void WidgetMuonTraSach::capNhatDanhSachSachDangMuon() {
         modelSachDangMuon->clear();
         return;
     }
-    
+
     // ✅ Gọi backend function LayDSSachDangMuon() với DTO
     ThongTinSachDangMuon_DTO danhSach[100];
     int soLuong = LayDSSachDangMuon(docGiaHienTai, danhSach, 100, dsDauSach, soLuongDauSach);
-    
+
+    // Defensive: ensure soLuong is in a safe range
+    if (soLuong < 0) soLuong = 0;
+    if (soLuong > 100) soLuong = 100;
+
     cacSachDangMuon.clear();
     for (int i = 0; i < soLuong; i++) {
         cacSachDangMuon.append(danhSach[i]);
     }
-    
+
     modelSachDangMuon->setLoans(cacSachDangMuon);
 }
 
 void WidgetMuonTraSach::timSachCoTheMuon(const QString& tuKhoa) {
-    // ✅ Gọi backend function LayDanhSachTimKiem()
-    KetQuaTimKiem ketQua[100];
-    int soKetQua = 0;
-    
-    try {
-        LayDanhSachTimKiem(tuKhoa.toStdString(), ketQua, soKetQua, 100);
-    } catch (...) {
-        lblKetQuaTimSach->setText("❌ Lỗi khi tìm kiếm sách!");
-        lblKetQuaTimSach->setStyleSheet("color: #DC2626;");
-        comboBanSao->clear();
-        sachTimThay = nullptr;
-        return;
-    }
-    
-    // Validate results
-    if (soKetQua < 0 || soKetQua > 100) {
-        lblKetQuaTimSach->setText("❌ Kết quả tìm kiếm không hợp lệ!");
-        lblKetQuaTimSach->setStyleSheet("color: #DC2626;");
-        comboBanSao->clear();
-        sachTimThay = nullptr;
-        return;
-    }
-    
-    if (soKetQua == 0) {
+    // This function remains for synchronous usage but is now rarely called
+    // Use DBBatcher::timKiemDauSach asynchronously; synchronous fallback below.
+    std::vector<KetQuaTimKiem> results = DBBatcher::timKiemDauSach(tuKhoa.toStdString(), 100);
+
+    if (results.empty()) {
         lblKetQuaTimSach->setText("❌ Không tìm thấy sách nào phù hợp!");
         lblKetQuaTimSach->setStyleSheet("color: #DC2626;");
         comboBanSao->clear();
         sachTimThay = nullptr;
         return;
     }
-    
-    // Lấy kết quả đầu tiên (priority cao nhất)
-    sachTimThay = ketQua[0].sach;
-    
-    // Validate pointer
+
+    sachTimThay = results[0].sach;
     if (!sachTimThay) {
         lblKetQuaTimSach->setText("❌ Dữ liệu sách không hợp lệ!");
         lblKetQuaTimSach->setStyleSheet("color: #DC2626;");
         comboBanSao->clear();
         return;
     }
-    
-    // ✅ Gọi backend function DemBanSaoCoTheMuon()
+
+    // Synchronous fallback: compute available copies and load linked-list
     int soLuongSan = DemBanSaoCoTheMuon(sachTimThay);
-    
-    lblKetQuaTimSach->setText(QString(
-        "✅ Tìm thấy: <b>%1</b><br>"
-        "Số bản sao sẵn: <b>%2</b>"
-    ).arg(QString::fromStdString(sachTimThay->tenSach))
-     .arg(soLuongSan));
-    
+    lblKetQuaTimSach->setText(QString("✅ Tìm thấy: <b>%1</b><br>"
+        "Số bản sao sẵn: <b>%2</b>").arg(QString::fromStdString(sachTimThay->tenSach)).arg(soLuongSan));
     lblKetQuaTimSach->setStyleSheet("color: #10B981;");
-    
     if (soLuongSan == 0) {
         lblKetQuaTimSach->setText(lblKetQuaTimSach->text() + "<br>⚠️ Không có bản sao nào sẵn sàng!");
         comboBanSao->clear();
         btnXacNhanMuon->setEnabled(false);
         return;
     }
-    
-    // Load bản sao khả dụng
     loadBanSaoKhaDung(sachTimThay);
 }
 
@@ -1077,26 +1078,31 @@ void WidgetMuonTraSach::loadBanSaoKhaDung(PTRDS dauSach) {
     comboBanSao->clear();
     
     if (!dauSach) return;
-    
-    // ✅ Duyệt linked list DMS để tìm bản sao CHO_MUON_DUOC
-    PTRDMS p = dauSach->dms;
-    int count = 0;
-    
-    while (p) {
-        if (p->trangThai == CHO_MUON_DUOC) {
-            QString display = QString("%1 (%2)")
-                .arg(QString::fromStdString(p->maSach))
-                .arg(QString::fromStdString(p->viTri));
-            
-            comboBanSao->addItem(display, QString::fromStdString(p->maSach));
-            count++;
+    // Prefer using DBBatcher to collect available copies (allows future batching)
+    try {
+        btnTimSach->setEnabled(false);
+        lblKetQuaTimSach->setText("⏳ Đang tải bản sao...");
+        QFuture<std::vector<PTRDMS>> future = QtConcurrent::run(&DBBatcher::layBanSaoTheoISBN, std::string(dauSach->ISBN));
+        banSaoWatcher->setFuture(future);
+    } catch (...) {
+        // Fallback: traverse linked list (synchronous)
+        PTRDMS p = dauSach->dms;
+        int count = 0;
+        while (p) {
+            if (p->trangThai == CHO_MUON_DUOC) {
+                QString display = QString("%1 (%2)")
+                    .arg(QString::fromStdString(p->maSach))
+                    .arg(QString::fromStdString(p->viTri));
+                comboBanSao->addItem(display, QString::fromStdString(p->maSach));
+                count++;
+            }
+            p = p->next;
         }
-        p = p->next;
-    }
-    
-    if (count > 0) {
-        comboBanSao->setCurrentIndex(0);
-        onChonBanSaoChanged(0);
+        if (count > 0) {
+            comboBanSao->setCurrentIndex(0);
+            onChonBanSaoChanged(0);
+        }
+        btnTimSach->setEnabled(true);
     }
 }
 
@@ -1132,6 +1138,62 @@ void WidgetMuonTraSach::capNhatLabelThongTinDocGia() {
         lblSoSachDangMuon->setStyleSheet("color: #F59E0B;"); // Warning
     } else {
         lblSoSachDangMuon->setStyleSheet("color: #10B981;"); // Green
+    }
+}
+
+void WidgetMuonTraSach::onBookSearchFinished() {
+    btnTimSach->setEnabled(true);
+    if (!bookSearchWatcher) return;
+    std::vector<KetQuaTimKiem> results = bookSearchWatcher->future().result();
+    if (results.empty()) {
+        lblKetQuaTimSach->setText("❌ Không tìm thấy sách nào phù hợp!");
+        lblKetQuaTimSach->setStyleSheet("color: #DC2626;");
+        comboBanSao->clear();
+        sachTimThay = nullptr;
+        return;
+    }
+
+    sachTimThay = results[0].sach;
+    if (!sachTimThay) {
+        lblKetQuaTimSach->setText("❌ Dữ liệu sách không hợp lệ!");
+        lblKetQuaTimSach->setStyleSheet("color: #DC2626;");
+        comboBanSao->clear();
+        return;
+    }
+
+    // Start loading available copies asynchronously
+    lblKetQuaTimSach->setText(QString("✅ Tìm thấy: <b>%1</b><br>Đang tải bản sao...").arg(QString::fromStdString(sachTimThay->tenSach)));
+    lblKetQuaTimSach->setStyleSheet("color: #10B981;");
+    try {
+        QFuture<std::vector<PTRDMS>> future = QtConcurrent::run(&DBBatcher::layBanSaoTheoISBN, std::string(sachTimThay->ISBN));
+        banSaoWatcher->setFuture(future);
+    } catch (...) {
+        // fallback to sync
+        loadBanSaoKhaDung(sachTimThay);
+    }
+}
+
+void WidgetMuonTraSach::onBanSaoFinished() {
+    btnTimSach->setEnabled(true);
+    if (!banSaoWatcher) return;
+    std::vector<PTRDMS> copies = banSaoWatcher->future().result();
+    comboBanSao->clear();
+    int count = 0;
+    for (auto &p : copies) {
+        if (p && p->trangThai == CHO_MUON_DUOC) {
+            QString display = QString("%1 (%2)")
+                .arg(QString::fromStdString(p->maSach))
+                .arg(QString::fromStdString(p->viTri));
+            comboBanSao->addItem(display, QString::fromStdString(p->maSach));
+            count++;
+        }
+    }
+    if (count > 0) {
+        comboBanSao->setCurrentIndex(0);
+        onChonBanSaoChanged(0);
+    } else {
+        lblKetQuaTimSach->setText(lblKetQuaTimSach->text() + "<br>⚠️ Không có bản sao nào sẵn sàng!");
+        btnXacNhanMuon->setEnabled(false);
     }
 }
 

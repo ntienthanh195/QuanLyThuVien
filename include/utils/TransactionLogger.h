@@ -11,7 +11,7 @@
 /**
  * @brief TransactionLogger - Ghi lịch sử giao dịch mượn/trả sách
  * 
- * File log: files/muontralogs.txt
+ * File log: data/muontralogs.txt
  * Format: timestamp|maThe|hoTen|ISBN|tenSach|loai|trangThai
  * - timestamp: yyyy-MM-dd HH:mm:ss
  * - maThe: Mã thẻ độc giả

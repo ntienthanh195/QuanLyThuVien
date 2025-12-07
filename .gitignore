@@ -28,10 +28,10 @@ run_debug.log
 *.swp
 *.user
 
-# 7. Không đẩy file backup (chỉ giữ files/ duy nhất)
-files/backup/
-files/backup_*
-files/*.dat
+# 7. Không đẩy file backup (chỉ giữ data/ duy nhất)
+data/backup/
+data/backup_archives/
+data/*.dat
 main
 *.xcodeproj
 *.xcworkspace

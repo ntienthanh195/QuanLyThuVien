@@ -5,8 +5,10 @@
 #include "models/QuanLySach.h"
 #include "utils/ConfirmationDialog.h"
 #include "utils/AnimationHelper.h"
+#include "utils/DBBatcher.h"
 #include "utils/NgayThang.h"
 #include "utils/Utf8Helper.h"
+#include "utils/SafeGui.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -24,6 +26,10 @@
 #include <QDialogButtonBox>
 #include <QTabBar>
 #include <QRegularExpression>
+#include <algorithm>
+#include <QFuture>
+#include <QFutureWatcher>
+#include <QtConcurrent>
 
 extern PTRDG rootDocGia;
 
@@ -34,18 +40,26 @@ extern PTRDG rootDocGia;
 
 ReaderTableModel::ReaderTableModel(QObject *parent)
     : QAbstractTableModel(parent)
-    , readers(nullptr)
-    , readerCount(0)
+    , readers()
     , isSearchMode(false)
     , sortColumn(-1)
     , sortOrder(Qt::AscendingOrder)
 {
-    readers = new PTRDG[1000]; // Max readers
+}
+
+void WidgetQuanLyDocGia::onSearchFinished() {
+    if (!searchWatcher) return;
+    QFuture<std::vector<PTRDG>> f = searchWatcher->future();
+    std::vector<PTRDG> results = f.result();
+    readerModel->setSearchResults(results);
+    showMessage(QString("👤 Tìm thấy %1 độc giả").arg((int)results.size()));
+    btnSearch->setEnabled(true);
+    searchProgress->setVisible(false);
 }
 
 int ReaderTableModel::rowCount(const QModelIndex &parent) const {
     Q_UNUSED(parent);
-    return readerCount;
+    return static_cast<int>(readers.size());
 }
 
 int ReaderTableModel::columnCount(const QModelIndex &parent) const {
@@ -54,7 +68,7 @@ int ReaderTableModel::columnCount(const QModelIndex &parent) const {
 }
 
 QVariant ReaderTableModel::data(const QModelIndex &index, int role) const {
-    if (!index.isValid() || index.row() >= readerCount || !readers)
+    if (!index.isValid() || index.row() >= static_cast<int>(readers.size()))
         return QVariant();
     
     PTRDG reader = readers[index.row()];
@@ -116,86 +130,79 @@ QVariant ReaderTableModel::headerData(int section, Qt::Orientation orientation, 
     return QVariant();
 }
 
-void ReaderTableModel::collectReadersFromTree(PTRDG root, PTRDG* arr, int &count) {
-    if (!root || count >= 1000) return;
-    
-    collectReadersFromTree(root->left, arr, count);
-    arr[count++] = root;
-    collectReadersFromTree(root->right, arr, count);
+void ReaderTableModel::collectReadersFromTree(PTRDG root, std::vector<PTRDG> &out) {
+    if (!root) return;
+    collectReadersFromTree(root->left, out);
+    out.push_back(root);
+    collectReadersFromTree(root->right, out);
 }
 
 void ReaderTableModel::refreshData() {
     beginResetModel();
-    readerCount = 0;
     isSearchMode = false;
-    collectReadersFromTree(rootDocGia, readers, readerCount);
+    // Use DBBatcher snapshot to collect readers efficiently
+    readers = DBBatcher::snapshotDocGia();
     endResetModel();
 }
 
 void ReaderTableModel::setSearchResults(PTRDG* results, int count) {
     beginResetModel();
+    readers.clear();
+    readers.reserve(count > 0 ? count : 0);
+    for (int i = 0; i < count; ++i) {
+        readers.push_back(results[i]);
+    }
+    isSearchMode = true;
+    endResetModel();
+}
+
+void ReaderTableModel::setSearchResults(const std::vector<PTRDG> &results) {
+    beginResetModel();
     readers = results;
-    readerCount = count;
     isSearchMode = true;
     endResetModel();
 }
 
 PTRDG ReaderTableModel::getReaderAt(int row) const {
-    if (row >= 0 && row < readerCount && readers) {
+    if (row >= 0 && row < static_cast<int>(readers.size())) {
         return readers[row];
     }
     return nullptr;
 }
 
 void ReaderTableModel::sort(int column, Qt::SortOrder order) {
-    if (!readers || readerCount == 0) return;
-    
+    if (readers.empty()) return;
+
     sortColumn = column;
     sortOrder = order;
-    
+
     layoutAboutToBeChanged();
-    
-    // Bubble sort
-    for (int i = 0; i < readerCount - 1; i++) {
-        for (int j = 0; j < readerCount - i - 1; j++) {
-            bool swap = false;
-            
-            switch (column) {
-                case 0: // Ma The
-                    swap = (sortOrder == Qt::AscendingOrder) ? 
-                           (readers[j]->data.MaThe > readers[j+1]->data.MaThe) :
-                           (readers[j]->data.MaThe < readers[j+1]->data.MaThe);
-                    break;
-                case 1: // Ho
-                    swap = (sortOrder == Qt::AscendingOrder) ? 
-                           (readers[j]->data.Ho > readers[j+1]->data.Ho) :
-                           (readers[j]->data.Ho < readers[j+1]->data.Ho);
-                    break;
-                case 2: // Ten
-                    swap = (sortOrder == Qt::AscendingOrder) ? 
-                           (readers[j]->data.Ten > readers[j+1]->data.Ten) :
-                           (readers[j]->data.Ten < readers[j+1]->data.Ten);
-                    break;
-                case 3: // Phai
-                    swap = (sortOrder == Qt::AscendingOrder) ? 
-                           (readers[j]->data.Phai > readers[j+1]->data.Phai) :
-                           (readers[j]->data.Phai < readers[j+1]->data.Phai);
-                    break;
-                case 4: // Trang Thai
-                    swap = (sortOrder == Qt::AscendingOrder) ? 
-                           (readers[j]->data.TrangThai > readers[j+1]->data.TrangThai) :
-                           (readers[j]->data.TrangThai < readers[j+1]->data.TrangThai);
-                    break;
-            }
-            
-            if (swap) {
-                PTRDG temp = readers[j];
-                readers[j] = readers[j+1];
-                readers[j+1] = temp;
-            }
+
+    auto cmp = [column, order](const PTRDG &a, const PTRDG &b) {
+        if (!a || !b) return false;
+        switch (column) {
+            case 0: // Ma The
+                return (order == Qt::AscendingOrder) ? (a->data.MaThe < b->data.MaThe)
+                                                      : (a->data.MaThe > b->data.MaThe);
+            case 1: // Ho
+                return (order == Qt::AscendingOrder) ? (a->data.Ho < b->data.Ho)
+                                                      : (a->data.Ho > b->data.Ho);
+            case 2: // Ten
+                return (order == Qt::AscendingOrder) ? (a->data.Ten < b->data.Ten)
+                                                      : (a->data.Ten > b->data.Ten);
+            case 3: // Phai
+                return (order == Qt::AscendingOrder) ? (a->data.Phai < b->data.Phai)
+                                                      : (a->data.Phai > b->data.Phai);
+            case 4: // Trang Thai
+                return (order == Qt::AscendingOrder) ? (a->data.TrangThai < b->data.TrangThai)
+                                                      : (a->data.TrangThai > b->data.TrangThai);
+            default:
+                return false;
         }
-    }
-    
+    };
+
+    std::sort(readers.begin(), readers.end(), cmp);
+
     layoutChanged();
 }
 
@@ -250,6 +257,11 @@ WidgetQuanLyDocGia::WidgetQuanLyDocGia(QWidget *parent)
     searchTimer->setSingleShot(true);
     searchTimer->setInterval(300);
     
+    // Async search watcher
+    searchWatcher = new QFutureWatcher<std::vector<PTRDG>>(this);
+    connect(searchWatcher, &QFutureWatcher<std::vector<PTRDG>>::finished,
+            this, &WidgetQuanLyDocGia::onSearchFinished);
+
     setupUI();
     setupConnections();
     setupKeyboardShortcuts();
@@ -324,7 +336,13 @@ void WidgetQuanLyDocGia::setupUI() {
     btnClearSearch->setProperty("class", "Secondary");
     btnClearSearch->setMinimumHeight(40);
     filterRow->addWidget(btnClearSearch);
-    
+    // Inline progress indicator for search (indeterminate)
+    searchProgress = new QProgressBar(headerCard);
+    searchProgress->setRange(0, 0);
+    searchProgress->setVisible(false);
+    searchProgress->setFixedWidth(140);
+    filterRow->addWidget(searchProgress);
+
     headerLayout->addLayout(filterRow);
     mainLayout->addWidget(headerCard);
     
@@ -758,10 +776,8 @@ void WidgetQuanLyDocGia::updateButtonStates() {
 }
 
 void WidgetQuanLyDocGia::showMessage(const QString &message, bool isError) {
-    statusLabel->setText(message);
-    statusLabel->setStyleSheet(isError ? 
-        "color: #e74c3c; font-weight: bold;" : 
-        "color: #27ae60; font-weight: bold;");
+    SafeGui::safeSetText(statusLabel, message);
+    SafeGui::safeSetStyleSheet(statusLabel, isError ? "color: #e74c3c; font-weight: bold;" : "color: #27ae60; font-weight: bold;");
 }
 
 void WidgetQuanLyDocGia::onSearchClicked() {
@@ -769,7 +785,6 @@ void WidgetQuanLyDocGia::onSearchClicked() {
     int searchType = searchTypeCombo->currentData().toInt();
     
     extern PTRDG rootDocGia;
-    static PTRDG searchResults[1000];
     int count = 0;
     
     // Validate root pointer
@@ -795,13 +810,17 @@ void WidgetQuanLyDocGia::onSearchClicked() {
             showMessage("❌ Lỗi khi tìm kiếm độc giả!", true);
             return;
         }
-        
+
         if (reader) {
+            std::vector<PTRDG> v{reader};
+            readerModel->setSearchResults(v);
             showMessage(QString("🎫 Tìm thấy độc giả: %1 %2")
                 .arg(QString::fromStdString(reader->data.Ho),
                      QString::fromStdString(reader->data.Ten)));
         } else {
             showMessage("❌ Không tìm thấy độc giả!", true);
+            // clear model
+            readerModel->setSearchResults(std::vector<PTRDG>());
         }
         
     } else if (searchType == 1) {
@@ -811,14 +830,18 @@ void WidgetQuanLyDocGia::onSearchClicked() {
             return;
         }
         
-        try {
-            count = TimDocGiaTheoTen(rootDocGia, keyword.toStdString(), searchResults, 1000);
-            if (count < 0 || count > 1000) count = 0;
-        } catch (...) {
-            showMessage("❌ Lỗi khi tìm kiếm!", true);
-            return;
-        }
-        showMessage(QString("👤 Tìm thấy %1 độc giả có tên '%2'").arg(count).arg(keyword));
+            // Run search in background
+            try {
+                showMessage("⏳ Đang tìm kiếm...");
+                btnSearch->setEnabled(false);
+                searchProgress->setVisible(true);
+                QFuture<std::vector<PTRDG>> future = QtConcurrent::run(&DBBatcher::timDocGiaTheoTen, keyword.toStdString(), 1000);
+                searchWatcher->setFuture(future);
+            } catch (...) {
+                showMessage("❌ Lỗi khi tìm kiếm!", true);
+                btnSearch->setEnabled(true);
+                return;
+            }
         
     } else if (searchType == 2) {
         // Search by last name
@@ -828,13 +851,16 @@ void WidgetQuanLyDocGia::onSearchClicked() {
         }
         
         try {
-            count = TimDocGiaTheoHo(rootDocGia, keyword.toStdString(), searchResults, 1000);
-            if (count < 0 || count > 1000) count = 0;
+            showMessage("⏳ Đang tìm kiếm...");
+            btnSearch->setEnabled(false);
+            searchProgress->setVisible(true);
+            QFuture<std::vector<PTRDG>> future = QtConcurrent::run(&DBBatcher::timDocGiaTheoHo, keyword.toStdString(), 1000);
+            searchWatcher->setFuture(future);
         } catch (...) {
             showMessage("❌ Lỗi khi tìm kiếm!", true);
+            btnSearch->setEnabled(true);
             return;
         }
-        showMessage(QString("👥 Tìm thấy %1 độc giả có họ '%2'").arg(count).arg(keyword));
         
     } else if (searchType == 3) {
         // Search by full name
@@ -844,13 +870,16 @@ void WidgetQuanLyDocGia::onSearchClicked() {
         }
         
         try {
-            count = TimDocGiaTheoHoTen(rootDocGia, keyword.toStdString(), searchResults, 1000);
-            if (count < 0 || count > 1000) count = 0;
+            showMessage("⏳ Đang tìm kiếm...");
+            btnSearch->setEnabled(false);
+            searchProgress->setVisible(true);
+            QFuture<std::vector<PTRDG>> future = QtConcurrent::run(&DBBatcher::timDocGiaTheoHoTen, keyword.toStdString(), 1000);
+            searchWatcher->setFuture(future);
         } catch (...) {
             showMessage("❌ Lỗi khi tìm kiếm!", true);
+            btnSearch->setEnabled(true);
             return;
         }
-        showMessage(QString("👤👥 Tìm thấy %1 độc giả có họ tên '%2'").arg(count).arg(keyword));
         
     } else if (searchType == 4) {
         // Filter by status
@@ -865,13 +894,16 @@ void WidgetQuanLyDocGia::onSearchClicked() {
         int status = item.left(1).toInt();
         
         try {
-            count = TimDocGiaTheoTrangThai(rootDocGia, status, searchResults, 1000);
-            if (count < 0 || count > 1000) count = 0;
+            showMessage("⏳ Đang lọc...");
+            btnSearch->setEnabled(false);
+            QFuture<std::vector<PTRDG>> future = QtConcurrent::run(&DBBatcher::timDocGiaTheoTrangThai, status, 1000);
+            searchWatcher->setFuture(future);
         } catch (...) {
             showMessage("❌ Lỗi khi tìm kiếm!", true);
+            btnSearch->setEnabled(true);
             return;
         }
-        showMessage(QString("📊 Tìm thấy %1 độc giả '%2'").arg(count).arg(item.mid(4)));
+        // onSearchFinished will display result count
     }
 }
 

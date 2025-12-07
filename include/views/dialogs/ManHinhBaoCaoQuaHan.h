@@ -2,8 +2,11 @@
 #define MANHINHBAOCAOQUAHAN_H
 
 #include <QDialog>
-#include <QTableWidget>
+#include <QTableView>
+#include <QAbstractItemModel>
 #include <QPushButton>
+#include <vector>
+#include "models/DocGia.h"
 
 class ManHinhBaoCaoQuaHan : public QDialog {
     Q_OBJECT
@@ -16,7 +19,9 @@ private:
     void apDungPhongCachHienDai();
     void taiDuLieuQuaHan();
 
-    QTableWidget* bangKetQua;
+    QTableView* bangKetQua;
+    QAbstractItemModel* modelKetQua;
+    std::vector<DocGiaQuaHanDTO> danhSachQuaHan;
     QPushButton* nutLamMoi;
     QPushButton* nutDong;
 };

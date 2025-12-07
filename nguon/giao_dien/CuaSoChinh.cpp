@@ -28,6 +28,9 @@
 #include "utils/AnimationHelper.h"
 #include "utils/AutoSaveManager.h"
 #include "utils/FilePathManager.h"
+#include "utils/EventBus.h"
+#include <QDir>
+#include <QStandardPaths>
 
 CuaSoChinh::CuaSoChinh(QWidget *cha) 
     : QMainWindow(cha),
@@ -142,6 +145,106 @@ void CuaSoChinh::thieLapGiaoDien() {
     }
     
     qDebug() << "Hoàn thành khởi tạo widgets";
+
+    // Setup a central filesystem watcher to detect external changes
+    fsWatcher = new QFileSystemWatcher(this);
+    fsDebounceTimer = new QTimer(this);
+    fsDebounceTimer->setInterval(700);
+    fsDebounceTimer->setSingleShot(true);
+
+    // Paths to watch: prefer `data/` (managed by FilePathManager) but also watch legacy `files/`
+    QString appRoot = FilePathManager::getRootPath();
+    QString dataDir = FilePathManager::getFilesDirectory();
+    QString legacyFiles = appRoot + "/files";
+
+    // Ensure directories exist before adding
+    if (!dataDir.isEmpty()) {
+        QDir d(dataDir);
+        if (d.exists()) fsWatcher->addPath(d.absolutePath());
+    }
+    QDir legacyDir(legacyFiles);
+    if (legacyDir.exists()) fsWatcher->addPath(legacyDir.absolutePath());
+
+    // Also watch the DB file if present under data/ (data/library.db)
+    QString dbPath = dataDir + "/files/library.db";
+    QFileInfo fi(dbPath);
+    if (fi.exists()) fsWatcher->addPath(fi.absoluteFilePath());
+
+    // When the watcher reports changes, start debounce timer
+    connect(fsWatcher, &QFileSystemWatcher::directoryChanged, this, [this](const QString& path){
+        Q_UNUSED(path);
+        fsDebounceTimer->start();
+    });
+    connect(fsWatcher, &QFileSystemWatcher::fileChanged, this, [this](const QString& path){
+        Q_UNUSED(path);
+        fsDebounceTimer->start();
+    });
+
+    // On debounce timeout, emit a general dataChanged event so all widgets can refresh
+    connect(fsDebounceTimer, &QTimer::timeout, this, [this](){
+        qDebug() << "Filesystem change detected (debounced). Emitting EventBus::dataChanged";
+        try { EventBus::instance().dataChanged(); } catch(...) {}
+        // Also update dashboard/status
+        if (bangDieuKhien) bangDieuKhien->capNhatRealtimeTuWidget();
+    });
+
+    // Global realtime wiring: update widgets/dashboard when EventBus emits changes
+    connect(&EventBus::instance(), &EventBus::docGiaAdded, this, [this](int){
+        qDebug() << "EventBus: docGiaAdded received";
+        if (widgetDocGia) widgetDocGia->taiLaiDanhSach();
+        if (bangDieuKhien) bangDieuKhien->capNhatRealtimeTuWidget();
+    });
+    connect(&EventBus::instance(), &EventBus::docGiaUpdated, this, [this](int){
+        qDebug() << "EventBus: docGiaUpdated received";
+        if (widgetDocGia) widgetDocGia->taiLaiDanhSach();
+        if (bangDieuKhien) bangDieuKhien->capNhatRealtimeTuWidget();
+    });
+    connect(&EventBus::instance(), &EventBus::docGiaRemoved, this, [this](int){
+        qDebug() << "EventBus: docGiaRemoved received";
+        if (widgetDocGia) widgetDocGia->taiLaiDanhSach();
+        if (bangDieuKhien) bangDieuKhien->capNhatRealtimeTuWidget();
+    });
+
+    connect(&EventBus::instance(), &EventBus::muonTraAdded, this, [this](int, const QString&){
+        qDebug() << "EventBus: muonTraAdded received";
+        if (widgetMuonTra) widgetMuonTra->lamMoi();
+        if (bangDieuKhien) bangDieuKhien->capNhatRealtimeTuWidget();
+    });
+    connect(&EventBus::instance(), &EventBus::muonTraUpdated, this, [this](int, const QString&){
+        qDebug() << "EventBus: muonTraUpdated received";
+        if (widgetMuonTra) widgetMuonTra->lamMoi();
+        if (bangDieuKhien) bangDieuKhien->capNhatRealtimeTuWidget();
+    });
+    connect(&EventBus::instance(), &EventBus::muonTraRemoved, this, [this](int, const QString&){
+        qDebug() << "EventBus: muonTraRemoved received";
+        if (widgetMuonTra) widgetMuonTra->lamMoi();
+        if (bangDieuKhien) bangDieuKhien->capNhatRealtimeTuWidget();
+    });
+
+    connect(&EventBus::instance(), &EventBus::dauSachAdded, this, [this](const QString&){
+        qDebug() << "EventBus: dauSachAdded received";
+        if (widgetSach) widgetSach->taiLaiDanhSach();
+        if (bangDieuKhien) bangDieuKhien->capNhatRealtimeTuWidget();
+    });
+    connect(&EventBus::instance(), &EventBus::dauSachUpdated, this, [this](const QString&){
+        qDebug() << "EventBus: dauSachUpdated received";
+        if (widgetSach) widgetSach->taiLaiDanhSach();
+        if (bangDieuKhien) bangDieuKhien->capNhatRealtimeTuWidget();
+    });
+    connect(&EventBus::instance(), &EventBus::dauSachRemoved, this, [this](const QString&){
+        qDebug() << "EventBus: dauSachRemoved received";
+        if (widgetSach) widgetSach->taiLaiDanhSach();
+        if (bangDieuKhien) bangDieuKhien->capNhatRealtimeTuWidget();
+    });
+
+    // General external data change: refresh all major lists and dashboard
+    connect(&EventBus::instance(), &EventBus::dataChanged, this, [this](){
+        qDebug() << "EventBus: dataChanged received - refreshing all main widgets";
+        if (widgetSach) widgetSach->taiLaiDanhSach();
+        if (widgetDocGia) widgetDocGia->taiLaiDanhSach();
+        if (widgetMuonTra) widgetMuonTra->lamMoi();
+        if (bangDieuKhien) bangDieuKhien->capNhatRealtimeTuWidget();
+    });
     
     // Thêm vào stack
     boChuyenManHinh->addWidget(bangDieuKhien);      // Index 0

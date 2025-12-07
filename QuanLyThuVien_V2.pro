@@ -1,4 +1,4 @@
-QT += core gui widgets printsupport charts
+QT += core gui widgets printsupport charts sql concurrent
 
 CONFIG += c++17
 
@@ -48,27 +48,32 @@ HEADERS += \
 # Utils Backend (GIỮ NGUYÊN MỘT SỐ)
 SOURCES += \
     src/utils/NgayThang.cpp \
+    src/utils/EventBus.cpp \
     src/utils/ThongBao.cpp \
     src/utils/XuLyChuoi.cpp \
     src/utils/FileManager.cpp \
     src/utils/BackupManager.cpp \
     src/utils/FilePathManager.cpp \
     src/utils/Utf8Helper.cpp \
+    src/utils/DatabaseManager.cpp \
     src/utils/AutoSaveManager.cpp \
     src/utils/PrintHelper.cpp \
     src/utils/QrCodeGenerator.cpp \
     src/utils/TransactionLogger.cpp \
     src/utils/PrintQueueManager.cpp \
+    src/utils/DBBatcher.cpp \
     src/qrcode/qrcodegen.cpp
 
 HEADERS += \
     include/utils/NgayThang.h \
+    include/utils/EventBus.h \
     include/utils/ThongBao.h \
     include/utils/XuLyChuoi.h \
     include/utils/FileManager.h \
     include/utils/BackupManager.h \
     include/utils/FilePathManager.h \
     include/utils/Utf8Helper.h \
+    include/utils/DatabaseManager.h \
     include/utils/AutoSaveManager.h \
     include/utils/PrintHelper.h \
     include/utils/QrCodeGenerator.h \
@@ -112,6 +117,7 @@ SOURCES += \
     nguon/giao_dien/hop_thoai/HopThoaiInAn.cpp \
     nguon/giao_dien/hop_thoai/HopThoaiQuetMaVach.cpp \
     nguon/giao_dien/hop_thoai/HopThoaiHangDoiIn.cpp \
+    nguon/giao_dien/hop_thoai/HopThoaiCauHinhIn.cpp \
     src/views/dialogs/ManHinhChiTietSach.cpp
 
 HEADERS += \
@@ -126,6 +132,7 @@ HEADERS += \
     bao_gom/giao_dien/hop_thoai/HopThoaiInAn.h \
     bao_gom/giao_dien/hop_thoai/HopThoaiQuetMaVach.h \
     bao_gom/giao_dien/hop_thoai/HopThoaiHangDoiIn.h \
+    bao_gom/giao_dien/hop_thoai/HopThoaiCauHinhIn.h \
     include/views/dialogs/ManHinhChiTietSach.h
 
 # Tiện ích UI mới (animation, responsive helpers)
@@ -175,7 +182,7 @@ DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000
 # win32: RC_ICONS = tai_nguyen/bieu_tuong/app_icon.ico
 
 # ============================================
-# CHỈ DÙNG 1 THƯ MỤC files/ DUY NHẤT
+# CHỈ DÙNG 1 THƯ MỤC data/ DUY NHẤT
 # ============================================
-# Không copy files/ vào build output
-# App sẽ đọc/ghi trực tiếp từ thư mục files/ ở root project
+# Không copy data/ vào build output
+# App sẽ đọc/ghi trực tiếp từ thư mục data/ ở root project (FilePathManager xử lý khi cần)

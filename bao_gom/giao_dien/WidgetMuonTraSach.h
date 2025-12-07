@@ -2,7 +2,7 @@
 #define WIDGETMUONTRASACH_H
 
 #include <QWidget>
-#include <QTableWidget>
+#include <QTableView>
 #include <QPushButton>
 #include <QLineEdit>
 #include <QLabel>
@@ -13,6 +13,9 @@
 #include <QListWidget>
 #include <QCheckBox>
 #include <vector>
+
+class QAbstractItemModel;
+class DocGiaTableModel;
 
 // Include backend models
 #include "models/DocGia.h"
@@ -106,7 +109,8 @@ private:
     QWidget *widgetMuonSach;
     
     // Bảng độc giả (cột trái)
-    QTableWidget *bangDocGia;
+    QTableView *bangDocGia;
+    DocGiaTableModel *modelDocGia;
     QLineEdit *oNhapTimDocGia;
     QPushButton *nutTimDocGia;
     QPushButton *nutTrangTruoc;
@@ -118,7 +122,9 @@ private:
     // Panel chi tiết (cột phải)
     QLabel *nhanThongTinDocGia;
     QGroupBox *nhanTieuDeSachDangMuon;
-    QTableWidget *bangSachDangMuon;
+    QTableView *bangSachDangMuon; // Changed from QTableWidget to QTableView
+    QAbstractItemModel *modelSachDangMuon;
+    std::vector<ThongTinSachDangMuon_DTO> danhSachSachDangMuon;
     QLineEdit *oNhapISBN;
     QPushButton *nutQuetMaSach;
     QPushButton *nutQuetMaDocGia;

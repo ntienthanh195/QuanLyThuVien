@@ -2,8 +2,13 @@
 #define MANHINHTOP10SACH_H
 
 #include <QDialog>
-#include <QTableWidget>
+#include <QTableView>
+#include <QAbstractItemModel>
 #include <QPushButton>
+#include <vector>
+#include "models/DauSach.h"
+
+struct TopSachDTO;
 
 class ManHinhTop10Sach : public QDialog {
     Q_OBJECT
@@ -16,7 +21,9 @@ private:
     void apDungPhongCachHienDai();
     void taiDuLieuTop10();
 
-    QTableWidget* bangKetQua;
+    QTableView* bangKetQua;
+    QAbstractItemModel* modelKetQua;
+    std::vector<TopSachDTO> danhSachTop;
     QPushButton* nutLamMoi;
     QPushButton* nutDong;
 };

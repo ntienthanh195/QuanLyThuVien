@@ -52,6 +52,7 @@ private slots:
     void xuLyInDanhMucSach();            // Xuất PDF danh mục sách
     void xuLyInPhieuMuon();              // In phiếu mượn với QR code auto-return
     void xuLyInPhieuTra();               // In phiếu trả
+    void xuLyCauHinhIn();                // Mở dialog cấu hình in
 
 private:
     // ========== UI SETUP ==========

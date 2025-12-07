@@ -2,7 +2,8 @@
 #define WIDGETQUANLYDOCGIA_H
 
 #include <QWidget>
-#include <QTableWidget>
+#include <QTableView>
+#include <vector>
 #include <QPushButton>
 #include <QLineEdit>
 #include <QComboBox>
@@ -67,7 +68,7 @@ private:
     // Hàm hỗ trợ tìm kiếm và lọc
     void xuLyLocKetHopToanBo();
     void hienThiKetQuaTimKiem(PTRDG ketQua[], int soKetQua);
-    void themDongVaoBang(PTRDG docGia, int stt);
+    // (migration) per-row insertion replaced by model-backed view
     
     QString layTenTrangThai(int trangThai) const;
     QString layTenGioiTinh(bool phai) const;
@@ -85,7 +86,9 @@ private:
     QPushButton *nutLamMoi;
     
     // Bảng dữ liệu
-    QTableWidget *bangDocGia;
+    QTableView *bangDocGia;
+    QAbstractItemModel *modelDocGia;
+    std::vector<PTRDG> danhSachDocGia;
     QLabel *nhanThongTinChon;
     
     // Thông tin chi tiết độc giả được chọn

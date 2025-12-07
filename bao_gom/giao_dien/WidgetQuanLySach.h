@@ -2,7 +2,7 @@
 #define WIDGETQUANLYSACH_H
 
 #include <QWidget>
-#include <QTableWidget>
+#include <QTableView>
 #include <QPushButton>
 #include <QLineEdit>
 #include <QComboBox>
@@ -11,6 +11,9 @@
 #include <QHBoxLayout>
 #include <QGroupBox>
 #include <QSet>
+
+#include <QFileSystemWatcher>
+#include <QTimer>
 
 // Include backend models
 #include "models/DauSach.h"
@@ -57,6 +60,7 @@ private slots:
     void xuLyLocTrangThai(int chiSo);
     void xuLyChonDong(int dong, int cot);
     void xuLyNhapDuLieuTu();
+    void onWatchedFileChanged(const QString &path);
 
 private:
     void thieLapGiaoDien();
@@ -84,9 +88,15 @@ private:
     QLabel *nhanKetQuaTimKiem;
     
     // Bảng dữ liệu
-    QTableWidget *bangSach;
-    QTableWidget *bangBanSao;
+    QTableView *bangSach;
+    QTableView *bangBanSao;
+    QAbstractItemModel *modelBanSao;
+    std::vector<PTRDMS> danhSachBanSaoVec;
     QLabel *nhanThongTinChon;
+
+    // Filesystem watcher for external changes
+    QFileSystemWatcher *fsWatcher;
+    QTimer *fsDebounceTimer;
     
     // Nút chức năng
     QGroupBox *nhomChucNang;

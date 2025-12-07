@@ -9,7 +9,8 @@
 #include <QChart>
 #include <QChartView>
 #include <QGraphicsDropShadowEffect>
-#include <QTableWidget>
+#include <QTableView>
+#include <QAbstractItemModel>
 #include <QSpinBox>
 
 /**
@@ -72,6 +73,9 @@ private:
     QWidget* taoTheNho(const QString &icon, const QString &soLieu, const QString &nhan, const QString &mau, QLabel **outLabelSoLieu = nullptr);
     QWidget* taoBangHoatDongGanDay();
     QWidget* taoPanelCanhBao();
+
+    // Thêm hoạt động gần đây
+    void appendActivity(const QString &text);
     
     // Widgets
     QGridLayout *boTriChinh;
@@ -89,8 +93,9 @@ private:
     QLabel *labelSoLieuDangMuon;
     QLabel *labelSoLieuQuaHan;
     
-    // Bảng hoạt động gần đây
-    QTableWidget *bangHoatDong;
+    // Bảng hoạt động gần đây (model/view)
+    QTableView *bangHoatDong;
+    QAbstractItemModel *modelHoatDong;
     
     // Panel cảnh báo
     QWidget *panelCanhBao;

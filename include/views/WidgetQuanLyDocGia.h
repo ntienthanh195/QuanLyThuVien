@@ -15,6 +15,7 @@
 #include <QShortcut>
 #include <QItemSelectionModel>
 #include "models/DocGia.h"
+#include <vector>
 
 class ReaderTableModel : public QAbstractTableModel {
     Q_OBJECT
@@ -29,6 +30,7 @@ public:
     
     void refreshData();
     void setSearchResults(PTRDG* results, int count);
+    void setSearchResults(const std::vector<PTRDG> &results);
     PTRDG getReaderAt(int row) const;
     void sort(int column, Qt::SortOrder order = Qt::AscendingOrder) override;
     
@@ -37,13 +39,12 @@ public:
     int getBorrowedBookCount(PTRDG reader) const;
 
 private:
-    PTRDG* readers;
-    int readerCount;
+    std::vector<PTRDG> readers;
     bool isSearchMode;
     int sortColumn;
     Qt::SortOrder sortOrder;
     
-    void collectReadersFromTree(PTRDG root, PTRDG* arr, int &count);
+    void collectReadersFromTree(PTRDG root, std::vector<PTRDG> &out);
 };
 
 class WidgetQuanLyDocGia : public QWidget {
@@ -119,12 +120,16 @@ private:
     QLabel *lblThongKeQuaHan;
     
     PTRDG selectedReader;
+    QProgressBar *searchProgress;
+    // Async search watcher
+    QFutureWatcher<std::vector<PTRDG>> *searchWatcher;
     
     void setupUI();
     void setupTabQuanLy();
     void setupTabQuaHan();
     void setupConnections();
     void setupKeyboardShortcuts();
+    void onSearchFinished();
     void updateButtonStates();
     void showMessage(const QString &message, bool isError = false);
     void showAddReaderDialog();

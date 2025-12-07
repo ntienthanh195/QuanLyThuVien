@@ -5,19 +5,115 @@
 #include "utils/ConfirmationDialog.h"
 #include "utils/AnimationHelper.h"
 #include <QVBoxLayout>
+#if defined(__has_include)
+#  if __has_include("utils/DBBatcher.h")
+#    include "utils/DBBatcher.h"
+#  endif
+#endif
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QMessageBox>
 #include <QDebug>
+#include <QTableView>
+#include <QAbstractTableModel>
+
+// Lightweight model for `WidgetQuanLyDocGia` (virtualized)
+class DocGiaTableModel : public QAbstractTableModel {
+public:
+    DocGiaTableModel(std::vector<PTRDG> *data, QObject *parent = nullptr)
+        : QAbstractTableModel(parent), m_data(data) {}
+
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override {
+        Q_UNUSED(parent)
+        return m_data ? (int)m_data->size() : 0;
+    }
+
+    int columnCount(const QModelIndex &parent = QModelIndex()) const override {
+        Q_UNUSED(parent)
+        return 9;
+    }
+
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override {
+        if (!m_data || !index.isValid()) return QVariant();
+        int r = index.row();
+        if (r < 0 || r >= (int)m_data->size()) return QVariant();
+        PTRDG dgptr = (*m_data)[r];
+        if (!dgptr) return QVariant();
+        const TheDocGia &dg = dgptr->data;
+
+        if (role == Qt::DisplayRole) {
+            switch (index.column()) {
+            case 0: return QString::number(r + 1);
+            case 1: return QString::number(dg.MaThe);
+            case 2: return QString::fromStdString(dg.Ho);
+            case 3: return QString::fromStdString(dg.Ten);
+            case 4: return dg.Phai ? QStringLiteral("Nữ") : QStringLiteral("Nam");
+            case 5: return dg.TrangThai == 1 ? QStringLiteral("Hoạt động") : QStringLiteral("Bị khóa");
+            case 6: return QString("%1 / 3").arg(dg.soSachDangMuon);
+            case 7: {
+                int soNgay = TinhSoNgayQuaHanLonNhat(dgptr);
+                return soNgay > 0 ? QString("%1 ngày").arg(soNgay) : QStringLiteral("—");
+            }
+            case 8: {
+                int tong = 0; MUONTRA mt = dg.dsmt; while (mt) { tong++; mt = mt->next; }
+                return QString::number(tong);
+            }
+            }
+        }
+
+        if (role == Qt::UserRole) {
+            // expose MaThe for quick lookup
+            if (index.column() == 1) return dg.MaThe;
+            return QVariant();
+        }
+
+        return QVariant();
+    }
+
+    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override {
+        if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
+            switch (section) {
+            case 0: return QStringLiteral("STT");
+            case 1: return QStringLiteral("Mã Thẻ");
+            case 2: return QStringLiteral("Họ");
+            case 3: return QStringLiteral("Tên");
+            case 4: return QStringLiteral("Giới Tính");
+            case 5: return QStringLiteral("Trạng Thái");
+            case 6: return QStringLiteral("Sách Đang Mượn");
+            case 7: return QStringLiteral("Quá Hạn");
+            case 8: return QStringLiteral("Tổng Mượn");
+            }
+        }
+        return QAbstractTableModel::headerData(section, orientation, role);
+    }
+
+    void refresh() { beginResetModel(); endResetModel(); }
+
+private:
+    std::vector<PTRDG> *m_data;
+};
 
 // Include responsive helpers
 #include "utils/ResponsiveHelper.h"
 #include "utils/AnimationHelper.h"
+#include "utils/EventBus.h"
 
 WidgetQuanLyDocGia::WidgetQuanLyDocGia(QWidget *cha) 
     : QWidget(cha), docGiaDangChon(nullptr), maTheDangChon(-1) {
     thieLapGiaoDien();
     taiLaiDanhSach();
+
+    // Realtime updates: refresh when EventBus emits relevant events
+    connect(&EventBus::instance(), &EventBus::docGiaAdded, this, [this](int){ this->taiLaiDanhSach(); });
+    connect(&EventBus::instance(), &EventBus::docGiaUpdated, this, [this](int){ this->taiLaiDanhSach(); });
+    connect(&EventBus::instance(), &EventBus::docGiaRemoved, this, [this](int){ this->taiLaiDanhSach(); });
+
+    connect(&EventBus::instance(), &EventBus::muonTraAdded, this, [this](int, const QString&){ this->taiLaiDanhSach(); });
+    connect(&EventBus::instance(), &EventBus::muonTraUpdated, this, [this](int, const QString&){ this->taiLaiDanhSach(); });
+    connect(&EventBus::instance(), &EventBus::muonTraRemoved, this, [this](int, const QString&){ this->taiLaiDanhSach(); });
+
+    // Refresh when global data changes (e.g. background loader finished)
+    connect(&EventBus::instance(), &EventBus::dataChanged, this, [this]() { this->taiLaiDanhSach(); });
 }
 
 WidgetQuanLyDocGia::~WidgetQuanLyDocGia() {}
@@ -129,16 +225,14 @@ void WidgetQuanLyDocGia::thieLapTimKiem() {
 }
 
 void WidgetQuanLyDocGia::thieLapBangDocGia() {
-    bangDocGia = new QTableWidget();
-    bangDocGia->setColumnCount(9);
-    bangDocGia->setHorizontalHeaderLabels({
-        "STT", "Mã Thẻ", "Họ", "Tên", "Giới Tính", 
-        "Trạng Thái", "Sách Đang Mượn", "Quá Hạn", "Tổng Mượn"
-    });
+    // switch to QTableView + model
+    bangDocGia = new QTableView();
+    modelDocGia = new DocGiaTableModel(&danhSachDocGia, this);
+    bangDocGia->setModel(modelDocGia);
     
     // Styling chuyên nghiệp
     bangDocGia->setStyleSheet(
-        "QTableWidget {"
+        "QTableView {"
         "    background-color: #1E1E2D;"
         "    border: 1px solid #2B2B40;"
         "    border-radius: 12px;"
@@ -146,11 +240,11 @@ void WidgetQuanLyDocGia::thieLapBangDocGia() {
         "    color: #FFFFFF;"
         "    selection-background-color: #3699FF;"
         "}"
-        "QTableWidget::item {"
+        "QTableView::item {"
         "    padding: 8px;"
         "    border-bottom: 1px solid #2B2B40;"
         "}"
-        "QTableWidget::item:selected {"
+        "QTableView::item:selected {"
         "    background-color: #3699FF;"
         "    color: #FFFFFF;"
         "}"
@@ -172,7 +266,7 @@ void WidgetQuanLyDocGia::thieLapBangDocGia() {
     bangDocGia->setEditTriggers(QAbstractItemView::NoEditTriggers);
     bangDocGia->setMinimumHeight(450);
     
-    // Responsive column widths
+    // Responsive column widths (visual widths)
     bangDocGia->setColumnWidth(0, 50);   // STT
     bangDocGia->setColumnWidth(1, 80);   // Mã Thẻ
     bangDocGia->setColumnWidth(2, 120);  // Họ
@@ -182,23 +276,24 @@ void WidgetQuanLyDocGia::thieLapBangDocGia() {
     bangDocGia->setColumnWidth(6, 130);  // Sách Đang Mượn
     bangDocGia->setColumnWidth(7, 100);  // Quá Hạn
     bangDocGia->horizontalHeader()->setStretchLastSection(true);
-    
+
     boTriChinh->addWidget(bangDocGia, 1);
-    
-    connect(bangDocGia, &QTableWidget::cellClicked, this, &WidgetQuanLyDocGia::xuLyChonDong);
-    
-    // Double-click to show detail
-    connect(bangDocGia, &QTableWidget::cellDoubleClicked, this, [this](int row, int) {
-        if (row >= 0 && row < bangDocGia->rowCount()) {
-            int maThe = bangDocGia->item(row, 1)->data(Qt::UserRole).toInt();
-            extern PTRDG rootDocGia;
-            PTRDG docGia = timDocGia(rootDocGia, maThe);
-            if (docGia) {
-                HopThoaiSuaDocGia *dialog = new HopThoaiSuaDocGia(maThe, this);
-                dialog->exec();
-                delete dialog;
-                taiLaiDanhSach();
-            }
+
+    connect(bangDocGia, &QTableView::clicked, this, [this](const QModelIndex &idx){ this->xuLyChonDong(idx.row(), idx.column()); });
+
+    // Double-click -> open edit dialog using MaThe from model's UserRole
+    connect(bangDocGia, &QTableView::doubleClicked, this, [this](const QModelIndex &idx){
+        int row = idx.row();
+        if (row < 0) return;
+        QModelIndex maTheIdx = modelDocGia->index(row, 1);
+        int maThe = modelDocGia->data(maTheIdx, Qt::UserRole).toInt();
+        extern PTRDG rootDocGia;
+        PTRDG docGia = timDocGia(rootDocGia, maThe);
+        if (docGia) {
+            HopThoaiSuaDocGia *dialog = new HopThoaiSuaDocGia(maThe, this);
+            dialog->exec();
+            delete dialog;
+            taiLaiDanhSach();
         }
     });
 }
@@ -300,160 +395,19 @@ void WidgetQuanLyDocGia::thieLapNutChucNang() {
     connect(nutMoKhoaThe, &QPushButton::clicked, this, &WidgetQuanLyDocGia::xuLyNutMoKhoaThe);
     connect(nutXemLichSu, &QPushButton::clicked, this, &WidgetQuanLyDocGia::xuLyNutXemLichSu);
 }
-
-void WidgetQuanLyDocGia::taiLaiDanhSach() {
-    hienThiDanhSachDocGia();
-}
-
-void WidgetQuanLyDocGia::capNhatBang() {
-    hienThiDanhSachDocGia();
-}
-
-void WidgetQuanLyDocGia::hienThiDanhSachDocGia() {
-    bangDocGia->setRowCount(0);
-    
-    extern PTRDG rootDocGia;
-    if (!rootDocGia) {
-        emit thongBaoCapNhat("Chưa có độc giả nào");
-        return;
-    }
-    
-    // Chuyển cây AVL thành mảng
-    PTRDG danhSach[1000];
-    int dem = 0;
-    DuyetCayRaMang(rootDocGia, danhSach, dem);
-    
-    // Hiển thị với 9 cột đầy đủ thông tin
-    for (int i = 0; i < dem; i++) {
-        if (danhSach[i]) {
-            int hang = bangDocGia->rowCount();
-            bangDocGia->insertRow(hang);
-            
-            TheDocGia &dg = danhSach[i]->data;
-            
-            // Cột 0: STT
-            QTableWidgetItem *itemSTT = new QTableWidgetItem(QString::number(i + 1));
-            itemSTT->setTextAlignment(Qt::AlignCenter);
-            itemSTT->setForeground(QBrush(QColor("#B5B5C3")));
-            bangDocGia->setItem(hang, 0, itemSTT);
-            
-            // Cột 1: Mã Thẻ
-            QTableWidgetItem *itemMaThe = new QTableWidgetItem(QString::number(dg.MaThe));
-            itemMaThe->setTextAlignment(Qt::AlignCenter);
-            itemMaThe->setForeground(QBrush(QColor("#3699FF")));
-            itemMaThe->setFont(QFont("Segoe UI", 11, QFont::Bold));
-            bangDocGia->setItem(hang, 1, itemMaThe);
-            
-            // Cột 2: Họ
-            QTableWidgetItem *itemHo = new QTableWidgetItem(QString::fromStdString(dg.Ho));
-            itemHo->setForeground(QBrush(QColor("#FFFFFF")));
-            bangDocGia->setItem(hang, 2, itemHo);
-            
-            // Cột 3: Tên
-            QTableWidgetItem *itemTen = new QTableWidgetItem(QString::fromStdString(dg.Ten));
-            itemTen->setForeground(QBrush(QColor("#FFFFFF")));
-            itemTen->setFont(QFont("Segoe UI", 10, QFont::Bold));
-            bangDocGia->setItem(hang, 3, itemTen);
-            
-            // Cột 4: Giới Tính
-            QString gioiTinh = dg.Phai ? "Nữ" : "Nam";
-            QTableWidgetItem *itemGioiTinh = new QTableWidgetItem(gioiTinh);
-            itemGioiTinh->setTextAlignment(Qt::AlignCenter);
-            itemGioiTinh->setForeground(QBrush(dg.Phai ? QColor("#FF69B4") : QColor("#3699FF")));
-            bangDocGia->setItem(hang, 4, itemGioiTinh);
-            
-            // Cột 5: Trạng Thái với color-coding
-            QString trangThai = (dg.TrangThai == 1) ? "Hoạt động" : "Bị khóa";
-            QTableWidgetItem *itemTrangThai = new QTableWidgetItem(trangThai);
-            itemTrangThai->setTextAlignment(Qt::AlignCenter);
-            if (dg.TrangThai == 1) {
-                itemTrangThai->setBackground(QBrush(QColor(27, 197, 189, 40)));
-                itemTrangThai->setForeground(QBrush(QColor("#1BC5BD")));
-            } else {
-                itemTrangThai->setBackground(QBrush(QColor(246, 78, 96, 40)));
-                itemTrangThai->setForeground(QBrush(QColor("#F64E60")));
-            }
-            itemTrangThai->setFont(QFont("Segoe UI", 10, QFont::Bold));
-            bangDocGia->setItem(hang, 5, itemTrangThai);
-            
-            // Cột 6: Sách Đang Mượn với badge
-            QString sachDangMuon = QString("%1 / 3").arg(dg.soSachDangMuon);
-            QTableWidgetItem *itemSachMuon = new QTableWidgetItem(sachDangMuon);
-            itemSachMuon->setTextAlignment(Qt::AlignCenter);
-            itemSachMuon->setFont(QFont("Segoe UI", 10, QFont::Bold));
-            
-            if (dg.soSachDangMuon == 0) {
-                itemSachMuon->setForeground(QBrush(QColor("#B5B5C3")));
-            } else if (dg.soSachDangMuon >= 3) {
-                itemSachMuon->setBackground(QBrush(QColor(246, 78, 96, 50)));
-                itemSachMuon->setForeground(QBrush(QColor("#F64E60")));
-            } else {
-                itemSachMuon->setBackground(QBrush(QColor(255, 168, 0, 40)));
-                itemSachMuon->setForeground(QBrush(QColor("#FFA800")));
-            }
-            bangDocGia->setItem(hang, 6, itemSachMuon);
-            
-            // Cột 7: Quá Hạn (tính toán real-time)
-            int soNgayQuaHan = TinhSoNgayQuaHanLonNhat(danhSach[i]);
-            QTableWidgetItem *itemQuaHan = new QTableWidgetItem();
-            itemQuaHan->setTextAlignment(Qt::AlignCenter);
-            
-            if (soNgayQuaHan > 0) {
-                itemQuaHan->setText(QString("%1 ngày").arg(soNgayQuaHan));
-                itemQuaHan->setBackground(QBrush(QColor(246, 78, 96, 50)));
-                itemQuaHan->setForeground(QBrush(QColor("#F64E60")));
-                itemQuaHan->setFont(QFont("Segoe UI", 10, QFont::Bold));
-            } else {
-                itemQuaHan->setText("—");
-                itemQuaHan->setForeground(QBrush(QColor("#B5B5C3")));
-            }
-            bangDocGia->setItem(hang, 7, itemQuaHan);
-            
-            // Cột 8: Tổng Mượn (đếm từ dsmt)
-            int tongMuon = 0;
-            MUONTRA mt = dg.dsmt;
-            while (mt) {
-                tongMuon++;
-                mt = mt->next;
-            }
-            QTableWidgetItem *itemTongMuon = new QTableWidgetItem(QString::number(tongMuon));
-            itemTongMuon->setTextAlignment(Qt::AlignCenter);
-            itemTongMuon->setForeground(QBrush(QColor("#3699FF")));
-            bangDocGia->setItem(hang, 8, itemTongMuon);
-        }
-    }
-    
-    emit thongBaoCapNhat(QString("Đã tải %1 độc giả").arg(dem));
-}
-
-void WidgetQuanLyDocGia::xuLyChonDong(int dong, int) {
-    if (dong < 0) return;
-    
-    int maThe = bangDocGia->item(dong, 0)->text().toInt();
-    
-    extern PTRDG rootDocGia;
-    docGiaDangChon = timDocGia(rootDocGia, maThe);
-    maTheDangChon = maThe;
-    
-    if (docGiaDangChon) {
-        emit thongBaoCapNhat(QString("Đã chọn: %1 %2 (Mã: %3)")
-            .arg(QString::fromStdString(docGiaDangChon->data.Ho))
-            .arg(QString::fromStdString(docGiaDangChon->data.Ten))
-            .arg(maThe));
-    }
-}
+// themDongVaoBang removed as part of migration to model/view.
 
 void WidgetQuanLyDocGia::xuLyNutThemDocGia() {
     HopThoaiThemDocGia *hopThoai = new HopThoaiThemDocGia(this);
-    
+
     connect(hopThoai, &HopThoaiThemDocGia::docGiaDaThem, this, [this]() {
         extern PTRDG rootDocGia;
-        saveDocGia(rootDocGia); // Tự động lưu file
+        saveDocGia(rootDocGia);
         taiLaiDanhSach();
         emit thongBaoCapNhat("Đã thêm độc giả mới thành công!");
-        emit duLieuThayDoi(); // Realtime update Dashboard
+        emit duLieuThayDoi();
     });
-    
+
     hopThoai->exec();
     delete hopThoai;
 }
@@ -463,21 +417,20 @@ void WidgetQuanLyDocGia::xuLyNutSuaDocGia() {
         QMessageBox::warning(this, "Cảnh Báo", "Vui lòng chọn một độc giả!");
         return;
     }
-    
+
     HopThoaiSuaDocGia *hopThoai = new HopThoaiSuaDocGia(docGiaDangChon->data.MaThe, this);
-    
+
     connect(hopThoai, &HopThoaiSuaDocGia::docGiaDaSua, this, [this]() {
         extern PTRDG rootDocGia;
-        saveDocGia(rootDocGia); // Tự động lưu file
+        saveDocGia(rootDocGia);
         taiLaiDanhSach();
         emit thongBaoCapNhat("Đã cập nhật thông tin độc giả!");
-        emit duLieuThayDoi(); // Realtime update Dashboard
+        emit duLieuThayDoi();
     });
-    
+
     hopThoai->exec();
     delete hopThoai;
 }
-
 void WidgetQuanLyDocGia::xuLyNutXoaDocGia() {
     if (!docGiaDangChon) {
         QMessageBox::warning(this, "Cảnh Báo", "Vui lòng chọn một độc giả!");
@@ -523,8 +476,13 @@ void WidgetQuanLyDocGia::xuLyNutXoaDocGia() {
         int maThe = docGiaDangChon->data.MaThe;
         xoaDocGia(rootDocGia, maThe);
         
-        saveDocGia(rootDocGia); // Tự động lưu file
-        emit duLieuThayDoi(); // Realtime update Dashboard
+        if (rootDocGia) {
+            saveDocGia(rootDocGia); // Tự động lưu file
+            emit duLieuThayDoi(); // Realtime update Dashboard
+        } else {
+            // Nếu rootDocGia rỗng, log để dễ debug
+            std::cerr << "Canh bao: rootDocGia is null, skip saveDocGia." << std::endl;
+        }
         
         QMessageBox::information(this, "Thành Công", "Đã xóa độc giả thành công!");
         docGiaDangChon = nullptr;
@@ -625,29 +583,27 @@ void WidgetQuanLyDocGia::xuLyNutXemSachDangMuon() {
 }
 
 void WidgetQuanLyDocGia::xuLyTimKiem(const QString &tuKhoa) {
-    bangDocGia->setRowCount(0);
-    
     extern PTRDG rootDocGia;
     if (!rootDocGia) {
         emit thongBaoCapNhat("Chưa có độc giả nào");
         return;
     }
-    
+
     QString tuKhoaTrimmed = tuKhoa.trimmed();
-    
+
     // Nếu không có từ khóa, hiển thị tất cả (có áp dụng bộ lọc nếu có)
     if (tuKhoaTrimmed.isEmpty()) {
         xuLyLocKetHopToanBo();
         return;
     }
-    
+
     PTRDG ketQua[1000];
     int soKetQua = 0;
-    
+
     // Kiểm tra xem có phải mã thẻ không (số nguyên)
     bool laMaThe = false;
     int maThe = tuKhoaTrimmed.toInt(&laMaThe);
-    
+
     if (laMaThe) {
         // Tìm theo mã thẻ
         PTRDG docGia = timDocGia(rootDocGia, maThe);
@@ -659,10 +615,10 @@ void WidgetQuanLyDocGia::xuLyTimKiem(const QString &tuKhoa) {
         // Tìm theo Họ + Tên (backend hỗ trợ tìm kiếm không phân biệt hoa/thường)
         soKetQua = TimDocGiaTheoHoTen(rootDocGia, tuKhoaTrimmed.toStdString(), ketQua, 1000);
     }
-    
+
     // Hiển thị kết quả với bộ lọc
     hienThiKetQuaTimKiem(ketQua, soKetQua);
-    
+
     emit thongBaoCapNhat(QString("Tìm thấy %1 kết quả cho '%2'").arg(soKetQua).arg(tuKhoaTrimmed));
 }
 
@@ -676,170 +632,91 @@ void WidgetQuanLyDocGia::xuLyLocGioiTinh(int chiSo) {
     xuLyLocKetHopToanBo();
 }
 
-void WidgetQuanLyDocGia::xuLyLocKetHopToanBo() {
-    bangDocGia->setRowCount(0);
-    
+void WidgetQuanLyDocGia::hienThiDanhSachDocGia() {
+    // Reuse combined filter loader to populate model-backed vector
+    xuLyLocKetHopToanBo();
+}
+
+void WidgetQuanLyDocGia::taiLaiDanhSach() {
+    hienThiDanhSachDocGia();
+}
+
+void WidgetQuanLyDocGia::capNhatBang() {
+    hienThiDanhSachDocGia();
+}
+
+void WidgetQuanLyDocGia::xuLyChonDong(int dong, int) {
+    if (dong < 0) return;
+    if (!modelDocGia) return;
+
+    QModelIndex maTheIdx = modelDocGia->index(dong, 1);
+    int maThe = modelDocGia->data(maTheIdx, Qt::UserRole).toInt();
+
     extern PTRDG rootDocGia;
+    docGiaDangChon = timDocGia(rootDocGia, maThe);
+    maTheDangChon = maThe;
+
+    if (docGiaDangChon) {
+        emit thongBaoCapNhat(QString("Đã chọn: %1 %2 (Mã: %3)")
+            .arg(QString::fromStdString(docGiaDangChon->data.Ho))
+            .arg(QString::fromStdString(docGiaDangChon->data.Ten))
+            .arg(maThe));
+    }
+}
+
+void WidgetQuanLyDocGia::xuLyLocKetHopToanBo() {
+    // Build filtered list and notify model (model-backed view)
+    extern PTRDG rootDocGia;
+    danhSachDocGia.clear();
     if (!rootDocGia) {
         emit thongBaoCapNhat("Chưa có độc giả nào");
+        if (modelDocGia) { if (auto m = dynamic_cast<DocGiaTableModel*>(modelDocGia)) m->refresh(); }
         return;
     }
-    
-    // Lấy toàn bộ độc giả
-    PTRDG danhSach[1000];
+
+    PTRDG tmp[1000];
     int dem = 0;
-    DuyetCayRaMang(rootDocGia, danhSach, dem);
-    
-    // Áp dụng bộ lọc
-    int trangThaiLoc = hopChonTrangThai->currentIndex(); // 0: Tất cả, 1: Hoạt động, 2: Bị khóa
-    int gioiTinhLoc = hopChonGioiTinh->currentIndex();   // 0: Tất cả, 1: Nam, 2: Nữ
-    
-    int soHienThi = 0;
-    for (int i = 0; i < dem; i++) {
-        if (danhSach[i]) {
-            bool hienThi = true;
-            
-            // Lọc trạng thái
-            if (trangThaiLoc == 1 && danhSach[i]->data.TrangThai != 1) hienThi = false;
-            if (trangThaiLoc == 2 && danhSach[i]->data.TrangThai != 0) hienThi = false;
-            
-            // Lọc giới tính
-            if (gioiTinhLoc == 1 && danhSach[i]->data.Phai != false) hienThi = false; // Nam
-            if (gioiTinhLoc == 2 && danhSach[i]->data.Phai != true) hienThi = false;  // Nữ
-            
-            if (hienThi) {
-                themDongVaoBang(danhSach[i], soHienThi);
-                soHienThi++;
-            }
-        }
+#if defined(__has_include) && __has_include("utils/DBBatcher.h")
+    std::vector<PTRDG> _tmp = DBBatcher::snapshotDocGia();
+    dem = static_cast<int>(std::min<size_t>(_tmp.size(), 1000));
+    for (int i = 0; i < dem; ++i) tmp[i] = _tmp[i];
+#else
+    DuyetCayRaMang(rootDocGia, tmp, dem);
+#endif
+
+    int trangThaiLoc = hopChonTrangThai->currentIndex();
+    int gioiTinhLoc = hopChonGioiTinh->currentIndex();
+    for (int i = 0; i < dem; ++i) {
+        PTRDG p = tmp[i];
+        if (!p) continue;
+        bool hienThi = true;
+        if (trangThaiLoc == 1 && p->data.TrangThai != 1) hienThi = false;
+        if (trangThaiLoc == 2 && p->data.TrangThai != 0) hienThi = false;
+        if (gioiTinhLoc == 1 && p->data.Phai != false) hienThi = false;
+        if (gioiTinhLoc == 2 && p->data.Phai != true) hienThi = false;
+        if (hienThi) danhSachDocGia.push_back(p);
     }
-    
-    emit thongBaoCapNhat(QString("Hiển thị %1/%2 độc giả").arg(soHienThi).arg(dem));
+
+    if (modelDocGia) { if (auto m = dynamic_cast<DocGiaTableModel*>(modelDocGia)) m->refresh(); }
+    emit thongBaoCapNhat(QString("Đã tải %1 độc giả").arg((int)danhSachDocGia.size()));
 }
 
 void WidgetQuanLyDocGia::hienThiKetQuaTimKiem(PTRDG ketQua[], int soKetQua) {
-    bangDocGia->setRowCount(0);
-    
-    // Áp dụng bộ lọc trên kết quả tìm kiếm
+    // Build filtered search result list and refresh model
+    danhSachDocGia.clear();
     int trangThaiLoc = hopChonTrangThai->currentIndex();
     int gioiTinhLoc = hopChonGioiTinh->currentIndex();
-    
-    int soHienThi = 0;
-    for (int i = 0; i < soKetQua; i++) {
-        if (ketQua[i]) {
-            bool hienThi = true;
-            
-            // Lọc trạng thái
-            if (trangThaiLoc == 1 && ketQua[i]->data.TrangThai != 1) hienThi = false;
-            if (trangThaiLoc == 2 && ketQua[i]->data.TrangThai != 0) hienThi = false;
-            
-            // Lọc giới tính
-            if (gioiTinhLoc == 1 && ketQua[i]->data.Phai != false) hienThi = false;
-            if (gioiTinhLoc == 2 && ketQua[i]->data.Phai != true) hienThi = false;
-            
-            if (hienThi) {
-                themDongVaoBang(ketQua[i], soHienThi);
-                soHienThi++;
-            }
-        }
+    for (int i = 0; i < soKetQua; ++i) {
+        PTRDG p = ketQua[i];
+        if (!p) continue;
+        bool hienThi = true;
+        if (trangThaiLoc == 1 && p->data.TrangThai != 1) hienThi = false;
+        if (trangThaiLoc == 2 && p->data.TrangThai != 0) hienThi = false;
+        if (gioiTinhLoc == 1 && p->data.Phai != false) hienThi = false;
+        if (gioiTinhLoc == 2 && p->data.Phai != true) hienThi = false;
+        if (hienThi) danhSachDocGia.push_back(p);
     }
-}
-
-void WidgetQuanLyDocGia::themDongVaoBang(PTRDG docGia, int stt) {
-    int hang = bangDocGia->rowCount();
-    bangDocGia->insertRow(hang);
-    
-    TheDocGia &dg = docGia->data;
-    
-    // STT
-    QTableWidgetItem *itemSTT = new QTableWidgetItem(QString::number(stt + 1));
-    itemSTT->setTextAlignment(Qt::AlignCenter);
-    itemSTT->setForeground(QBrush(QColor("#B5B5C3")));
-    bangDocGia->setItem(hang, 0, itemSTT);
-    
-    // Mã Thẻ
-    QTableWidgetItem *itemMaThe = new QTableWidgetItem(QString::number(dg.MaThe));
-    itemMaThe->setTextAlignment(Qt::AlignCenter);
-    itemMaThe->setForeground(QBrush(QColor("#3699FF")));
-    itemMaThe->setFont(QFont("Segoe UI", 11, QFont::Bold));
-    bangDocGia->setItem(hang, 1, itemMaThe);
-    
-    // Họ
-    QTableWidgetItem *itemHo = new QTableWidgetItem(QString::fromStdString(dg.Ho));
-    itemHo->setForeground(QBrush(QColor("#FFFFFF")));
-    bangDocGia->setItem(hang, 2, itemHo);
-    
-    // Tên
-    QTableWidgetItem *itemTen = new QTableWidgetItem(QString::fromStdString(dg.Ten));
-    itemTen->setForeground(QBrush(QColor("#FFFFFF")));
-    itemTen->setFont(QFont("Segoe UI", 10, QFont::Bold));
-    bangDocGia->setItem(hang, 3, itemTen);
-    
-    // Giới Tính
-    QString gioiTinh = dg.Phai ? "Nữ" : "Nam";
-    QTableWidgetItem *itemGioiTinh = new QTableWidgetItem(gioiTinh);
-    itemGioiTinh->setTextAlignment(Qt::AlignCenter);
-    itemGioiTinh->setForeground(QBrush(dg.Phai ? QColor("#FF69B4") : QColor("#3699FF")));
-    bangDocGia->setItem(hang, 4, itemGioiTinh);
-    
-    // Trạng Thái
-    QString trangThai = (dg.TrangThai == 1) ? "Hoạt động" : "Bị khóa";
-    QTableWidgetItem *itemTrangThai = new QTableWidgetItem(trangThai);
-    itemTrangThai->setTextAlignment(Qt::AlignCenter);
-    if (dg.TrangThai == 1) {
-        itemTrangThai->setBackground(QBrush(QColor(27, 197, 189, 40)));
-        itemTrangThai->setForeground(QBrush(QColor("#1BC5BD")));
-    } else {
-        itemTrangThai->setBackground(QBrush(QColor(246, 78, 96, 40)));
-        itemTrangThai->setForeground(QBrush(QColor("#F64E60")));
-    }
-    itemTrangThai->setFont(QFont("Segoe UI", 10, QFont::Bold));
-    bangDocGia->setItem(hang, 5, itemTrangThai);
-    
-    // Sách Đang Mượn
-    QString sachDangMuon = QString("%1 / 3").arg(dg.soSachDangMuon);
-    QTableWidgetItem *itemSachMuon = new QTableWidgetItem(sachDangMuon);
-    itemSachMuon->setTextAlignment(Qt::AlignCenter);
-    itemSachMuon->setFont(QFont("Segoe UI", 10, QFont::Bold));
-    
-    if (dg.soSachDangMuon == 0) {
-        itemSachMuon->setForeground(QBrush(QColor("#B5B5C3")));
-    } else if (dg.soSachDangMuon >= 3) {
-        itemSachMuon->setBackground(QBrush(QColor(246, 78, 96, 50)));
-        itemSachMuon->setForeground(QBrush(QColor("#F64E60")));
-    } else {
-        itemSachMuon->setBackground(QBrush(QColor(255, 168, 0, 40)));
-        itemSachMuon->setForeground(QBrush(QColor("#FFA800")));
-    }
-    bangDocGia->setItem(hang, 6, itemSachMuon);
-    
-    // Quá Hạn
-    int soNgayQuaHan = TinhSoNgayQuaHanLonNhat(docGia);
-    QTableWidgetItem *itemQuaHan = new QTableWidgetItem();
-    itemQuaHan->setTextAlignment(Qt::AlignCenter);
-    
-    if (soNgayQuaHan > 0) {
-        itemQuaHan->setText(QString("%1 ngày").arg(soNgayQuaHan));
-        itemQuaHan->setBackground(QBrush(QColor(246, 78, 96, 50)));
-        itemQuaHan->setForeground(QBrush(QColor("#F64E60")));
-        itemQuaHan->setFont(QFont("Segoe UI", 10, QFont::Bold));
-    } else {
-        itemQuaHan->setText("—");
-        itemQuaHan->setForeground(QBrush(QColor("#B5B5C3")));
-    }
-    bangDocGia->setItem(hang, 7, itemQuaHan);
-    
-    // Tổng Mượn
-    int tongMuon = 0;
-    MUONTRA mt = dg.dsmt;
-    while (mt) {
-        tongMuon++;
-        mt = mt->next;
-    }
-    QTableWidgetItem *itemTongMuon = new QTableWidgetItem(QString::number(tongMuon));
-    itemTongMuon->setTextAlignment(Qt::AlignCenter);
-    itemTongMuon->setForeground(QBrush(QColor("#3699FF")));
-    bangDocGia->setItem(hang, 8, itemTongMuon);
+    if (modelDocGia) { if (auto m = dynamic_cast<DocGiaTableModel*>(modelDocGia)) m->refresh(); }
 }
 void WidgetQuanLyDocGia::xuLyNhapDuLieuTu() {}
 void WidgetQuanLyDocGia::hienThiThongTinChiTiet(PTRDG) {}

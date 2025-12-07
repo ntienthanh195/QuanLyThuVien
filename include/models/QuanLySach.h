@@ -3,12 +3,15 @@
 
 #include <string>
 #include <iostream>
+#include <mutex>
 #include "DauSach.h"
 
 // bien toan cuc
 extern PTRDS dsDauSach[MAX_DAUSACH];   // mang dau sach
 extern int soLuongDauSach;             // so dau sach hien co
 extern bool duLieuDaThayDoi;           // co thay doi du lieu
+// Mutex to protect access to global dsDauSach/soLuongDauSach when swapping from background loader
+extern std::mutex g_ds_mutex;
 
 //  NHOM 1: SINH MA & CHUYEN DOI TRANG THAI 
 std::string sinhMaSach(const std::string &chiSo, int &soThuTu);                 // sinh ma: ISBN-1, ISBN-2,...

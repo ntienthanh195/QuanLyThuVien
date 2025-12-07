@@ -6,6 +6,10 @@
 #include "models/QuanLySach.h"
 #include <QMessageBox>
 #include <QInputDialog>
+#include <QScrollArea>
+#include <QSizePolicy>
+#include "hop_thoai/HopThoaiCauHinhIn.h"
+#include "utils/EventBus.h"
 
 extern PTRDG rootDocGia;
 extern PTRDS dsDauSach[MAX_DAUSACH];
@@ -27,6 +31,19 @@ HopThoaiInAn::HopThoaiInAn(QWidget *parent)
     
     thieLapGiaoDien();
     apDungPhongCachModern();
+
+    // Realtime: update dialog state if underlying data changes
+    connect(&EventBus::instance(), &EventBus::docGiaRemoved, this, [this](int maThe){
+        if (docGiaHienTai && docGiaHienTai->data.MaThe == maThe) {
+            docGiaHienTai = nullptr;
+        }
+    });
+    connect(&EventBus::instance(), &EventBus::docGiaUpdated, this, [this](int maThe){
+        Q_UNUSED(maThe);
+        this->update();
+    });
+    connect(&EventBus::instance(), &EventBus::dauSachUpdated, this, [this](const QString&){ this->update(); });
+    connect(&EventBus::instance(), &EventBus::dauSachAdded, this, [this](const QString&){ this->update(); });
 }
 
 HopThoaiInAn::~HopThoaiInAn() {
@@ -46,7 +63,16 @@ void HopThoaiInAn::setDanhSachDauSach(PTRDS* ds, int soLuong) {
 // ==================== UI SETUP ====================
 
 void HopThoaiInAn::thieLapGiaoDien() {
-    QVBoxLayout* layoutChinh = new QVBoxLayout(this);
+    // Use a scrollable area so the dialog can fit on small screens
+    QVBoxLayout* mainLayout = new QVBoxLayout(this);
+    mainLayout->setContentsMargins(8, 8, 8, 8);
+
+    QScrollArea* scroll = new QScrollArea(this);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+
+    QWidget* content = new QWidget(scroll);
+    QVBoxLayout* layoutChinh = new QVBoxLayout(content);
     layoutChinh->setSpacing(12);
     layoutChinh->setContentsMargins(20, 20, 20, 20);
     
@@ -70,14 +96,20 @@ void HopThoaiInAn::thieLapGiaoDien() {
     QLabel* labelThe = new QLabel("Thẻ Độc Giả");
     labelThe->setStyleSheet("font-size: 12px; font-weight: 600; color: #9CDCFE; margin-top: 16px; text-transform: uppercase; letter-spacing: 1px;");
     layoutChinh->addWidget(labelThe);
-    
-    QPushButton* nutInThe = new QPushButton("In Thẻ Độc Giả Hiện Tại");
-    nutInThe->setMinimumHeight(36);
+
+    auto makeMainButton = [&](const QString& text){
+        QPushButton* b = new QPushButton(text);
+        b->setMinimumHeight(48);
+        b->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        b->setStyleSheet("text-align: left; padding: 10px 14px; font-size: 13px;");
+        return b;
+    };
+
+    QPushButton* nutInThe = makeMainButton("In Thẻ Độc Giả Hiện Tại");
     connect(nutInThe, &QPushButton::clicked, this, &HopThoaiInAn::xuLyInTheDocGiaHienTai);
     layoutChinh->addWidget(nutInThe);
-    
-    QPushButton* nutInHangLoat = new QPushButton("In Hàng Loạt Thẻ");
-    nutInHangLoat->setMinimumHeight(36);
+
+    QPushButton* nutInHangLoat = makeMainButton("In Hàng Loạt Thẻ");
     connect(nutInHangLoat, &QPushButton::clicked, this, &HopThoaiInAn::xuLyInHangLoatThe);
     layoutChinh->addWidget(nutInHangLoat);
     
@@ -85,9 +117,8 @@ void HopThoaiInAn::thieLapGiaoDien() {
     QLabel* labelTem = new QLabel("Tem Sách");
     labelTem->setStyleSheet("font-size: 12px; font-weight: 600; color: #9CDCFE; margin-top: 16px; text-transform: uppercase; letter-spacing: 1px;");
     layoutChinh->addWidget(labelTem);
-    
-    QPushButton* nutTimSach = new QPushButton("Tìm & In Tem Sách");
-    nutTimSach->setMinimumHeight(36);
+
+    QPushButton* nutTimSach = makeMainButton("Tìm & In Tem Sách");
     connect(nutTimSach, &QPushButton::clicked, this, &HopThoaiInAn::xuLyTimVaInTem);
     layoutChinh->addWidget(nutTimSach);
     
@@ -95,34 +126,47 @@ void HopThoaiInAn::thieLapGiaoDien() {
     QLabel* labelBaoCao = new QLabel("Báo Cáo & Danh Sách");
     labelBaoCao->setStyleSheet("font-size: 12px; font-weight: 600; color: #9CDCFE; margin-top: 16px; text-transform: uppercase; letter-spacing: 1px;");
     layoutChinh->addWidget(labelBaoCao);
-    
-    QPushButton* nutDSDocGia = new QPushButton("Xuất Danh Sách Độc Giả (PDF)");
-    nutDSDocGia->setMinimumHeight(36);
+
+    QPushButton* nutDSDocGia = makeMainButton("Xuất Danh Sách Độc Giả (PDF)");
     connect(nutDSDocGia, &QPushButton::clicked, this, &HopThoaiInAn::xuLyInDanhSachDocGia);
     layoutChinh->addWidget(nutDSDocGia);
-    
-    QPushButton* nutDMSach = new QPushButton("Xuất Danh Mục Sách (PDF)");
-    nutDMSach->setMinimumHeight(36);
+
+    QPushButton* nutDMSach = makeMainButton("Xuất Dan Mục Sách (PDF)");
     connect(nutDMSach, &QPushButton::clicked, this, &HopThoaiInAn::xuLyInDanhMucSach);
     layoutChinh->addWidget(nutDMSach);
-    
-    QPushButton* nutPhieuMuon = new QPushButton("In Phiếu Mượn Sách");
-    nutPhieuMuon->setMinimumHeight(36);
+
+    QPushButton* nutPhieuMuon = makeMainButton("In Phiếu Mượn Sách");
     connect(nutPhieuMuon, &QPushButton::clicked, this, &HopThoaiInAn::xuLyInPhieuMuon);
     layoutChinh->addWidget(nutPhieuMuon);
-    
-    QPushButton* nutPhieuTra = new QPushButton("In Phiếu Trả Sách");
-    nutPhieuTra->setMinimumHeight(36);
+
+    QPushButton* nutPhieuTra = makeMainButton("In Phiếu Trả Sách");
     connect(nutPhieuTra, &QPushButton::clicked, this, &HopThoaiInAn::xuLyInPhieuTra);
     layoutChinh->addWidget(nutPhieuTra);
     
     layoutChinh->addStretch();
-    
-    // ========== NÚT ĐÓNG ==========
-    QPushButton* nutDong = new QPushButton("Đóng");
-    nutDong->setMinimumHeight(36);
+
+    // Footer buttons (aligned horizontally)
+    QHBoxLayout* footer = new QHBoxLayout();
+    footer->setSpacing(10);
+    QPushButton* nutCauHinh = makeMainButton("Cấu hình In");
+    nutCauHinh->setMinimumHeight(42);
+    nutCauHinh->setMaximumWidth(200);
+    connect(nutCauHinh, &QPushButton::clicked, this, &HopThoaiInAn::xuLyCauHinhIn);
+
+    QPushButton* nutDong = makeMainButton("Đóng");
+    nutDong->setMinimumHeight(42);
+    nutDong->setMaximumWidth(200);
     connect(nutDong, &QPushButton::clicked, this, &QDialog::accept);
-    layoutChinh->addWidget(nutDong);
+
+    footer->addStretch();
+    footer->addWidget(nutCauHinh);
+    footer->addWidget(nutDong);
+    layoutChinh->addLayout(footer);
+
+    // Put content into scroll area
+    content->setLayout(layoutChinh);
+    scroll->setWidget(content);
+    mainLayout->addWidget(scroll);
 }
 
 void HopThoaiInAn::apDungPhongCachModern() {
@@ -337,4 +381,13 @@ void HopThoaiInAn::xuLyInPhieuTra() {
 
 bool HopThoaiInAn::kiemTraDocGiaHopLe() {
     return (docGiaHienTai != nullptr);
+}
+
+void HopThoaiInAn::xuLyCauHinhIn() {
+    PrintHelper::PrintConfig cfg = PrintHelper::getCauHinh();
+    HopThoaiCauHinhIn dlg(cfg, this);
+    if (dlg.exec() == QDialog::Accepted) {
+        PrintHelper::setCauHinh(dlg.getConfig());
+        QMessageBox::information(this, "Lưu Cấu Hình", "Cấu hình in đã được lưu.");
+    }
 }

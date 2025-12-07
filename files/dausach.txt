@@ -32,8 +32,8 @@
 9786040000668|Lập Trình Di Động|815|Lê Văn Khánh|2020|Lập Trình
 9786040000514|Lập Trình Python|210|Nguyễn Thị Hoa|2020|Lập Trình
 9786040000392|Lập Trình Đỉnh Cao|450|Lê Quốc Cường|2023|Công Nghệ
-9786040000507|Máy Học Ứng Dụng|170|Nguyễn Văn An|2019|Học Máy
 9786040000408|Máy Học Ứng Dụng|400|Nguyễn Văn An|2009|Học Máy
+9786040000507|Máy Học Ứng Dụng|170|Nguyễn Văn An|2019|Học Máy
 9786040000798|Mã Hóa Và Giải Mã|440|Lê Minh|2023|Mật Mã Học
 9786040000538|Mạng Không Dây|278|Phạm Minh Tú|2022|Mạng Máy Tính
 9786040000460|Mạng Máy Tính|622|Phan Tuấn|2015|Mạng Máy Tính
@@ -46,8 +46,8 @@
 9786040000545|Phân Tích Dữ Liệu|312|Àthảo|2023|Khoa Học Dữ Liệu
 9786040000828|Phân Tích Log|560|Trần Hữu|2021|An Toàn Thông Tin
 9786040000743|Phân Tích Mạng Xã Hội|240|Nguyễn Hoài An|2023|Khoa Học Dữ Liệu
-9786040000385|Phần Mềm Hướng Đối Tượng|326|Vũ Thanh Hải|2007|Lập Trình Hướng Đối Tượng
 9786040000484|Phần Mềm Hướng Đối Tượng|696|Vũ Thanh Hải|2017|Lập Trình Hướng Đối Tượng
+9786040000385|Phần Mềm Hướng Đối Tượng|326|Vũ Thanh Hải|2007|Lập Trình Hướng Đối Tượng
 9780306406157|Sống Hết Đời Thanh Xuân|235|Chăm Rốch Thi|2025|Cuộc Sống
 9876067873676|Sống Thế Nào Cho Trọn Vẹn|451|Chăm Rốch Thi|2025|Cuộc Sống
 9786041219403|Sống Thế Nào Cho Đáng Giá|762|Chăm Rốch Thi|2025|Cuộc Sống

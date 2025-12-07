@@ -5,9 +5,15 @@
 #include "views/dialogs/ManHinhSuaSach.h"
 #include "views/BadgeStyledItemDelegate.h"
 #include "models/QuanLySach.h"
+#include "utils/DBBatcher.h"
 #include "utils/ConfirmationDialog.h"
 #include "utils/AnimationHelper.h"
 #include "utils/Utf8Helper.h"
+#include "utils/EventBus.h"
+#include "utils/Perf.h"
+#include <thread>
+#include <atomic>
+#include <algorithm>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -25,6 +31,7 @@
 #include <QDate>
 #include <QTabBar>
 #include <vector>
+#include <QSettings>
 
 // Modern Card-based Design - No hardcoded styles
 // All styles are managed by modern-dashboard.qss
@@ -38,12 +45,19 @@ BookTableModel::BookTableModel(QObject *parent)
     , isSearchMode(false)
     , sortColumn(-1)
     , sortOrder(Qt::AscendingOrder)
+    , m_pageSize(1000)
+    , m_page(0)
 {
 }
 
 int BookTableModel::rowCount(const QModelIndex &parent) const {
     Q_UNUSED(parent);
-    return bookCount;
+    if (isSearchMode) return bookCount;
+    if (bookCount <= 0) return 0;
+    int offset = m_page * m_pageSize;
+    if (offset >= bookCount) return 0;
+    int remain = bookCount - offset;
+    return std::min(remain, m_pageSize);
 }
 
 int BookTableModel::columnCount(const QModelIndex &parent) const {
@@ -54,8 +68,11 @@ int BookTableModel::columnCount(const QModelIndex &parent) const {
 QVariant BookTableModel::data(const QModelIndex &index, int role) const {
     if (!index.isValid() || index.row() >= bookCount || !books)
         return QVariant();
-    
-    PTRDS book = books[index.row()];
+    // Map paged row to absolute index
+    int absRow = index.row();
+    if (!isSearchMode) absRow = m_page * m_pageSize + index.row();
+    if (absRow >= bookCount) return QVariant();
+    PTRDS book = books[absRow];
     if (!book)
         return QVariant();
     
@@ -68,7 +85,13 @@ QVariant BookTableModel::data(const QModelIndex &index, int role) const {
             case 4: return book->namXuatBan;
             case 5: return book->soTrang;
             case 6: {
-                // Đếm số bản sao có sẵn (CHO_MUON_DUOC)
+                // Dùng cache nếu có
+                if ((int)cachedAvailableCount.size() == bookCount && (int)cachedTotalCopies.size() == bookCount) {
+                    int coSan = cachedAvailableCount[absRow];
+                    int tong = cachedTotalCopies[absRow];
+                    return QString("%1/%2").arg(coSan).arg(tong);
+                }
+                // Fallback (should be rare)
                 int coSan = 0;
                 PTRDMS dms = book->dms;
                 while (dms) {
@@ -78,23 +101,30 @@ QVariant BookTableModel::data(const QModelIndex &index, int role) const {
                 return QString("%1/%2").arg(coSan).arg(book->tongBanSao);
             }
             case 7: {
-                // Trạng thái tổng hợp của cuốn sách
-                int dangMuon = 0, coSan = 0, thanhLy = 0;
+                if ((int)cachedStatusEnum.size() == bookCount) {
+                    int st = cachedStatusEnum[absRow];
+                    if (st == CHO_MUON_DUOC) return "Có sẵn";
+                    else if (st == DANG_MUON) return "Đang mượn";
+                    else return "Đã thanh lý";
+                }
+                // Fallback
+                int dangMuon = 0, coSan = 0;
                 PTRDMS dms = book->dms;
                 while (dms) {
                     if (dms->trangThai == DANG_MUON) dangMuon++;
                     else if (dms->trangThai == CHO_MUON_DUOC) coSan++;
-                    else if (dms->trangThai == THANH_LY) thanhLy++;
                     dms = dms->next;
                 }
-                // Hiển thị trạng thái chính
                 if (coSan > 0) return "Có sẵn";
                 else if (dangMuon > 0) return "Đang mượn";
                 else return "Đã thanh lý";
             }
         }
     } else if (role == Qt::UserRole && index.column() == 7) {
-        // Trả về enum để delegate vẽ badge
+        // Trả về enum để delegate vẽ badge (dùng cache nếu có)
+        if ((int)cachedStatusEnum.size() == bookCount) {
+            return cachedStatusEnum[absRow];
+        }
         int dangMuon = 0, coSan = 0;
         PTRDMS dms = book->dms;
         while (dms) {
@@ -113,6 +143,93 @@ QVariant BookTableModel::data(const QModelIndex &index, int role) const {
     
     return QVariant();
 }
+
+// Pagination API
+void BookTableModel::setPageSize(int size) {
+    if (size <= 0) return;
+    m_pageSize = size;
+    m_page = 0;
+    beginResetModel();
+    // recompute caches for new visible page
+    cachedAvailableCount.assign(bookCount, 0);
+    cachedTotalCopies.assign(bookCount, 0);
+    cachedStatusEnum.assign(bookCount, THANH_LY);
+    // compute only visible page asynchronously
+    {
+        std::vector<PTRDS> snapshot;
+        int offset = m_page * m_pageSize;
+        int cnt = std::min(m_pageSize, std::max(0, bookCount - offset));
+        snapshot.reserve(cnt);
+        for (int i = 0; i < cnt; ++i) snapshot.push_back(books[offset + i]);
+        std::thread([this, snapshot = std::move(snapshot), offset, cnt]() mutable {
+            PerfTimer perf("BookTableModel::computeCaches_page");
+            std::vector<int> avail(cnt, 0);
+            std::vector<int> total(cnt, 0);
+            std::vector<int> status(cnt, THANH_LY);
+            for (int i = 0; i < cnt; ++i) {
+                PTRDS b = snapshot[i];
+                if (!b) continue;
+                int coSan = 0, dangMuon = 0, tong = b->tongBanSao;
+                PTRDMS p = b->dms;
+                while (p) {
+                    if (p->trangThai == CHO_MUON_DUOC) coSan++;
+                    else if (p->trangThai == DANG_MUON) dangMuon++;
+                    p = p->next;
+                }
+                avail[i] = coSan; total[i] = tong;
+                if (coSan > 0) status[i] = CHO_MUON_DUOC;
+                else if (dangMuon > 0) status[i] = DANG_MUON;
+            }
+            QMetaObject::invokeMethod(this, [this, avail = std::move(avail), total = std::move(total), status = std::move(status), offset, cnt]() {
+                for (int i = 0; i < cnt; ++i) {
+                    cachedAvailableCount[offset + i] = avail[i];
+                    cachedTotalCopies[offset + i] = total[i];
+                    cachedStatusEnum[offset + i] = status[i];
+                }
+                if (cnt > 0) emit dataChanged(index(0,0), index(cnt-1, columnCount()-1));
+            }, Qt::QueuedConnection);
+        }).detach();
+    }
+    endResetModel();
+}
+
+int BookTableModel::pageSize() const { return m_pageSize; }
+int BookTableModel::page() const { return m_page; }
+void BookTableModel::setPage(int page) {
+    if (page < 0) page = 0;
+    int maxp = std::max(0, (bookCount + m_pageSize - 1) / m_pageSize - 1);
+    if (page > maxp) page = maxp;
+    m_page = page;
+    beginResetModel();
+    // recompute caches for visible page only
+    int offset = m_page * m_pageSize;
+    int cnt = std::min(m_pageSize, std::max(0, bookCount - offset));
+    cachedAvailableCount.assign(bookCount, 0);
+    cachedTotalCopies.assign(bookCount, 0);
+    cachedStatusEnum.assign(bookCount, THANH_LY);
+    {
+        std::vector<PTRDS> snapshot; snapshot.reserve(cnt);
+        for (int i = 0; i < cnt; ++i) snapshot.push_back(books[offset + i]);
+        std::thread([this, snapshot = std::move(snapshot), offset, cnt]() mutable {
+            PerfTimer perf("BookTableModel::computeCaches_setPage");
+            std::vector<int> avail(cnt, 0), total(cnt, 0), status(cnt, THANH_LY);
+            for (int i = 0; i < cnt; ++i) {
+                PTRDS b = snapshot[i]; if (!b) continue;
+                int coSan = 0, dangMuon = 0; PTRDMS p = b->dms; int tong = b->tongBanSao;
+                while (p) { if (p->trangThai == CHO_MUON_DUOC) coSan++; else if (p->trangThai == DANG_MUON) dangMuon++; p = p->next; }
+                avail[i]=coSan; total[i]=tong; if (coSan>0) status[i]=CHO_MUON_DUOC; else if (dangMuon>0) status[i]=DANG_MUON;
+            }
+            QMetaObject::invokeMethod(this, [this, avail=std::move(avail), total=std::move(total), status=std::move(status), offset, cnt]() {
+                for (int i=0;i<cnt;++i) { cachedAvailableCount[offset+i]=avail[i]; cachedTotalCopies[offset+i]=total[i]; cachedStatusEnum[offset+i]=status[i]; }
+                if (cnt>0) emit dataChanged(index(0,0), index(cnt-1, columnCount()-1));
+            }, Qt::QueuedConnection);
+        }).detach();
+    }
+    endResetModel();
+}
+
+int BookTableModel::totalPages() const { if (m_pageSize<=0) return 1; return (bookCount + m_pageSize - 1) / m_pageSize; }
+int BookTableModel::totalCount() const { return bookCount; }
 
 QVariant BookTableModel::headerData(int section, Qt::Orientation orientation, int role) const {
     if (role != Qt::DisplayRole)
@@ -135,9 +252,62 @@ QVariant BookTableModel::headerData(int section, Qt::Orientation orientation, in
 
 void BookTableModel::refreshData() {
     beginResetModel();
-    books = LayDanhSachDauSach();
-    bookCount = LaySoLuongDauSach();
+    // reset to first page when reloading full dataset
+    m_page = 0;
+    // Sử dụng DBBatcher để lấy snapshot an toàn (có thể xử lý off-thread)
+    std::vector<PTRDS> snapshot = DBBatcher::snapshotDauSach();
+    // Lưu vào cachedBooks để giữ quyền sở hữu snapshot trong model
+    cachedBooks = std::move(snapshot);
+    bookCount = static_cast<int>(cachedBooks.size());
+    books = cachedBooks.empty() ? nullptr : cachedBooks.data();
     isSearchMode = false;
+    // recompute caches for faster cell access
+    cachedAvailableCount.assign(bookCount, 0);
+    cachedTotalCopies.assign(bookCount, 0);
+    cachedStatusEnum.assign(bookCount, THANH_LY);
+    // Compute caches asynchronously to avoid blocking the GUI thread for large datasets
+    {
+        // Capture snapshot of pointers to safely compute off-thread
+        std::vector<PTRDS> snapshot;
+        snapshot.reserve(bookCount);
+        for (int i = 0; i < bookCount; ++i) snapshot.push_back(books ? books[i] : nullptr);
+
+        std::thread([this, snapshot = std::move(snapshot), count = bookCount]() mutable {
+            PerfTimer perf("BookTableModel::computeCaches_async");
+            std::vector<int> avail(count, 0);
+            std::vector<int> total(count, 0);
+            std::vector<int> status(count, THANH_LY);
+
+            for (int i = 0; i < count; ++i) {
+                PTRDS b = snapshot[i];
+                if (!b) continue;
+                int coSan = 0;
+                int dangMuon = 0;
+                int tong = b->tongBanSao;
+                PTRDMS p = b->dms;
+                while (p) {
+                    if (p->trangThai == CHO_MUON_DUOC) coSan++;
+                    else if (p->trangThai == DANG_MUON) dangMuon++;
+                    p = p->next;
+                }
+                avail[i] = coSan;
+                total[i] = tong;
+                if (coSan > 0) status[i] = CHO_MUON_DUOC;
+                else if (dangMuon > 0) status[i] = DANG_MUON;
+                else status[i] = THANH_LY;
+            }
+
+            // Apply results back on the GUI thread
+            QMetaObject::invokeMethod(this, [this, avail = std::move(avail), total = std::move(total), status = std::move(status), count]() {
+                cachedAvailableCount = std::move(avail);
+                cachedTotalCopies = std::move(total);
+                cachedStatusEnum = std::move(status);
+                if (count > 0) {
+                    emit dataChanged(index(0, 0), index(count - 1, columnCount() - 1));
+                }
+            }, Qt::QueuedConnection);
+        }).detach();
+    }
     endResetModel();
 }
 
@@ -147,6 +317,11 @@ void BookTableModel::setSearchResults(PTRDS* results, int count) {
     bookCount = count;
     isSearchMode = true;
     cachedBooks.clear();  // Clear cache khi dùng array mode
+    // recompute caches
+    cachedAvailableCount.assign(bookCount, 0);
+    cachedTotalCopies.assign(bookCount, 0);
+    cachedStatusEnum.assign(bookCount, THANH_LY);
+    computeCaches();
     endResetModel();
 }
 
@@ -156,6 +331,11 @@ void BookTableModel::setBooks(const std::vector<PTRDS>& bookList) {
     bookCount = cachedBooks.size();
     books = cachedBooks.empty() ? nullptr : cachedBooks.data();
     isSearchMode = true;
+    // recompute caches
+    cachedAvailableCount.assign(bookCount, 0);
+    cachedTotalCopies.assign(bookCount, 0);
+    cachedStatusEnum.assign(bookCount, THANH_LY);
+    computeCaches();
     endResetModel();
 }
 
@@ -170,7 +350,72 @@ void BookTableModel::clearData() {
     beginResetModel();
     books = nullptr;
     bookCount = 0;
+    cachedAvailableCount.clear();
+    cachedTotalCopies.clear();
+    cachedStatusEnum.clear();
     endResetModel();
+}
+
+// Recompute cached aggregates for faster UI rendering
+void BookTableModel::computeCaches() {
+    PerfTimer perf("BookTableModel::computeCaches");
+    if (!books || bookCount <= 0) return;
+    // If dataset is huge, compute only visible page initially to keep GUI responsive.
+    const int threshold = std::max(2000, m_pageSize * 4);
+    cachedAvailableCount.assign(bookCount, 0);
+    cachedTotalCopies.assign(bookCount, 0);
+    cachedStatusEnum.assign(bookCount, THANH_LY);
+
+    if (!isSearchMode && bookCount > threshold) {
+        int offset = m_page * m_pageSize;
+        int cnt = std::min(m_pageSize, std::max(0, bookCount - offset));
+        std::vector<PTRDS> snapshot; snapshot.reserve(cnt);
+        for (int i = 0; i < cnt; ++i) snapshot.push_back(books[offset + i]);
+
+        std::thread([this, snapshot = std::move(snapshot), offset, cnt]() mutable {
+            PerfTimer perf2("BookTableModel::computeCaches_visiblePage");
+            std::vector<int> avail(cnt, 0);
+            std::vector<int> total(cnt, 0);
+            std::vector<int> status(cnt, THANH_LY);
+            for (int i = 0; i < cnt; ++i) {
+                PTRDS b = snapshot[i];
+                if (!b) continue;
+                int coSan = 0, dangMuon = 0, tong = b->tongBanSao;
+                PTRDMS p = b->dms;
+                while (p) { if (p->trangThai == CHO_MUON_DUOC) coSan++; else if (p->trangThai == DANG_MUON) dangMuon++; p = p->next; }
+                avail[i] = coSan; total[i] = tong; if (coSan > 0) status[i] = CHO_MUON_DUOC; else if (dangMuon > 0) status[i] = DANG_MUON;
+            }
+            QMetaObject::invokeMethod(this, [this, avail = std::move(avail), total = std::move(total), status = std::move(status), offset, cnt]() {
+                for (int i = 0; i < cnt; ++i) {
+                    cachedAvailableCount[offset + i] = avail[i];
+                    cachedTotalCopies[offset + i] = total[i];
+                    cachedStatusEnum[offset + i] = status[i];
+                }
+                if (cnt > 0) emit dataChanged(index(0,0), index(cnt-1, columnCount()-1));
+            }, Qt::QueuedConnection);
+        }).detach();
+        return;
+    }
+
+    // Full computation for small/medium datasets
+    for (int i = 0; i < bookCount; ++i) {
+        PTRDS b = books[i];
+        if (!b) continue;
+        int coSan = 0;
+        int dangMuon = 0;
+        int tong = b->tongBanSao;
+        PTRDMS p = b->dms;
+        while (p) {
+            if (p->trangThai == CHO_MUON_DUOC) coSan++;
+            else if (p->trangThai == DANG_MUON) dangMuon++;
+            p = p->next;
+        }
+        cachedAvailableCount[i] = coSan;
+        cachedTotalCopies[i] = tong;
+        if (coSan > 0) cachedStatusEnum[i] = CHO_MUON_DUOC;
+        else if (dangMuon > 0) cachedStatusEnum[i] = DANG_MUON;
+        else cachedStatusEnum[i] = THANH_LY;
+    }
 }
 
 void BookTableModel::sort(int column, Qt::SortOrder order) {
@@ -180,58 +425,34 @@ void BookTableModel::sort(int column, Qt::SortOrder order) {
     sortOrder = order;
     
     layoutAboutToBeChanged();
-    
-    // Simple bubble sort for demonstration
-    for (int i = 0; i < bookCount - 1; i++) {
-        for (int j = 0; j < bookCount - i - 1; j++) {
-            bool swap = false;
-            
-            switch (column) {
-                case 0: // ISBN
-                    swap = (sortOrder == Qt::AscendingOrder) ? 
-                           (books[j]->ISBN > books[j+1]->ISBN) :
-                           (books[j]->ISBN < books[j+1]->ISBN);
-                    break;
-                case 1: // Ten Sach
-                    swap = (sortOrder == Qt::AscendingOrder) ? 
-                           (books[j]->tenSach > books[j+1]->tenSach) :
-                           (books[j]->tenSach < books[j+1]->tenSach);
-                    break;
-                case 2: // Tac Gia
-                    swap = (sortOrder == Qt::AscendingOrder) ? 
-                           (books[j]->tacGia > books[j+1]->tacGia) :
-                           (books[j]->tacGia < books[j+1]->tacGia);
-                    break;
-                case 3: // The Loai
-                    swap = (sortOrder == Qt::AscendingOrder) ? 
-                           (books[j]->theLoai > books[j+1]->theLoai) :
-                           (books[j]->theLoai < books[j+1]->theLoai);
-                    break;
-                case 4: // Nam XB
-                    swap = (sortOrder == Qt::AscendingOrder) ? 
-                           (books[j]->namXuatBan > books[j+1]->namXuatBan) :
-                           (books[j]->namXuatBan < books[j+1]->namXuatBan);
-                    break;
-                case 5: // So Trang
-                    swap = (sortOrder == Qt::AscendingOrder) ? 
-                           (books[j]->soTrang > books[j+1]->soTrang) :
-                           (books[j]->soTrang < books[j+1]->soTrang);
-                    break;
-                case 6: // Tong Ban Sao
-                    swap = (sortOrder == Qt::AscendingOrder) ? 
-                           (books[j]->tongBanSao > books[j+1]->tongBanSao) :
-                           (books[j]->tongBanSao < books[j+1]->tongBanSao);
-                    break;
-            }
-            
-            if (swap) {
-                PTRDS temp = books[j];
-                books[j] = books[j+1];
-                books[j+1] = temp;
-            }
-        }
+    // Use std::sort on a local vector for O(n log n) behavior.
+    // If `books` is not backed by cachedBooks, move pointers into cachedBooks first
+    if (books != (cachedBooks.empty() ? nullptr : cachedBooks.data())) {
+        cachedBooks.assign(books, books + bookCount);
+        books = cachedBooks.data();
+        isSearchMode = true;
     }
-    
+
+    auto cmp = [column, this](const PTRDS &a, const PTRDS &b) {
+        if (!a || !b) return false;
+        switch (column) {
+            case 0: return (sortOrder == Qt::AscendingOrder) ? (a->ISBN < b->ISBN) : (a->ISBN > b->ISBN);
+            case 1: return (sortOrder == Qt::AscendingOrder) ? (a->tenSach < b->tenSach) : (a->tenSach > b->tenSach);
+            case 2: return (sortOrder == Qt::AscendingOrder) ? (a->tacGia < b->tacGia) : (a->tacGia > b->tacGia);
+            case 3: return (sortOrder == Qt::AscendingOrder) ? (a->theLoai < b->theLoai) : (a->theLoai > b->theLoai);
+            case 4: return (sortOrder == Qt::AscendingOrder) ? (a->namXuatBan < b->namXuatBan) : (a->namXuatBan > b->namXuatBan);
+            case 5: return (sortOrder == Qt::AscendingOrder) ? (a->soTrang < b->soTrang) : (a->soTrang > b->soTrang);
+            case 6: return (sortOrder == Qt::AscendingOrder) ? (a->tongBanSao < b->tongBanSao) : (a->tongBanSao > b->tongBanSao);
+            default: return false;
+        }
+    };
+
+    std::sort(cachedBooks.begin(), cachedBooks.end(), cmp);
+
+    // update internal pointer and recompute caches
+    books = cachedBooks.empty() ? nullptr : cachedBooks.data();
+    computeCaches();
+
     layoutChanged();
 }
 
@@ -307,7 +528,7 @@ void WidgetQuanLySach::setupUI() {
     filterRow->addWidget(searchTypeCombo);
     
     searchEdit = new QLineEdit(headerCard);
-    searchEdit->setPlaceholderText("🔍 Tìm kiếm theo ISBN, Tên sách, Tác giả...");
+    searchEdit->setPlaceholderText("Tìm kiếm theo ISBN, Tên sách, Tác giả...");
     searchEdit->setMinimumHeight(40);
     filterRow->addWidget(searchEdit, 1); // Search bar giãn hết cỡ
     
@@ -375,6 +596,11 @@ void WidgetQuanLySach::setupUI() {
     
     // Gắn Delegate vẽ Badge (Nút trạng thái đẹp)
     tableView->setItemDelegateForColumn(7, badgeDelegate);
+
+    // Also apply badge delegate to Top10 table if present (reuse visual style)
+    if (tableTop10 && badgeDelegate) {
+        tableTop10->setItemDelegateForColumn(5, badgeDelegate);
+    }
     
     tableLayout->addWidget(tableView);
     
@@ -401,6 +627,27 @@ void WidgetQuanLySach::setupUI() {
     btnBack->setProperty("class", "Secondary");
     
     footerLayout->addWidget(statusLabel);
+    // Pagination controls
+    btnPrevPage = new QPushButton("←", tableCard);
+    btnPrevPage->setFixedSize(36, 28);
+    lblPageInfo = new QLabel("1 / 1", tableCard);
+    lblPageInfo->setAlignment(Qt::AlignCenter);
+    btnNextPage = new QPushButton("→", tableCard);
+    btnNextPage->setFixedSize(36, 28);
+    cbPageSize = new QComboBox(tableCard);
+    cbPageSize->addItems({"50","100","500","1000"});
+    // Restore saved page size (persisted in QSettings)
+    {
+        QSettings settings("Rochthii", "QuanLyThuVien");
+        int saved = settings.value("WidgetQuanLySach/PageSize", bookModel->pageSize()).toInt();
+        if (saved <= 0) saved = bookModel->pageSize();
+        cbPageSize->setCurrentText(QString::number(saved));
+        bookModel->setPageSize(saved);
+    }
+    footerLayout->addWidget(btnPrevPage);
+    footerLayout->addWidget(lblPageInfo);
+    footerLayout->addWidget(btnNextPage);
+    footerLayout->addWidget(cbPageSize);
     footerLayout->addStretch();
     footerLayout->addWidget(btnDetails);
     footerLayout->addWidget(btnAddCopy);
@@ -655,17 +902,49 @@ void WidgetQuanLySach::setupConnections() {
         connect(filterTrangThaiCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
                 this, &WidgetQuanLySach::performSearch);
     }
+
+    // Pagination control signals
+    connect(btnPrevPage, &QPushButton::clicked, this, [this]() {
+        int p = bookModel->page(); if (p > 0) bookModel->setPage(p - 1); updatePaginationControls();
+    });
+    connect(btnNextPage, &QPushButton::clicked, this, [this]() {
+        int p = bookModel->page(); int tp = bookModel->totalPages(); if (p + 1 < tp) bookModel->setPage(p + 1); updatePaginationControls();
+    });
+    connect(cbPageSize, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int){
+        int sz = cbPageSize->currentText().toInt(); if (sz > 0) {
+            bookModel->setPageSize(sz);
+            // persist choice
+            QSettings settings("Rochthii", "QuanLyThuVien");
+            settings.setValue("WidgetQuanLySach/PageSize", sz);
+        }
+        updatePaginationControls();
+    });
     
     connect(tableView->selectionModel(), &QItemSelectionModel::selectionChanged,
             [this]() {
                 QModelIndexList selected = tableView->selectionModel()->selectedRows();
                 if (!selected.isEmpty()) {
-                    selectedBook = bookModel->getBookAt(selected.first().row());
+                    // Refresh selected book pointer from backend to get latest data
+                    PTRDS tmp = bookModel->getBookAt(selected.first().row());
+                    if (tmp) {
+                        PTRDS refreshed = TimDauSachTheoISBN(LayDanhSachDauSach(), LaySoLuongDauSach(), tmp->ISBN);
+                        selectedBook = refreshed ? refreshed : tmp;
+                    } else {
+                        selectedBook = nullptr;
+                    }
+                    // Update a small preview in the status area for quick info
+                    showSelectedBookSummary();
                 } else {
                     selectedBook = nullptr;
                 }
                 updateButtonStates();
             });
+
+    // Also update preview when selection cleared or data refreshed
+    connect(this, &WidgetQuanLySach::dataRefreshed, this, &WidgetQuanLySach::showSelectedBookSummary);
+
+    // Refresh when background data loader signals completion
+    connect(&EventBus::instance(), &EventBus::dataChanged, this, [this]() { this->refreshData(); });
     
     // Tab buttons
     connect(btnRefreshTop10, &QPushButton::clicked, this, &WidgetQuanLySach::onRefreshTop10);
@@ -706,6 +985,7 @@ void WidgetQuanLySach::refreshData() {
     
     updateButtonStates();
     showMessage(QString("Đã tải %1 đầu sách").arg(LaySoLuongDauSach()));
+    updatePaginationControls();
 }
 
 void WidgetQuanLySach::updateButtonStates() {
@@ -721,6 +1001,35 @@ void WidgetQuanLySach::showMessage(const QString &message, bool isError) {
     statusLabel->setStyleSheet(isError ? 
         "color: #e74c3c; font-weight: bold;" : 
         "color: #27ae60; font-weight: bold;");
+}
+
+void WidgetQuanLySach::showSelectedBookSummary() {
+    if (!selectedBook) {
+        statusLabel->setText("");
+        return;
+    }
+
+    QString summary = QString("%1 — %2 | ISBN: %3 | Bản sao: %4")
+        .arg(QString::fromStdString(selectedBook->tenSach))
+        .arg(QString::fromStdString(selectedBook->tacGia))
+        .arg(QString::fromStdString(selectedBook->ISBN))
+        .arg(selectedBook->tongBanSao);
+
+    statusLabel->setText(summary);
+    statusLabel->setStyleSheet("color: #374151; background: transparent; padding: 6px;");
+}
+
+void WidgetQuanLySach::updatePaginationControls() {
+    if (!bookModel) return;
+    int tp = bookModel->totalPages();
+    int p = bookModel->page();
+    if (lblPageInfo) lblPageInfo->setText(QString("%1 / %2").arg(p + 1).arg(tp));
+    if (btnPrevPage) btnPrevPage->setEnabled(p > 0);
+    if (btnNextPage) btnNextPage->setEnabled(p + 1 < tp);
+    if (cbPageSize) {
+        QString cur = QString::number(bookModel->pageSize());
+        if (cbPageSize->currentText() != cur) cbPageSize->setCurrentText(cur);
+    }
 }
 
 void WidgetQuanLySach::onSearchClicked() {
@@ -1359,6 +1668,22 @@ void WidgetQuanLySach::setupKeyboardShortcuts() {
     btnDelete->setToolTip("Xóa sách (Delete hoặc Ctrl+D)");
     searchEdit->setToolTip("Tìm kiếm sách (Ctrl+F)");
     btnSearch->setToolTip("Tìm kiếm (Enter)");
+
+    // Pagination shortcuts: PageUp/PageDown and Ctrl+Left/Ctrl+Right
+    QShortcut *scPagePrev = new QShortcut(QKeySequence(Qt::Key_PageUp), this);
+    connect(scPagePrev, &QShortcut::activated, this, [this]() {
+        if (!bookModel) return;
+        int p = bookModel->page(); if (p > 0) bookModel->setPage(p - 1); updatePaginationControls();
+    });
+    QShortcut *scPageNext = new QShortcut(QKeySequence(Qt::Key_PageDown), this);
+    connect(scPageNext, &QShortcut::activated, this, [this]() {
+        if (!bookModel) return;
+        int p = bookModel->page(); int tp = bookModel->totalPages(); if (p + 1 < tp) bookModel->setPage(p + 1); updatePaginationControls();
+    });
+    QShortcut *scCtrlLeft = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Left), this);
+    connect(scCtrlLeft, &QShortcut::activated, this, [this]() { if (!bookModel) return; int p = bookModel->page(); if (p > 0) bookModel->setPage(0); updatePaginationControls(); });
+    QShortcut *scCtrlRight = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Right), this);
+    connect(scCtrlRight, &QShortcut::activated, this, [this]() { if (!bookModel) return; bookModel->setPage(bookModel->totalPages() - 1); updatePaginationControls(); });
 }
 
 void WidgetQuanLySach::onBulkDelete() {

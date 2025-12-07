@@ -18,6 +18,9 @@
 #include <QTimer>
 #include "models/DocGia.h"
 #include "models/DauSach.h"
+#include <QFuture>
+#include <QFutureWatcher>
+#include <vector>
 
 // ============ WORKFLOW STATE MACHINE ============
 enum WorkflowState {
@@ -66,6 +69,7 @@ public:
 
 signals:
     void backToHome();
+    void duLieuThayDoi();
 
 private slots:
     // Workflow control
@@ -92,6 +96,8 @@ private slots:
     // Helper slots
     void onTableDoubleClicked(const QModelIndex &index);
     void onMaTheEnterPressed();
+    void onBookSearchFinished();
+    void onBanSaoFinished();
 
 private:
     // ========== UI COMPONENTS ==========
@@ -158,6 +164,9 @@ private:
     QVector<ThongTinSachDangMuon_DTO> cacSachDangMuon; // Cache sách đang mượn
     PTRDS sachTimThay;               // Sách tìm được (state 2)
     ThongTinSachDangMuon_DTO sachDuocChon; // Sách được chọn để trả/báo mất
+    // Async search watchers
+    QFutureWatcher<std::vector<KetQuaTimKiem>> *bookSearchWatcher;
+    QFutureWatcher<std::vector<PTRDMS>> *banSaoWatcher;
     
     // ========== METHODS ==========
     void setupUI();

@@ -2,7 +2,10 @@
 #define HOPTHOAITOP10_H
 
 #include <QDialog>
-#include <QTableWidget>
+#include <QTableView>
+#include <QAbstractItemModel>
+#include <vector>
+#include "models/DocGia.h"
 #include <QPushButton>
 
 class HopThoaiTop10 : public QDialog {
@@ -15,7 +18,9 @@ private:
     void thieLapGiaoDien();
     void taiDuLieuTop10();
     
-    QTableWidget *bangTop10;
+    QTableView *bangTop10;
+    QAbstractItemModel *modelTop10;
+    std::vector<TopSachDTO> danhSachTop;
     QPushButton *nutDong;
 };
 

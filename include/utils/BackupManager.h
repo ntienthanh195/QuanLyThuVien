@@ -41,4 +41,17 @@ std::string LayThuMucBackupMacDinh();
 // Tao ten file backup theo format: backup_YYYYMMDD_HHMMSS_loai.txt
 std::string TaoTenFileBackup(const std::string& loaiFile);
 
+// Archive old backups: create monthly zips for months older than 1 month,
+// and yearly zips for full past years. Archives stored under data/backup_archives
+void AutoArchiveBackups();
+
+// Force pack a specific month (YYYY, MM) into a zip
+bool PackMonth(int year, int month);
+
+// Pack all months of a year into a yearly zip
+bool PackYear(int year);
+
+// Consolidate legacy backup folders (e.g. data/backup, data/backup_migration_*)
+// into the centralized `data/backup` folder. Returns number of files moved.
+int ConsolidateLegacyBackups(const std::string& rootPath = "");
 #endif // BACKUP_MANAGER_H

@@ -14,6 +14,7 @@
 #include <QShortcut>
 #include <QKeySequence>
 #include <functional>
+#include "utils/EventBus.h"
 
 // ==================== REFACTORED: Sử dụng Backend API ====================
 // Thay vì tự đếm, sử dụng các hàm có sẵn:
@@ -67,6 +68,9 @@ WidgetBangDieuKhien::WidgetBangDieuKhien(QWidget *parent)
     connect(timerAutoRefresh, &QTimer::timeout, this, &WidgetBangDieuKhien::capNhatThongKe);
     timerAutoRefresh->start(30000); // 30 seconds
     
+    // Refresh when global data changes (e.g. background loader finished)
+    connect(&EventBus::instance(), &EventBus::dataChanged, this, [this]() { this->capNhatThongKe(); });
+
     capNhatThongKe();
 }
 

@@ -11,8 +11,96 @@
 #include <QPrinter>
 #include <QPrintDialog>
 #include <algorithm>
+#include <QTableView>
+#include <QAbstractTableModel>
+#include <vector>
 
 const int TIEN_PHAT_MOI_NGAY = 5000;  // 5000 VND per day late fee
+
+// Lightweight model for QuaHan table
+class QuaHanTableModel : public QAbstractTableModel {
+public:
+    QuaHanTableModel(std::vector<DocGiaQuaHan> *data, QObject *parent = nullptr)
+        : QAbstractTableModel(parent), m_data(data) {}
+
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override {
+        Q_UNUSED(parent)
+        return m_data ? (int)m_data->size() : 0;
+    }
+
+    int columnCount(const QModelIndex &parent = QModelIndex()) const override {
+        Q_UNUSED(parent)
+        return 8;
+    }
+
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override {
+        if (!m_data || !index.isValid()) return QVariant();
+        int r = index.row();
+        if (r < 0 || r >= (int)m_data->size()) return QVariant();
+        const DocGiaQuaHan &item = (*m_data)[r];
+
+        if (role == Qt::DisplayRole) {
+            switch (index.column()) {
+            case 0: return QString::number(item.docGia->data.MaThe);
+            case 1: return QString::fromStdString(item.docGia->data.Ho + " " + item.docGia->data.Ten);
+            case 2: return (item.docGia->data.Phai == 0) ? QString("Nam") : QString("Nữ");
+            case 3: return QString::number(item.soSachQuaHan);
+            case 4: return QString::number(item.tongSoNgayQuaHan) + " ngày";
+            case 5: return QString::number(item.maxNgayQuaHan) + " ngày";
+            case 6: return QString::number(item.phiPhat) + " đ";
+            case 7: {
+                if (item.maxNgayQuaHan >= 30) return QString("🔴 Nghiêm Trọng");
+                if (item.maxNgayQuaHan >= 14) return QString("🟠 Cao");
+                if (item.maxNgayQuaHan >= 7) return QString("🟡 Trung Bình");
+                return QString("🟢 Nhẹ");
+            }
+            }
+        }
+
+        if (role == Qt::BackgroundRole && index.column() == 7) {
+            if (item.maxNgayQuaHan >= 30) return QColor("#e74c3c");
+            if (item.maxNgayQuaHan >= 14) return QColor("#e67e22");
+            if (item.maxNgayQuaHan >= 7) return QColor("#f39c12");
+            return QColor("#f1c40f");
+        }
+
+        if (role == Qt::ForegroundRole) {
+            if (index.column() == 6) return QColor("#c0392b");
+            if (index.column() == 7 && item.maxNgayQuaHan < 7) return QColor(Qt::black);
+            if (index.column() == 7) return QColor(Qt::white);
+        }
+
+        if (role == Qt::FontRole) {
+            QFont f;
+            if (index.column() == 0 || index.column() == 3 || index.column() == 5 || index.column() == 6) {
+                f.setBold(true); return f;
+            }
+        }
+
+        return QVariant();
+    }
+
+    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override {
+        if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
+            switch (section) {
+            case 0: return QStringLiteral("Mã Thẻ");
+            case 1: return QStringLiteral("Họ Tên");
+            case 2: return QStringLiteral("Giới Tính");
+            case 3: return QStringLiteral("Số Sách QH");
+            case 4: return QStringLiteral("Tổng Ngày");
+            case 5: return QStringLiteral("Ngày Max");
+            case 6: return QStringLiteral("Phí Phạt");
+            case 7: return QStringLiteral("Mức Độ");
+            }
+        }
+        return QAbstractTableModel::headerData(section, orientation, role);
+    }
+
+    void refresh() { beginResetModel(); endResetModel(); }
+
+private:
+    std::vector<DocGiaQuaHan> *m_data;
+};
 
 ManHinhQuaHan::ManHinhQuaHan(PTRDG rootDocGia, PTRDS dsDauSach[], int soLuongDauSach, QWidget *parent)
     : QDialog(parent), cayDocGia(rootDocGia), danhSachDauSach(dsDauSach), soLuong(soLuongDauSach) {
@@ -119,15 +207,10 @@ void ManHinhQuaHan::thietLapGiaoDien() {
     nhanThongTin->setWordWrap(true);
     mainLayout->addWidget(nhanThongTin);
     
-    // Bảng quá hạn (8 cột - thêm "Phí Phạt")
-    bangQuaHan = new QTableWidget(this);
-    bangQuaHan->setColumnCount(8);
-    bangQuaHan->setHorizontalHeaderLabels({
-        "Mã Thẻ", "👤 Họ Tên", "📱 Giới Tính",
-        "📚 Số Sách QH", "⏰ Tổng Ngày QH", 
-        "🔥 Ngày QH Max", "💰 Phí Phạt", "⚠️ Mức Độ"
-    });
-    
+    // Bảng quá hạn (model/view)
+    bangQuaHan = new QTableView(this);
+    modelQuaHan = new QuaHanTableModel(&danhSachQuaHan, this);
+    bangQuaHan->setModel(modelQuaHan);
     bangQuaHan->setSelectionBehavior(QAbstractItemView::SelectRows);
     bangQuaHan->setSelectionMode(QAbstractItemView::SingleSelection);
     bangQuaHan->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -135,7 +218,7 @@ void ManHinhQuaHan::thietLapGiaoDien() {
     bangQuaHan->verticalHeader()->setVisible(false);
     bangQuaHan->horizontalHeader()->setStretchLastSection(true);
     bangQuaHan->setShowGrid(true);
-    
+
     // Đặt chiều rộng cột
     bangQuaHan->setColumnWidth(0, 80);   // Mã thẻ
     bangQuaHan->setColumnWidth(1, 200);  // Họ tên
@@ -144,7 +227,7 @@ void ManHinhQuaHan::thietLapGiaoDien() {
     bangQuaHan->setColumnWidth(4, 120);  // Tổng ngày QH
     bangQuaHan->setColumnWidth(5, 120);  // Ngày QH max
     bangQuaHan->setColumnWidth(6, 120);  // Phí phạt
-    
+
     mainLayout->addWidget(bangQuaHan);
     
     // Buttons
@@ -186,17 +269,17 @@ void ManHinhQuaHan::thietLapGiaoDien() {
 
 void ManHinhQuaHan::apDungPhongCach() {
     bangQuaHan->setStyleSheet(
-        "QTableWidget { "
+        "QTableView { "
         "    background-color: white; "
         "    alternate-background-color: #fef5e7; "
         "    border: 2px solid #e74c3c; "
         "    border-radius: 5px; "
         "    gridline-color: #f8d7da; "
         "} "
-        "QTableWidget::item { "
+        "QTableView::item { "
         "    padding: 8px; "
         "} "
-        "QTableWidget::item:selected { "
+        "QTableView::item:selected { "
         "    background-color: #e74c3c; "
         "    color: white; "
         "} "
@@ -294,8 +377,9 @@ void ManHinhQuaHan::duyetInOrder(PTRDG root, std::vector<DocGiaQuaHan>& ds) {
 }
 
 void ManHinhQuaHan::capNhatBangQuaHan() {
-    bangQuaHan->setRowCount(0);
-    
+    // Prepare model-backed data
+    danhSachQuaHan.clear();
+
     if (!cayDocGia) {
         nhanThongTin->setText("⚠️ Chưa có dữ liệu độc giả trong hệ thống");
         nhanThongTin->setStyleSheet(
@@ -304,127 +388,41 @@ void ManHinhQuaHan::capNhatBangQuaHan() {
         );
         return;
     }
-    
+
     // Thu thập danh sách độc giả quá hạn
-    std::vector<DocGiaQuaHan> danhSach;
-    duyetInOrder(cayDocGia, danhSach);
-    
-    if (danhSach.empty()) {
+    duyetInOrder(cayDocGia, danhSachQuaHan);
+
+    if (danhSachQuaHan.empty()) {
         nhanThongTin->setText("✅ Không có độc giả nào mượn quá hạn!");
         nhanThongTin->setStyleSheet(
             "color: #27ae60; font-weight: bold; padding: 12px; "
             "background-color: #d5f4e6; border-radius: 6px; border-left: 4px solid #27ae60;"
         );
+        // ensure model empty
+        if (modelQuaHan) if (auto m = dynamic_cast<QuaHanTableModel*>(modelQuaHan)) m->refresh();
         return;
     }
-    
+
     // Sắp xếp theo số ngày quá hạn tối đa giảm dần
-    std::sort(danhSach.begin(), danhSach.end(), 
+    std::sort(danhSachQuaHan.begin(), danhSachQuaHan.end(), 
         [](const DocGiaQuaHan& a, const DocGiaQuaHan& b) {
             return a.maxNgayQuaHan > b.maxNgayQuaHan;
         });
-    
-    // Hiển thị
-    int soLuongHienThi = danhSach.size();
-    bangQuaHan->setRowCount(soLuongHienThi);
-    
+
+    // Hiển thị (model provides data)
+    int soLuongHienThi = (int)danhSachQuaHan.size();
     int tongSachQuaHan = 0;
-    
-    for (int i = 0; i < soLuongHienThi; i++) {
-        const DocGiaQuaHan& item = danhSach[i];
-        tongSachQuaHan += item.soSachQuaHan;
-        
-        // Mã thẻ
-        QTableWidgetItem* itemMaThe = new QTableWidgetItem(
-            QString::number(item.docGia->data.MaThe));
-        itemMaThe->setTextAlignment(Qt::AlignCenter);
-        QFont fontMaThe = itemMaThe->font();
-        fontMaThe.setBold(true);
-        itemMaThe->setFont(fontMaThe);
-        bangQuaHan->setItem(i, 0, itemMaThe);
-        
-        // Họ tên
-        QString hoTen = QString::fromStdString(item.docGia->data.Ho + " " + item.docGia->data.Ten);
-        QTableWidgetItem* itemHoTen = new QTableWidgetItem(hoTen);
-        bangQuaHan->setItem(i, 1, itemHoTen);
-        
-        // Giới tính
-        QString gioiTinh = (item.docGia->data.Phai == 0) ? "Nam" : "Nữ";
-        QTableWidgetItem* itemGioiTinh = new QTableWidgetItem(gioiTinh);
-        itemGioiTinh->setTextAlignment(Qt::AlignCenter);
-        bangQuaHan->setItem(i, 2, itemGioiTinh);
-        
-        // Số sách quá hạn
-        QTableWidgetItem* itemSoSach = new QTableWidgetItem(
-            QString::number(item.soSachQuaHan));
-        itemSoSach->setTextAlignment(Qt::AlignCenter);
-        QFont fontSoSach = itemSoSach->font();
-        fontSoSach.setBold(true);
-        itemSoSach->setFont(fontSoSach);
-        itemSoSach->setForeground(QColor("#e74c3c"));
-        bangQuaHan->setItem(i, 3, itemSoSach);
-        
-        // Tổng ngày quá hạn
-        QTableWidgetItem* itemTongNgay = new QTableWidgetItem(
-            QString::number(item.tongSoNgayQuaHan) + " ngày");
-        itemTongNgay->setTextAlignment(Qt::AlignCenter);
-        bangQuaHan->setItem(i, 4, itemTongNgay);
-        
-        // Ngày quá hạn tối đa
-        QTableWidgetItem* itemMaxNgay = new QTableWidgetItem(
-            QString::number(item.maxNgayQuaHan) + " ngày");
-        itemMaxNgay->setTextAlignment(Qt::AlignCenter);
-        QFont fontMaxNgay = itemMaxNgay->font();
-        fontMaxNgay.setBold(true);
-        itemMaxNgay->setFont(fontMaxNgay);
-        bangQuaHan->setItem(i, 5, itemMaxNgay);
-        
-        // Phí phạt (cột mới)
-        QTableWidgetItem* itemPhiPhat = new QTableWidgetItem(
-            QString::number(item.phiPhat).rightJustified(10, ' ') + " đ");
-        itemPhiPhat->setTextAlignment(Qt::AlignCenter);
-        QFont fontPhiPhat = itemPhiPhat->font();
-        fontPhiPhat.setBold(true);
-        itemPhiPhat->setFont(fontPhiPhat);
-        itemPhiPhat->setForeground(QColor("#c0392b"));
-        bangQuaHan->setItem(i, 6, itemPhiPhat);
-        
-        // Mức độ với màu
-        QString mucDo;
-        QColor mauNen;
-        QColor mauChu(Qt::white);
-        
-        if (item.maxNgayQuaHan >= 30) {
-            mucDo = "🔴 Nghiêm Trọng";
-            mauNen = QColor("#e74c3c");
-        } else if (item.maxNgayQuaHan >= 14) {
-            mucDo = "🟠 Cao";
-            mauNen = QColor("#e67e22");
-        } else if (item.maxNgayQuaHan >= 7) {
-            mucDo = "🟡 Trung Bình";
-            mauNen = QColor("#f39c12");
-        } else {
-            mucDo = "🟢 Nhẹ";
-            mauNen = QColor("#f1c40f");
-            mauChu = QColor(Qt::black);
-        }
-        
-        QTableWidgetItem* itemMucDo = new QTableWidgetItem(mucDo);
-        itemMucDo->setTextAlignment(Qt::AlignCenter);
-        itemMucDo->setBackground(mauNen);
-        itemMucDo->setForeground(mauChu);
-        QFont fontMucDo = itemMucDo->font();
-        fontMucDo.setBold(true);
-        itemMucDo->setFont(fontMucDo);
-        bangQuaHan->setItem(i, 7, itemMucDo);
-        
-        // Đặt chiều cao hàng
-        bangQuaHan->setRowHeight(i, 45);
-    }
-    
+    for (const auto &it : danhSachQuaHan) tongSachQuaHan += it.soSachQuaHan;
+
+    // Use uniform row height for visible rows (avoid per-row calls)
+    bangQuaHan->verticalHeader()->setDefaultSectionSize(45);
+
+    // Refresh model
+    if (modelQuaHan) { if (auto m = dynamic_cast<QuaHanTableModel*>(modelQuaHan)) m->refresh(); }
+
     // Cập nhật thống kê
-    capNhatThongKeDoanhThu(danhSach);
-    
+    capNhatThongKeDoanhThu(danhSachQuaHan);
+
     // Cập nhật thông tin
     nhanThongTin->setText(
         QString("⚠️ Có %1 độc giả mượn quá hạn | "
@@ -520,13 +518,18 @@ void ManHinhQuaHan::capNhatThongKeDoanhThu(const std::vector<DocGiaQuaHan>& ds) 
 }
 
 void ManHinhQuaHan::onViewReaderDetail() {
-    int selectedRow = bangQuaHan->currentRow();
+    int selectedRow = bangQuaHan->currentIndex().row();
     if (selectedRow < 0) {
         QMessageBox::warning(this, "Chưa chọn", "Vui lòng chọn độc giả để xem chi tiết!");
         return;
     }
-    
-    int maThe = bangQuaHan->item(selectedRow, 0)->text().toInt();
+
+    int maThe = 0;
+    if (modelQuaHan) {
+        QAbstractItemModel *m = modelQuaHan;
+        QModelIndex idx = m->index(selectedRow, 0);
+        maThe = m->data(idx, Qt::DisplayRole).toInt();
+    }
     
     // Find reader in tree
     PTRDG reader = nullptr;
@@ -665,10 +668,14 @@ void ManHinhQuaHan::onExportReport() {
     html += "<table>";
     html += "<tr><th>Mã Thẻ</th><th>Họ Tên</th><th>Giới Tính</th><th>Số Sách QH</th><th>Tổng Ngày</th><th>Ngày Max</th><th>Phí Phạt</th><th>Mức Độ</th></tr>";
     
-    for (int row = 0; row < bangQuaHan->rowCount(); row++) {
+    QAbstractItemModel *m = modelQuaHan;
+    int rows = m ? m->rowCount() : 0;
+    for (int row = 0; row < rows; row++) {
         html += "<tr>";
         for (int col = 0; col < 8; col++) {
-            html += QString("<td>%1</td>").arg(bangQuaHan->item(row, col)->text());
+            QModelIndex idx = m->index(row, col);
+            QString text = m->data(idx, Qt::DisplayRole).toString();
+            html += QString("<td>%1</td>").arg(text);
         }
         html += "</tr>";
     }

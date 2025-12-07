@@ -1,4 +1,5 @@
 ﻿#include "models/QuanLySach.h"
+#include <mutex>
 #include "utils/ThongBao.h"
 #include "models/KiemTraDuLieu.h"
 #include "utils/XuLyChuoi.h"
@@ -9,6 +10,7 @@
 #include <ctime>
 #include <stdexcept>
 #include <sstream>
+#include "utils/EventBus.h"
 
 
 //  BIEN TOAN CUC 
@@ -174,6 +176,8 @@ std::string ThemNhieuBanSao(PTRDS dauSach, int soLuong, const std::string &viTri
     // cap nhat tong ban sao
     dauSach->tongBanSao += themThanhCong;
     duLieuDaThayDoi = true;
+    // Notify listeners that this DauSach changed (copies added)
+    try { EventBus::instance().dauSachUpdated(QString::fromStdString(dauSach->ISBN)); } catch(...) {}
     
     // tra ve ket qua
     if (!loiTrongLoop.empty()) {
@@ -289,14 +293,24 @@ bool themDauSach(PTRDS ds[], int &n, const std::string &isbn, const std::string 
     if (!anLang) {
         thongBao(std::cout, "Them thanh cong: " + node->tenSach, THONG_TIN);
     }
+    // Emit event: new book added
+    try {
+        EventBus::instance().dauSachAdded(QString::fromStdString(node->ISBN));
+    } catch(...) {}
     return true;
 }
 
 // tim dau sach theo ISBN - linear O(N)
 PTRDS TimDauSachTheoISBN(PTRDS ds[], int n, const std::string &isbn) {
+    // Defensive checks
+    if (!ds || n <= 0) return nullptr;
+    if (n > MAX_DAUSACH) n = MAX_DAUSACH;
+    if (isbn.empty()) return nullptr;
+
     for (int i = 0; i < n; ++i) {                              // duyet mang
-        if (ds[i] && ds[i]->ISBN == isbn) {                    // tim thay - early return
-            return ds[i];
+        PTRDS cur = ds[i];
+        if (cur && cur->ISBN == isbn) {                        // tim thay - early return
+            return cur;
         }
     }
     return nullptr;                                             // khong thay
@@ -732,6 +746,10 @@ std::string XoaDauSach(PTRDS ds[], int &n, const std::string &isbn) {
     
     ds[--n] = nullptr;                                         // giam so luong
     duLieuDaThayDoi = true;                                    // danh dau thay doi
+    // Emit event: remove book
+    try {
+        EventBus::instance().dauSachRemoved(QString::fromStdString(isbn));
+    } catch(...) {}
     return "";                                                 // thanh cong
 }
 
@@ -832,6 +850,10 @@ std::string CapNhatDauSach(PTRDS ds[], int n, const std::string &isbn, const std
     }
     
     duLieuDaThayDoi = true;                                    // danh dau thay doi
+    // Emit event: book updated
+    try {
+        EventBus::instance().dauSachUpdated(QString::fromStdString(isbn));
+    } catch(...) {}
     return "";                                                 // thanh cong
 }
 
@@ -866,6 +888,8 @@ std::string CapNhatViTriTatCaBanSao(PTRDS dauSach, const std::string &viTri) {
     
     if (capNhatThanhCong > 0) {                                // co thay doi
         duLieuDaThayDoi = true;                                // danh dau thay doi
+        // Notify listeners that copies (DMS) for this DauSach changed
+        try { EventBus::instance().dauSachUpdated(QString::fromStdString(dauSach->ISBN)); } catch(...) {}
     }
     
     return "";                                                 // thanh cong
@@ -905,6 +929,9 @@ PTRDS* LayDanhSachDauSach() {
     return dsDauSach;  // tra ve con tro mang
 }
 
+// Define the global mutex declared in the header
+std::mutex g_ds_mutex;
+
 // lay so luong dau sach hien tai
 int LaySoLuongDauSach() {
     return soLuongDauSach;
@@ -921,21 +948,38 @@ bool KiemTraDuLieuThayDoi() {
 // lay danh sach tim kiem (gom logic "lay tat ca" neu khong co tu khoa)
 void LayDanhSachTimKiem(const std::string& tuKhoa, KetQuaTimKiem* ketQua, int& soLuongKetQua, int maxKetQua) {
     soLuongKetQua = 0;  // reset ket qua cu
-    
+
     if (!ketQua || maxKetQua <= 0) return;  // validate input
-    
+
     std::string tuKhoaChuan = ChuanHoaKhoangTrang(tuKhoa);
-    
+
     if (tuKhoaChuan.empty()) {
         // Logic "Get All" - Copy toan bo danh sach (da duoc sap xep)
         for (int i = 0; i < soLuongDauSach && soLuongKetQua < maxKetQua; ++i) {
+            if (!dsDauSach[i]) continue; // skip null entries
             ketQua[soLuongKetQua].sach = dsDauSach[i];
             ketQua[soLuongKetQua].loaiKhop = 0;  // 0 = tat ca
             soLuongKetQua++;
         }
     } else {
-        // Tim kiem logic (co sap xep ket qua ben trong)
-        soLuongKetQua = timKiemLogic(dsDauSach, soLuongDauSach, tuKhoaChuan, ketQua);
+        // Tim kiem logic: use an internal temp buffer to protect against
+        // callers that pass a smaller maxKetQua than internal limits.
+        KetQuaTimKiem tmp[MAX_KET_QUA_TIM_KIEM];
+        int found = timKiemLogic(dsDauSach, soLuongDauSach, tuKhoaChuan, tmp);
+
+        if (found <= 0) {
+            soLuongKetQua = 0;
+            return;
+        }
+
+        // Copy up to caller's capacity (maxKetQua) from tmp results
+        int toCopy = found;
+        if (toCopy > maxKetQua) toCopy = maxKetQua;
+        for (int i = 0; i < toCopy; ++i) {
+            // defensive: ensure tmp entry is valid
+            if (!tmp[i].sach) continue;
+            ketQua[soLuongKetQua++] = tmp[i];
+        }
     }
 }
 
@@ -1054,6 +1098,8 @@ std::string ThemBanSaoMoi(const std::string& isbn, int soLuong, const std::strin
     }
     
     duLieuDaThayDoi = true;
+    // Notify listeners that a copy's status changed (thanh ly)
+    try { EventBus::instance().dauSachUpdated(QString::fromStdString(isbn)); } catch(...) {}
     return "";  // thanh cong
 }
 
@@ -1121,6 +1167,8 @@ std::string ThanhLyBanSaoTheoMa(const std::string& maSach) {
     }
     
     duLieuDaThayDoi = true;
+    // Notify listeners that a copy has been marked as disposed
+    try { EventBus::instance().dauSachUpdated(QString::fromStdString(isbn)); } catch(...) {}
     return "";  // thanh cong
 }
 
@@ -1148,6 +1196,8 @@ std::string XoaBanSaoTheoMa(const std::string& maSach) {
     // cap nhat lai tong so ban sao
     CapNhatTongBanSao(dsDauSach, soLuongDauSach);
     duLieuDaThayDoi = true;
+    // Notify listeners that a DauSach was modified (copy removed)
+    try { EventBus::instance().dauSachUpdated(QString::fromStdString(TachISBNTuMaSach(maSach))); } catch(...) {}
     
     return "";  // thanh cong
 }
@@ -1170,13 +1220,23 @@ int LayDanhSachBanSaoSapXep(const std::string& isbn, PTRDMS* mangKetQua, int max
     // Chuyen DSLK sang mang
     int count = 0;
     PTRDMS p = dauSach->dms;
-    while (p != nullptr && count < maxKetQua) {
+    int safety = 0;
+    int limit = (maxKetQua > MAX_BAN_SAO) ? MAX_BAN_SAO : maxKetQua;
+    while (p != nullptr && count < limit && safety < SO_VONG_LAP_DMS_MAX) {
+        // Defensive: if node looks invalid, stop collecting further
+        if (p == nullptr) break;
         mangKetQua[count++] = p;
+        // Detect trivial self-loop
+        if (p->next == p) {
+            thongBao(std::cout, "Phat hien node DMS self-loop, cat vong lap.", CANH_BAO);
+            break;
+        }
         p = p->next;
+        ++safety;
     }
     
     // Sap xep theo ma sach
-    SapXepBanSaoTheoMa(mangKetQua, count);
+    if (count > 1) SapXepBanSaoTheoMa(mangKetQua, count);
     
     return count;
 }
@@ -1199,7 +1259,7 @@ bool CoTheBanSao(const std::string& isbn) {
 
 // lay thong ke toan he thong O(N*M)
 ThongKeSach LayThongKeSach() {
-    ThongKeSach thongKe = {0};
+    ThongKeSach thongKe{};
     
     thongKe.tongSoDauSach = soLuongDauSach;
     

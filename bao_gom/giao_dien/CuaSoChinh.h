@@ -10,6 +10,8 @@
 #include <QToolBar>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QFileSystemWatcher>
+#include <QTimer>
 
 // Forward declarations cho các widget
 class BangDieuKhien;
@@ -98,6 +100,9 @@ private:
     
     // Auto-save manager
     AutoSaveManager *autoSaveManager;
+    // Filesystem watcher to detect external changes to `data/` or legacy `files/`
+    QFileSystemWatcher *fsWatcher;
+    QTimer *fsDebounceTimer;
     
     // Lưu trạng thái
     int chiSoManHinhHienTai;

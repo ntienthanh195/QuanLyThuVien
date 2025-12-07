@@ -1,5 +1,86 @@
 #include "views/dialogs/ManHinhBaoCaoQuaHan.h"
 #include "models/DocGia.h"
+#include <QAbstractTableModel>
+#include <QFont>
+
+// Model for the overdue readers report (vector-backed)
+class QuaHanReportModel : public QAbstractTableModel {
+public:
+    QuaHanReportModel(std::vector<DocGiaQuaHanDTO> *data, QObject *parent = nullptr)
+        : QAbstractTableModel(parent), m_data(data) {}
+
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override {
+        Q_UNUSED(parent)
+        return m_data ? (int)m_data->size() : 0;
+    }
+
+    int columnCount(const QModelIndex &parent = QModelIndex()) const override {
+        Q_UNUSED(parent)
+        return 5; // Card, Name, Gender, Days, Status
+    }
+
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override {
+        if (!m_data || !index.isValid()) return QVariant();
+        int r = index.row();
+        if (r < 0 || r >= (int)m_data->size()) return QVariant();
+        const DocGiaQuaHanDTO &dto = (*m_data)[r];
+        PTRDG reader = dto.docGia;
+        if (!reader) return QVariant();
+
+        if (role == Qt::DisplayRole) {
+            switch (index.column()) {
+            case 0: return QString::number(reader->data.MaThe);
+            case 1: return QString::fromStdString(std::string(reader->data.Ho + std::string(" ")) + reader->data.Ten);
+            case 2: return reader->data.Phai ? QStringLiteral("👩 Nữ") : QStringLiteral("👨 Nam");
+            case 3: return QString::number(dto.soNgayQuaHanMax) + QString(" ngày");
+            case 4: {
+                if (dto.soNgayQuaHanMax > 30) return QStringLiteral("🚨 Nghiêm Trọng");
+                if (dto.soNgayQuaHanMax > 14) return QStringLiteral("⚠️ Cảnh Báo");
+                return QStringLiteral("⏰ Nhắc Nhở");
+            }
+            }
+        }
+
+        if (role == Qt::FontRole) {
+            QFont f;
+            f.setBold(index.column() == 1 || index.column() == 3);
+            return f;
+        }
+
+        if (role == Qt::BackgroundRole && index.column() == 3) {
+            int days = dto.soNgayQuaHanMax;
+            if (days > 30) return QBrush(QColor(231,76,60));
+            if (days > 14) return QBrush(QColor(241,196,15));
+            return QBrush(QColor(230,126,34));
+        }
+
+        if (role == Qt::ForegroundRole && index.column() == 3) {
+            int days = dto.soNgayQuaHanMax;
+            if (days > 14) return QBrush(Qt::white);
+            return QBrush(QColor(52,73,94));
+        }
+
+        return QVariant();
+    }
+
+    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override {
+        if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
+            switch (section) {
+            case 0: return QStringLiteral("🎫 Mã Thẻ");
+            case 1: return QStringLiteral("👤 Họ Tên");
+            case 2: return QStringLiteral("⚧ Giới Tính");
+            case 3: return QStringLiteral("⏰ Số Ngày Quá Hạn (Max)");
+            case 4: return QStringLiteral("📊 Trạng Thái");
+            }
+        }
+        return QAbstractTableModel::headerData(section, orientation, role);
+    }
+
+    void refresh() { beginResetModel(); endResetModel(); }
+
+private:
+    std::vector<DocGiaQuaHanDTO> *m_data;
+};
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -55,17 +136,10 @@ void ManHinhBaoCaoQuaHan::thietLapGiaoDien() {
     );
     mainLayout->addWidget(warningLabel);
 
-    // Table
-    bangKetQua = new QTableWidget(this);
-    bangKetQua->setColumnCount(5);
-    bangKetQua->setHorizontalHeaderLabels({
-        "🎫 Mã Thẻ",
-        "👤 Họ Tên", 
-        "⚧ Giới Tính",
-        "⏰ Số Ngày Quá Hạn (Max)",
-        "📊 Trạng Thái"
-    });
-    
+    // Table (model/view)
+    bangKetQua = new QTableView(this);
+    modelKetQua = new QuaHanReportModel(&danhSachQuaHan, this);
+    bangKetQua->setModel(modelKetQua);
     bangKetQua->setSelectionBehavior(QAbstractItemView::SelectRows);
     bangKetQua->setSelectionMode(QAbstractItemView::SingleSelection);
     bangKetQua->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -73,13 +147,12 @@ void ManHinhBaoCaoQuaHan::thietLapGiaoDien() {
     bangKetQua->horizontalHeader()->setStretchLastSection(true);
     bangKetQua->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
     bangKetQua->verticalHeader()->setVisible(false);
-    
-    // Set column widths
+    // Default column widths
     bangKetQua->setColumnWidth(0, 120); // Card ID
     bangKetQua->setColumnWidth(1, 250); // Name
     bangKetQua->setColumnWidth(2, 100); // Gender
     bangKetQua->setColumnWidth(3, 180); // Overdue days
-    
+
     mainLayout->addWidget(bangKetQua);
 
     // Buttons
@@ -109,7 +182,7 @@ void ManHinhBaoCaoQuaHan::apDungPhongCachHienDai() {
             background-color: #ffffff;
         }
         
-        QTableWidget {
+        QTableView {
             background-color: white;
             border: 2px solid #e74c3c;
             border-radius: 8px;
@@ -117,12 +190,12 @@ void ManHinhBaoCaoQuaHan::apDungPhongCachHienDai() {
             font-size: 13px;
         }
         
-        QTableWidget::item {
+        QTableView::item {
             padding: 8px;
             border-bottom: 1px solid #fadbd8;
         }
         
-        QTableWidget::item:selected {
+        QTableView::item:selected {
             background-color: #e74c3c;
             color: white;
         }
@@ -190,11 +263,12 @@ void ManHinhBaoCaoQuaHan::apDungPhongCachHienDai() {
 }
 
 void ManHinhBaoCaoQuaHan::taiDuLieuQuaHan() {
-    bangKetQua->setRowCount(0);
+    // Clear existing data
+    danhSachQuaHan.clear();
 
     // Prepare array for results (max 1000)
     DocGiaQuaHanDTO overdueReaders[1000];
-    
+
     // Call backend function
     int count = LayDSDocGiaQuaHan(rootDocGia, overdueReaders, 1000);
 
@@ -205,84 +279,14 @@ void ManHinhBaoCaoQuaHan::taiDuLieuQuaHan() {
         return;
     }
 
-    // Populate table
-    bangKetQua->setRowCount(count);
-    
-    for (int i = 0; i < count; i++) {
-        PTRDG reader = overdueReaders[i].docGia;
-        int overdueDays = overdueReaders[i].soNgayQuaHanMax;
-        
-        if (!reader) continue;
+    // Fill vector backing the model
+    for (int i = 0; i < count; ++i) danhSachQuaHan.push_back(overdueReaders[i]);
 
-        // Card ID
-        QTableWidgetItem* cardItem = new QTableWidgetItem(
-            QString::number(reader->data.MaThe)
-        );
-        cardItem->setTextAlignment(Qt::AlignCenter);
-        cardItem->setFont(QFont("Courier", 11, QFont::Bold));
-        bangKetQua->setItem(i, 0, cardItem);
+    // Refresh model
+    if (modelKetQua) { if (auto m = dynamic_cast<QuaHanReportModel*>(modelKetQua)) m->refresh(); }
 
-        // Full name
-        QString fullName = QString("%1 %2")
-            .arg(QString::fromStdString(reader->data.Ho))
-            .arg(QString::fromStdString(reader->data.Ten));
-        QTableWidgetItem* nameItem = new QTableWidgetItem(fullName);
-        nameItem->setFont(QFont("Arial", 11, QFont::Bold));
-        bangKetQua->setItem(i, 1, nameItem);
-
-        // Gender
-        QString gender = reader->data.Phai == 0 ? "👨 Nam" : "👩 Nữ";
-        QTableWidgetItem* genderItem = new QTableWidgetItem(gender);
-        genderItem->setTextAlignment(Qt::AlignCenter);
-        bangKetQua->setItem(i, 2, genderItem);
-
-        // Overdue days with color coding
-        QTableWidgetItem* daysItem = new QTableWidgetItem(
-            QString("%1 ngày").arg(overdueDays)
-        );
-        daysItem->setTextAlignment(Qt::AlignCenter);
-        daysItem->setFont(QFont("Arial", 12, QFont::Bold));
-        
-        // Color code based on severity
-        QColor bgColor, textColor;
-        if (overdueDays > 30) {
-            bgColor = QColor(231, 76, 60);   // Dark red
-            textColor = Qt::white;
-        } else if (overdueDays > 14) {
-            bgColor = QColor(241, 196, 15);  // Yellow
-            textColor = QColor(52, 73, 94);
-        } else {
-            bgColor = QColor(230, 126, 34);  // Orange
-            textColor = Qt::white;
-        }
-        
-        daysItem->setBackground(QBrush(bgColor));
-        daysItem->setForeground(QBrush(textColor));
-        bangKetQua->setItem(i, 3, daysItem);
-
-        // Status with icon
-        QString statusText;
-        QColor statusColor;
-        if (overdueDays > 30) {
-            statusText = "🚨 Nghiêm Trọng";
-            statusColor = QColor(231, 76, 60);
-        } else if (overdueDays > 14) {
-            statusText = "⚠️ Cảnh Báo";
-            statusColor = QColor(241, 196, 15);
-        } else {
-            statusText = "⏰ Nhắc Nhở";
-            statusColor = QColor(230, 126, 34);
-        }
-        
-        QTableWidgetItem* statusItem = new QTableWidgetItem(statusText);
-        statusItem->setTextAlignment(Qt::AlignCenter);
-        statusItem->setFont(QFont("Arial", 11, QFont::Bold));
-        statusItem->setForeground(QBrush(statusColor));
-        bangKetQua->setItem(i, 4, statusItem);
-
-        // Set row height
-        bangKetQua->setRowHeight(i, 45);
-    }
+    // Use uniform row height for better performance
+    bangKetQua->verticalHeader()->setDefaultSectionSize(45);
 
     // Show warning message
     QString message = QString("⚠️ Phát hiện %1 độc giả quá hạn trả sách!\n\n"

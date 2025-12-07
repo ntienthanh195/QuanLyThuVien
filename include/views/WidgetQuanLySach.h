@@ -19,6 +19,9 @@
 #include "models/DauSach.h"
 #include "views/BadgeStyledItemDelegate.h"
 
+class QFileSystemWatcher;
+
+
 class BookTableModel : public QAbstractTableModel {
     Q_OBJECT
 
@@ -38,16 +41,32 @@ public:
     PTRDS getBookAt(int row) const;
     void clearData();
     
+    // Pagination support
+    void setPageSize(int size);
+    int pageSize() const;
+    void setPage(int page);
+    int page() const;
+    int totalPages() const;
+    int totalCount() const;
+    
     // Sorting
     void sort(int column, Qt::SortOrder order = Qt::AscendingOrder) override;
 
 private:
     PTRDS* books;
-    int bookCount;
+    int bookCount; // total number of books (unpaged)
     bool isSearchMode;
     int sortColumn;
     Qt::SortOrder sortOrder;
+    // pagination state
+    int m_pageSize;
+    int m_page;
     std::vector<PTRDS> cachedBooks;  // Cache cho vector mode
+    // Caches to avoid expensive per-cell traversal of linked lists
+    std::vector<int> cachedAvailableCount;   // number of copies available (CHO_MUON_DUOC)
+    std::vector<int> cachedTotalCopies;      // total copies (tongBanSao)
+    std::vector<int> cachedStatusEnum;       // status enum per book for column 7 (CHO_MUON_DUOC/DANG_MUON/THANH_LY)
+    void computeCaches(); // recompute caches for current `books` pointer
 };
 
 class WidgetQuanLySach : public QWidget {
@@ -83,6 +102,7 @@ private slots:
     // Tab Báo Cáo slots
     void onRefreshTop10();
     void onRefreshThongKe();
+    void onWatchedFileChanged(const QString &path);
 
 private:
     // Main layout
@@ -108,6 +128,13 @@ private:
     QLabel *statusLabel;
     QToolBar *toolbar;
     QTimer *searchTimer;
+    QFileSystemWatcher *fsWatcher;
+    QTimer *fsDebounceTimer;
+    // Pagination controls
+    QPushButton *btnPrevPage;
+    QPushButton *btnNextPage;
+    QLabel *lblPageInfo;
+    QComboBox *cbPageSize;
     
     // Keyboard shortcuts
     QShortcut *shortcutSearch;

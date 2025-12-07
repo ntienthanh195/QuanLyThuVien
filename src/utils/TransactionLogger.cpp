@@ -2,7 +2,7 @@
 #include <QDir>
 #include <QDebug>
 
-const QString TransactionLogger::LOG_FILE_PATH = "files/muontralogs.txt";
+const QString TransactionLogger::LOG_FILE_PATH = "data/muontralogs.txt";
 
 bool TransactionLogger::ghiLogMuon(PTRDG docGia, const QString& isbn, const QString& tenSach, bool thanhCong) {
     return ghiLog(MUON, docGia, isbn, tenSach, thanhCong);
@@ -23,10 +23,10 @@ bool TransactionLogger::ghiLog(LoaiGiaoDich loai, PTRDG docGia, const QString& m
         return false;
     }
     
-    // Tạo thư mục files nếu chưa tồn tại
+    // Tạo thư mục data nếu chưa tồn tại
     QDir dir;
-    if (!dir.exists("files")) {
-        dir.mkpath("files");
+    if (!dir.exists("data")) {
+        dir.mkpath("data");
     }
     
     // Mở file ở chế độ append

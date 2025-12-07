@@ -3,7 +3,7 @@
 #include <string>
 #include <fstream>
 #include "DauSach.h"
-using namespace std;
+using std::string;
 
 //danh sach muon tra
 struct MuonTra{
@@ -11,6 +11,8 @@ struct MuonTra{
     string NgayMuon;
     string NgayTra;
     int TrangThai;//0: dang muon, 1: da tra, 2: lam mat sach
+    // Cache the ma_sach value at the time of transaction to avoid dangling pointer derefs
+    string maSachCached;
 };
 struct NodeMT{
     MuonTra data;
@@ -106,8 +108,7 @@ int LayTopSach(PTRDS dsDauSach[], int soLuongDS, TopSachDTO arr[]);
 // Prototype File I/O
 string PTRDMS_to_String(PTRDMS p);
 PTRDMS MaSach_to_PTRDMS(const string& maSach, PTRDS dsDauSach[], int soLuongDauSach);
-void LuuGiaoDich(MUONTRA dsmt, std::ofstream& file);
-void NapGiaoDich(PTRDG docGia, std::ifstream& file, PTRDS dsDauSach[], int n);
+// Legacy low-level file helpers for docgia/muontra moved to ThaoTacFile
 
 void saveDocGia(PTRDG root);
 PTRDG loadDocGia(PTRDS dsDauSach[], int soLuongDS);

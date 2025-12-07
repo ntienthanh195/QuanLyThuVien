@@ -7,13 +7,22 @@
 #include <cstdlib>
 #include <ctime>
 #include <string>
+#include "models/ThaoTacFile.h"
 #include "models/QuanLySach.h"
 #include "Constants.h"
 #include "utils/NgayThang.h"
 // Cần thêm thư viện XuLyChuoi.h cho hàm BoDauVaThuong()
 #include "utils/XuLyChuoi.h" 
+// Database support
+#include "utils/DatabaseManager.h"
+#include <QSqlQuery>
+#include <QVariant>
+#include <functional>
 // Cần thêm thư viện QuanLySach.h nếu sử dụng TimDanhMucSachTuMaSach
 // #include "QuanLySach.h" 
+
+#include "utils/EventBus.h"
+#include "utils/Perf.h"
 
 // helper thay the max/abs tu <algorithm>
 static inline int my_max(int a, int b) { return (a > b) ? a : b; }
@@ -141,6 +150,10 @@ void InsertDocGia(PTRDG &root, PTRDG node) {
     // ensure new node has height = 1
     if (node != nullptr) node->height = 1;
     root = InsertDocGiaRec(root, node);
+    // Emit event that a new reader was added
+    try {
+        if (node) EventBus::instance().docGiaAdded(node->data.MaThe);
+    } catch(...) {}
 }
 
 // quan ly cay doc gia
@@ -176,10 +189,17 @@ PTRDG taoDocGia(std::string ho, std::string ten, bool phai, int trangthai, int m
 
 // giai phong dsmt
 void giaiPhongDsmt(MUONTRA& dsmt) {
+    // Defensive delete: handle possible self-loop corruption and avoid infinite loops
     while (dsmt != nullptr) {
-        MUONTRA tmp = dsmt;
-        dsmt = dsmt->next;
-        delete tmp;
+        MUONTRA next = dsmt->next;
+        // If node points to itself, delete and break
+        if (next == dsmt) {
+            delete dsmt;
+            dsmt = nullptr;
+            break;
+        }
+        delete dsmt;
+        dsmt = next;
     }
 }
 
@@ -261,7 +281,14 @@ static PTRDG xoaDocGiaRec(PTRDG root, int mathe) {
     return root;
 }
 void xoaDocGia(PTRDG& root, int mathe) {
+    // check existence before deletion
+    PTRDG found = timDocGia(root, mathe);
     root = xoaDocGiaRec(root, mathe);
+    if (found) {
+        try {
+            EventBus::instance().docGiaRemoved(mathe);
+        } catch(...) {}
+    }
 }
 
 // tim doc gia
@@ -289,6 +316,10 @@ void hieuChinhDocGia(PTRDG root, const TheDocGia& new_data) {
     if (p->data.Phai != new_data.Phai) p->data.Phai = new_data.Phai;
     if (p->data.TrangThai != new_data.TrangThai) p->data.TrangThai = new_data.TrangThai;
     // Không cập nhật MaThe, dsmt, soSachDangMuon
+    // Emit update event
+    try {
+        EventBus::instance().docGiaUpdated(new_data.MaThe);
+    } catch(...) {}
 }
 
 // hien thi
@@ -406,37 +437,54 @@ PTRDMS TimBanSaoCoTheMuon(PTRDS dauSach) {
 // tim ban sao theo ma sach trong 1 dau sach (O(M))
 PTRDMS TimBanSaoTheoMa(PTRDS dauSach, const std::string& maSach) {
     if (dauSach == nullptr) return nullptr;
-    
+    if (maSach.empty()) return nullptr;
+    if (maSach.length() > DO_DAI_MA_SACH_MAX) return nullptr; // guard insane input
+
     PTRDMS p = dauSach->dms;
+    if (!p) return nullptr; // no copies
+
     int dem = 0;
-    
+
     while (p != nullptr && dem < SO_VONG_LAP_DMS_MAX) {
-        if (p->maSach == maSach) {
+        // defensive: ensure p->maSach is reasonable before comparing
+        if (!p->maSach.empty() && p->maSach == maSach) {
             return p;  // tim thay
         }
         p = p->next;
         dem++;
     }
-    
+
     if (dem >= SO_VONG_LAP_DMS_MAX) {
         thongBao(std::cout, "Vong lap vo han DMS!", LOI);
     }
-    
+
     return nullptr;  // khong tim thay
 }
 
 // dem so ban sao co the muon (O(M))
 int DemBanSaoCoTheMuon(PTRDS dauSach) {
     if (dauSach == nullptr) return 0;
-    
+
     int dem = 0;
     PTRDMS p = dauSach->dms;
     int vong = 0;
-    
-    while (p != nullptr && vong < SO_VONG_LAP_DMS_MAX) {
+
+    // Use both logical and defensive caps to avoid infinite loops
+    int limit = SO_VONG_LAP_DMS_MAX;
+    if (limit <= 0) limit = MAX_BAN_SAO;
+
+    while (p != nullptr && vong < limit) {
+        // protect against malformed nodes
         if (p->trangThai == CHO_MUON_DUOC) {
             dem++;
         }
+
+        // detect trivial self-loop
+        if (p->next == p) {
+            thongBao(std::cout, "Phat hien node DMS self-loop trong DemBanSaoCoTheMuon.", CANH_BAO);
+            break;
+        }
+
         p = p->next;
         vong++;
     }
@@ -454,19 +502,28 @@ std::string MuonSach(PTRDG docGia, const std::string& isbn, PTRDS dsDauSach[], i
     // Duyệt qua danh sách sách đang mượn để kiểm tra xem có cuốn nào quá hạn không
     MUONTRA p = docGia->data.dsmt;
     std::stringstream dummyStream; // Dùng stream ảo để hứng log (không in ra màn hình)
-    
-    while (p != nullptr) {
+    int safety = 0;
+    while (p != nullptr && safety < SO_VONG_LAP_MT_MAX) {
+        // detect trivial self-loop
+        if (p->next == p) {
+            thongBao(std::cout, "Phat hien node MUONTRA self-loop trong MuonSach. Dung duyet.", CANH_BAO);
+            break;
+        }
         // Chỉ kiểm tra sách đang mượn (TrangThai == 0)
         if (p->data.TrangThai == 0) {
             // Gọi hàm tinhSoNgayQuaHan từ NgayThang.cpp
             int soNgayQua = tinhSoNgayQuaHan(p->data.NgayMuon, dummyStream);
-            
+
             // Nếu > 0 nghĩa là đã quá hạn (số ngày giữ > SO_NGAY_MUON_TOI_DA)
             if (soNgayQua > 0) {
                 return "Loi: Doc gia co sach qua han " + std::to_string(soNgayQua) + " ngay! Vui long tra sach truoc.";
             }
         }
         p = p->next;
+        ++safety;
+    }
+    if (safety >= SO_VONG_LAP_MT_MAX) {
+        thongBao(std::cout, "Phat hien vong lap vo han MUONTRA trong MuonSach.", LOI);
     }
     // ----------------------------------------
 
@@ -493,6 +550,7 @@ std::string MuonSach(PTRDG docGia, const std::string& isbn, PTRDS dsDauSach[], i
     // B5: Them vao lich su muon tra
     MuonTra mt;
     mt.banSaoSach = banSao;
+    mt.maSachCached = (banSao != nullptr) ? banSao->maSach : std::string();
     mt.NgayMuon = layNgayHienTai(dummyStream); // Dùng dummyStream để tránh in log rác
     mt.NgayTra = "";
     mt.TrangThai = 0;  // dang muon
@@ -502,6 +560,15 @@ std::string MuonSach(PTRDG docGia, const std::string& isbn, PTRDS dsDauSach[], i
     duLieuDaThayDoi = true;
 
     dauSach->soLuotMuon++;
+    // Notify listeners
+    try {
+        if (!mt.maSachCached.empty()) {
+            EventBus::instance().muonTraAdded(docGia->data.MaThe, QString::fromStdString(mt.maSachCached));
+        } else if (banSao != nullptr) {
+            EventBus::instance().muonTraAdded(docGia->data.MaThe, QString::fromStdString(banSao->maSach));
+        }
+        EventBus::instance().docGiaUpdated(docGia->data.MaThe);
+    } catch(...) {}
     return "";  // thanh cong
 }
 
@@ -512,15 +579,23 @@ std::string TraSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[], 
     // B1: Tim giao dich muon trong lich su
     MUONTRA curr = docGia->data.dsmt;
     MUONTRA found = nullptr;
-    
-    while (curr != nullptr) {
-        if (curr->data.banSaoSach != nullptr && // 1. Kiem tra con tro
-            curr->data.banSaoSach->maSach == maSach && // 2. So sanh maSach
-            curr->data.TrangThai == 0) {  // dang muon
+    int safety = 0;
+    while (curr != nullptr && safety < SO_VONG_LAP_MT_MAX) {
+        if (curr->next == curr) {
+            thongBao(std::cout, "Phat hien node MUONTRA self-loop trong TraSach. Dung duyet.", CANH_BAO);
+            break;
+        }
+        // Prefer cached maSach if present (safer than dereferencing possibly-dangling PTRDMS)
+        std::string currMaSach = !curr->data.maSachCached.empty() ? curr->data.maSachCached : (curr->data.banSaoSach ? curr->data.banSaoSach->maSach : std::string());
+        if (!currMaSach.empty() && currMaSach == maSach && curr->data.TrangThai == 0) {
             found = curr;
             break;
         }
         curr = curr->next;
+        ++safety;
+    }
+    if (safety >= SO_VONG_LAP_MT_MAX) {
+        thongBao(std::cout, "Phat hien vong lap vo han MUONTRA trong TraSach.", LOI);
     }
     
     if (found == nullptr) {
@@ -549,6 +624,11 @@ std::string TraSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[], 
     docGia->data.soSachDangMuon--;
     
     duLieuDaThayDoi = true;
+    // Emit events: muonTraUpdated + docGiaUpdated
+    try {
+        EventBus::instance().muonTraUpdated(docGia->data.MaThe, QString::fromStdString(maSach));
+        EventBus::instance().docGiaUpdated(docGia->data.MaThe);
+    } catch(...) {}
     return "";  // thanh cong
 }
 
@@ -565,6 +645,7 @@ void themMuonTra(PTRDG docgia, PTRDMS banSaoSach) {
 
     // 1. Gán con trỏ trực tiếp (Fix lỗi crash)
     node->data.banSaoSach = banSaoSach; 
+    node->data.maSachCached = (banSaoSach != nullptr) ? banSaoSach->maSach : std::string();
     
     // 2. Gán dữ liệu giao dịch
     node->data.NgayMuon = layNgayHienTai();
@@ -579,14 +660,15 @@ void themMuonTra(PTRDG docgia, PTRDMS banSaoSach) {
     
     // Cập nhật số lượng sách đang mượn
     docgia->data.soSachDangMuon++;
-    // Cap nhat so Luot Muon
-    std::string isbn = TachISBNTuMaSach(node->data.banSaoSach->maSach);
-    PTRDS dauSach = TimDauSachTheoISBN(dsDauSach, soLuongDauSach, isbn);
-    if(dauSach != nullptr){
-        dauSach->soLuotMuon++;//neu tim thay dauSach
-    } else {
-        std::cerr << "Canh bao: khong tim thay dau sach cho ma sach da muon";
-    }
+    // Phát sự kiện realtime
+    try {
+        if (!node->data.maSachCached.empty()) {
+            EventBus::instance().muonTraAdded(docgia->data.MaThe, QString::fromStdString(node->data.maSachCached));
+        } else if (node->data.banSaoSach != nullptr) {
+            EventBus::instance().muonTraAdded(docgia->data.MaThe, QString::fromStdString(node->data.banSaoSach->maSach));
+        }
+        EventBus::instance().docGiaUpdated(docgia->data.MaThe);
+    } catch(...) {}
    
 }
 
@@ -598,11 +680,9 @@ void themMuonTra(PTRDG docgia, const MuonTra &mt) {
     node->data = mt;
     node->next = docgia->data.dsmt;
     docgia->data.dsmt = node;
-    // Cập nhật bộ đếm dựa trên TRẠNG THÁI GIAO DỊCH (mt.TrangThai)
-    // Chỉ tăng bộ đếm nếu giao dịch đó đang ở trạng thái "Đang mượn" (0)
-    if (mt.TrangThai == 0) {
-        docgia->data.soSachDangMuon++;
-    }
+    // NOTE: This overload is used when loading existing transactions from storage.
+    // The caller (loader) is responsible for setting `docgia->data.soSachDangMuon`
+    // from the persisted value. Do NOT modify the counter here to avoid double-counting.
 }
 
 //G.Tra Sach
@@ -615,102 +695,64 @@ PTRDMS MaSach_to_PTRDMS(const string& maSach, PTRDS dsDauSach[], int soLuongDauS
     return timDanhMucTheoMaSach(maSach, dsDauSach,soLuongDauSach,dummyStream, true);
 }
 
-void LuuGiaoDich(MUONTRA dsmt, std::ofstream& file){
-    MUONTRA p = dsmt;
-    while(p != nullptr){
-        std::string maSach = PTRDMS_to_String(p->data.banSaoSach);
-        
-        file << "MT|"
-             << maSach << "|"
-             << p->data.NgayMuon << "|"
-             << p->data.NgayTra << "|"
-             << p->data.TrangThai << "\n";
-        p = p->next;
-    }
-}
 
-void NapGiaoDich(PTRDG docGia, std::ifstream& file, PTRDS dsDauSach[], int n){
-    std::string line;
-    while(getline(file, line)){
-        string fields[4];
-        if(!TachTruong(line, '|', fields, 4)) continue;
-
-        MuonTra mt;
-        //Gan cac truong gia tri truc tiep(NgayMuon, NgayTra, TrangThai)
-        mt.NgayMuon = fields[1];
-        mt.NgayTra = fields[2];
-
-        try{
-            mt.TrangThai = stoi(fields[3]);
-        } catch(...){
-            cerr << "Loi chuyen doi trang thai giao dich: " << fields[3] << endl;
-            continue;
-        }
-        // //Khoi phuc con tro tu ma sach
-        // mt.banSaoSach = MaSach_to_PTRDMS(fields[0], dsDauSach, n);
-
-        // //1. Lay ma sach tu file
-        // std::string maSachFile = fields[0];
-
-        // //2. Tach lay ISBN
-        // std::string isbn = TachISBNTuMaSach(maSachFile);
-
-        // //3. Tim dau sach va tang luot muon
-        // PTRDS dauSach = TimDauSachTheoISBN(dsDauSach, n, isbn);
-        // if(dauSach != nullptr) 
-        //     dauSach->soLuotMuon++;
-        // if(mt.banSaoSach == nullptr){
-        //     //canh bao neu con tra khong khoi phuc duoc
-        //     std::cerr << "Canh bao: khong tim thay sach " << fields[0] << " de khoi phuc con tro"<< endl;
-        // } else {
-        //     std::string isbn = TachISBNTuMaSach(fields[0]);
-        //     PTRDS dauSach = TimDauSachTheoISBN(dsDauSach, n, isbn);
-        //     if(dauSach != nullptr)
-        //         dauSach->soLuotMuon++;
-        // }
-        std::cout << ">> Doc file MT: MaSach=" << fields[0]; 
-        
-        std::string maSachFile = fields[0]; 
-        std::string isbn = TachISBNTuMaSach(maSachFile); 
-        std::cout << " | ISBN tach duoc=" << isbn;
-
-        PTRDS dauSach = TimDauSachTheoISBN(dsDauSach, n, isbn);
-        
-        if (dauSach != nullptr) {
-            dauSach->soLuotMuon++; 
-            std::cout << " -> TIM THAY! Ten=" << dauSach->tenSach 
-                      << " -> Tang len " << dauSach->soLuotMuon << "\n";
-        } else {
-            std::cout << " -> KHONG TIM THAY SACH NAY!\n";
-        }
-
-        themMuonTra(docGia, mt);
-    }
-}
 
 //H.Liet ke danh sach cac ma sach, ten sach ma 1 doc gia co so the X dang muon
 // lay danh sach sach dang muon cua doc gia (O(L) - L: so giao dich)
 // ham backend: lay danh sach sach dang muon (O(L))
 int LayDSSachDangMuon(PTRDG docGia, ThongTinSachDangMuon_DTO ketQua[], int maxKetQua, PTRDS dsDauSach[], int soLuongDauSach) {
     if (docGia == nullptr || ketQua == nullptr) return -1;  // loi: khong tim thay doc gia
+    if (maxKetQua <= 0) return 0; // nothing to fill
+    if (maxKetQua > MAX_DAUSACH) maxKetQua = MAX_DAUSACH;
+    if (soLuongDauSach < 0 || soLuongDauSach > MAX_DAUSACH) {
+        // invalid catalog array - treat as empty so lookups return nullptr safely
+        soLuongDauSach = 0;
+        dsDauSach = nullptr;
+    }
     
     MUONTRA curr = docGia->data.dsmt;
     if (curr == nullptr) return 0;  // doc gia chua muon cuon nao
-    
+
     int dem = 0;
-    
-    // duyet toan bo danh sach muon
-    while (curr != nullptr) {
+    int safety = 0;
+
+    // duyet toan bo danh sach muon with safety checks
+    while (curr != nullptr && safety < SO_VONG_LAP_MT_MAX) {
+        // detect trivial self-loop to avoid infinite loops / corruption
+        if (curr->next == curr) {
+            thongBao(std::cout, "Phat hien node MUONTRA self-loop. Dung duyet.", CANH_BAO);
+            break;
+        }
+
         // chi xu ly sach dang muon (TrangThai = 0)
         if (curr->data.TrangThai == 0) {
             // kiem tra con tro banSaoSach an toan
             if (curr->data.banSaoSach != nullptr) {
                 std::string maSach = curr->data.banSaoSach->maSach;
                 std::string isbn = TachISBNTuMaSach(maSach);
-                
+
                 // tim dau sach de lay ten sach
-                PTRDS dauSach = TimDauSachTheoISBN(dsDauSach, soLuongDauSach, isbn);
-                
+                PTRDS dauSach = nullptr;
+                if (dsDauSach != nullptr && soLuongDauSach > 0) {
+                    dauSach = TimDauSachTheoISBN(dsDauSach, soLuongDauSach, isbn);
+                }
+
+                // Diagnostic logging: append a brief record so failing reproductions can reveal state
+                try {
+                    std::ofstream dbg;
+                    dbg.open("data/debug_muontra.log", std::ios::app);
+                    if (dbg.is_open()) {
+                        dbg << "LayDSSachDangMuon: docGia=" << docGia << " curr=" << curr << " safety=" << safety << " dem=" << dem << "\n";
+                        if (!curr->data.maSachCached.empty()) dbg << "  maSachCached=" << curr->data.maSachCached << "\n";
+                        if (curr->data.banSaoSach) dbg << "  banSaoPtr=" << curr->data.banSaoSach << " banSao.maSach=" << curr->data.banSaoSach->maSach << "\n";
+                        else dbg << "  banSaoPtr=null\n";
+                        dbg << "  soLuongDauSach=" << soLuongDauSach << "\n";
+                        if (dauSach) dbg << "  dauSachPtr=" << dauSach << " ten_len=" << dauSach->tenSach.size() << "\n";
+                        else dbg << "  dauSachPtr=null\n";
+                        dbg.close();
+                    }
+                } catch(...) {}
+
                 // luu vao mang ket qua
                 if (dem < maxKetQua) {
                     ketQua[dem].maSach = maSach;
@@ -718,11 +760,20 @@ int LayDSSachDangMuon(PTRDG docGia, ThongTinSachDangMuon_DTO ketQua[], int maxKe
                     ketQua[dem].ngayMuon = curr->data.NgayMuon;
                     dem++;
                 }
+            } else {
+                // defensive: skip malformed entry but keep traversing
+                thongBao(std::cout, "Canh bao: MUONTRA co banSaoSach == nullptr.", CANH_BAO);
             }
         }
+
         curr = curr->next;
+        ++safety;
     }
-    
+
+    if (safety >= SO_VONG_LAP_MT_MAX) {
+        thongBao(std::cout, "Phat hien vong lap vo han trong danh sach muon (MUONTRA).", LOI);
+    }
+
     return dem;  // tra ve so luong sach dang muon
 }
 
@@ -734,16 +785,24 @@ int TinhSoNgayQuaHanLonNhat(PTRDG docgia) {
     int maxQuaHan = 0;
     int quaHan = 0;
     MUONTRA curr = docgia->data.dsmt;
-    
-    while (curr != nullptr) {
+    int safety = 0;
+    while (curr != nullptr && safety < SO_VONG_LAP_MT_MAX) {
+        if (curr->next == curr) {
+            thongBao(std::cout, "Phat hien node MUONTRA self-loop trong TinhSoNgayQuaHanLonNhat. Dung duyet.", CANH_BAO);
+            break;
+        }
         if (curr->data.TrangThai == 0) {
             std::stringstream dummy;  // thay std::cout bang stream ao
             quaHan = tinhSoNgayQuaHan(curr->data.NgayMuon, dummy);
-            
+
             if (quaHan > maxQuaHan)
                 maxQuaHan = quaHan;
         }
         curr = curr->next;
+        ++safety;
+    }
+    if (safety >= SO_VONG_LAP_MT_MAX) {
+        thongBao(std::cout, "Phat hien vong lap vo han MUONTRA trong TinhSoNgayQuaHanLonNhat.", LOI);
     }
     return maxQuaHan;
 }
@@ -914,26 +973,8 @@ int LayTopSach(PTRDS dsDauSach[], int soLuongDS, TopSachDTO arr[]){
 //Save
 //ham de quy
 static void LuuNodeVaoFile(PTRDG node, std::ofstream& file){
-    if(node == nullptr) return;
-
-    // (N) Ghi thong tin Doc Gia
-    file << "DG|"
-         << node->data.MaThe << "|"
-         << node->data.Ho << "|"
-         << node->data.Ten << "|"
-         << node->data.Phai << "|"
-         << node->data.TrangThai << "\n";
-
-    // (N) Ghi danh sach muon tra
-    LuuGiaoDich(node->data.dsmt, file);
-
-    // Ghi dau hieu ket thuc
-    file << "END_DG\n";
-
-    // (L) De quy sang trai
-    LuuNodeVaoFile(node->left, file);
-    // (R) De quy sang phai
-    LuuNodeVaoFile(node->right, file);
+    // Delegate to ThaoTacFile centralized writer
+    ThaoTacFile_LuuNodeVaoFile(node, file);
 }
 
 void saveDocGia(PTRDG root){
@@ -945,18 +986,139 @@ void saveDocGia(PTRDG root){
         }
         
         std::string filePath = FilePathManager::getDocGiaPathStd();
+
+        // Try writing to DB first
+        QString dbPath = FilePathManager::getLibraryDbPath();
+        // Diagnostic: log DB path availability
+        if (dbPath.isEmpty()) {
+            std::cerr << "[saveDocGia] Warning: FilePathManager returned empty DB path. Falling back to legacy file save.\n";
+        } else {
+            std::cerr << "[saveDocGia] Using DB path: " << dbPath.toStdString() << "\n";
+        }
+
+        if (DatabaseManager::instance().connect(dbPath)) {
+            std::cerr << "[saveDocGia] Database connected successfully.\n";
+            bool ok = true;
+            DatabaseManager::instance().beginTransaction();
+
+            // Clear existing doc_gia and muon_tra so we rebuild from in-memory tree
+            // This ensures deletions in memory are persisted (previous logic only did INSERT OR REPLACE)
+            if (!DatabaseManager::instance().execute("DELETE FROM muon_tra;")) ok = false;
+            if (!DatabaseManager::instance().execute("DELETE FROM doc_gia;")) ok = false;
+
+            // Insert/replace all doc_gia
+            // helper: count active loans in a MUONTRA list
+            auto countActiveLoans = [](MUONTRA head)->int{
+                int cnt = 0;
+                MUONTRA p = head;
+                int safety = 0;
+                while (p != nullptr && safety < SO_VONG_LAP_MT_MAX) {
+                    if (p->next == p) break;
+                    if (p->data.TrangThai == 0) ++cnt;
+                    p = p->next; ++safety;
+                }
+                return cnt;
+            };
+
+            std::function<void(PTRDG)> insertRec;
+            insertRec = [&](PTRDG node) {
+                if (!node) return;
+                insertRec(node->left);
+                QSqlQuery q(DatabaseManager::instance().database());
+                q.prepare("INSERT OR REPLACE INTO doc_gia (ma_the, ho, ten, phai, trang_thai, so_dien_thoai, email, ngay_dang_ky, ngay_het_han, so_sach_dang_muon) VALUES (:ma, :ho, :ten, :phai, :tt, :sdtt, :email, :ndk, :nhh, :so);");
+                q.bindValue(":ma", node->data.MaThe);
+                q.bindValue(":ho", QString::fromStdString(node->data.Ho));
+                q.bindValue(":ten", QString::fromStdString(node->data.Ten));
+                q.bindValue(":phai", node->data.Phai ? 1 : 0);
+                q.bindValue(":tt", node->data.TrangThai);
+                q.bindValue(":sdtt", QString::fromStdString(std::string()));
+                q.bindValue(":email", QString::fromStdString(std::string()));
+                q.bindValue(":ndk", QString::fromStdString(std::string()));
+                q.bindValue(":nhh", QString::fromStdString(std::string()));
+                // Persist canonical count: recompute from in-memory MUONTRA list to avoid stale/mismatched values
+                int canonicalSo = countActiveLoans(node->data.dsmt);
+                node->data.soSachDangMuon = canonicalSo; // keep in-memory consistent
+                q.bindValue(":so", canonicalSo);
+                if (!q.exec()) ok = false;
+                insertRec(node->right);
+            };
+
+            insertRec(root);
+
+            // Rebuild muon_tra: delete all then reinsert
+            if (ok) {
+                if (!DatabaseManager::instance().execute("DELETE FROM muon_tra;")) ok = false;
+                else {
+                    // traverse again and insert muon records
+                    std::function<void(PTRDG)> insertMuonRec;
+                    insertMuonRec = [&](PTRDG node) {
+                        if (!node) return;
+                        insertMuonRec(node->left);
+                        MUONTRA p = node->data.dsmt;
+                            int safetyP = 0;
+                            while (p && safetyP < SO_VONG_LAP_MT_MAX) {
+                                if (p->next == p) {
+                                    thongBao(std::cout, "Phat hien node MUONTRA self-loop trong saveDocGia->insertMuonRec. Dung duyet.", CANH_BAO);
+                                    break;
+                                }
+                                // find ban_sao id
+                                QSqlQuery q2(DatabaseManager::instance().database());
+                                q2.prepare("SELECT id FROM ban_sao WHERE ma_sach = :ma LIMIT 1");
+                                // Use cached maSach when available to avoid dereferencing dangling pointers
+                                std::string maForQuery = !p->data.maSachCached.empty() ? p->data.maSachCached : (p->data.banSaoSach ? p->data.banSaoSach->maSach : std::string());
+                                q2.bindValue(":ma", QString::fromStdString(maForQuery));
+                                if (q2.exec() && q2.next()) {
+                                    int banId = q2.value(0).toInt();
+                                    QSqlQuery q3(DatabaseManager::instance().database());
+                                    q3.prepare("INSERT INTO muon_tra (ma_the, ban_sao_id, ngay_muon, ngay_tra, trang_thai, tien_phat) VALUES (:ma, :bid, :nm, :nt, :tt, :tp);");
+                                    q3.bindValue(":ma", node->data.MaThe);
+                                    q3.bindValue(":bid", banId);
+                                    q3.bindValue(":nm", QString::fromStdString(p->data.NgayMuon));
+                                    q3.bindValue(":nt", QString::fromStdString(p->data.NgayTra));
+                                    q3.bindValue(":tt", p->data.TrangThai);
+                                    q3.bindValue(":tp", 0);
+                                    if (!q3.exec()) ok = false;
+                                }
+                                p = p->next;
+                                ++safetyP;
+                            }
+                            if (safetyP >= SO_VONG_LAP_MT_MAX) {
+                                thongBao(std::cout, "Phat hien vong lap vo han MUONTRA khi luu muon_tra (saveDocGia).", LOI);
+                            }
+                        insertMuonRec(node->right);
+                    };
+                    insertMuonRec(root);
+                }
+            }
+
+            if (ok) {
+                DatabaseManager::instance().commit();
+                std::cerr << "[saveDocGia] Commit successful.\n";
+            } else {
+                DatabaseManager::instance().rollback();
+                // Print DB last error for diagnostics
+                QSqlError err = DatabaseManager::instance().lastError();
+                std::cerr << "[saveDocGia] ERROR: commit failed, rolled back. QSqlError: " << err.text().toStdString() << "\n";
+            }
+            DatabaseManager::instance().close();
+            std::cout << "Thong tin: Da Luu doc_gia -> DB." << std::endl;
+            // DB save succeeded — do not write legacy text file when using DB-only mode
+            try { EventBus::instance().dataChanged(); } catch(...) {}
+            return;
+        }
+
         std::ofstream file(filePath);
 
-    if(!file.is_open()){
-        std::cerr << "Loi: khong the mo file '" << filePath << "' de ghi!" << std::endl;
-        return;
-    }
+        if(!file.is_open()){
+            std::cerr << "Loi: khong the mo file '" << filePath << "' de ghi!" << std::endl;
+            return;
+        }
 
-    LuuNodeVaoFile(root, file);
+        LuuNodeVaoFile(root, file);
 
-    file.close();
+        file.close();
 
-    std::cout << "Thong tin: Da Luu file docgia.txt thanh cong." << std::endl;
+        std::cout << "Thong tin: Da Luu file docgia.txt thanh cong." << std::endl;
     } catch (const std::exception &e) {
         std::cerr << "Loi ngoai le khi luu doc gia: " << e.what() << std::endl;
     } catch (...) {
@@ -965,96 +1127,104 @@ void saveDocGia(PTRDG root){
 }
 //Load
 PTRDG loadDocGia(PTRDS dsDauSach[], int soLuongDS){
+    PerfTimer perf("loadDocGia");
     try {
-        std::string filePath = FilePathManager::getDocGiaPathStd();
-        std::ifstream file(filePath);
-    if(!file.is_open()){
-        std::cerr << "Khong mo duoc file " << filePath << " de doc!" << std::endl;
-        
-        // Thu tao file moi neu khong ton tai
-        std::ofstream createFile(filePath);
-        if (createFile.is_open()) {
-            createFile.close();
-            std::cout << "Da tao file moi: " << filePath << std::endl;
-        }
-        return nullptr;
-    }
+        PTRDG root = nullptr;
 
-    PTRDG root = nullptr;
-    std::string line;
-    PTRDG docGiaHienTai = nullptr;
-    std::string fields[6];//mang tam cho DG hoac MT
+        // Try loading from DB first
+        QString dbPath = FilePathManager::getLibraryDbPath();
+        if (DatabaseManager::instance().connect(dbPath)) {
+            QSqlQuery q(DatabaseManager::instance().database());
+            if (q.exec("SELECT ma_the, ho, ten, phai, trang_thai, so_sach_dang_muon FROM doc_gia ORDER BY ma_the")) {
+                while (q.next()) {
+                    int maThe = q.value(0).toInt();
+                    QString hoQ = q.value(1).toString();
+                    QString tenQ = q.value(2).toString();
+                    int phaiQ = q.value(3).toInt();
+                    int trangQ = q.value(4).toInt();
+                    int soSachDangMuon = q.value(5).toInt();
 
-    while(std::getline(file, line)){
-        if(line.empty()) continue;
-
-        // Tach tien to (DG, MT, END_DG)
-        std::string prefix;
-        std::string data;
-        size_t pos = line.find("|");
-        if(pos != std::string::npos){
-            prefix = line.substr(0, pos);
-            data = line.substr(pos + 1);
-        } else {
-            prefix = line; // truong hop END_DG
-        }
-        
-        //bat dau doc Doc Gia 
-        if(prefix == "DG"){
-            if(!TachTruong(data, '|', fields, 5)) continue; //Tach 5 truong con lai
-
-            int mathe, phai, trangthai;
-            std::string ho, ten;
-
-            try{
-                mathe = std::stoi(fields[0]);
-                ho = fields[1];
-                ten = fields[2];
-                phai = std::stoi(fields[3]);
-                trangthai = std::stoi(fields[4]);
-            } catch(...){
-                continue; //Loi parsing
-            }
-
-            // Tao node moi va gan no la node hien tai
-            docGiaHienTai = taoDocGia(ho, ten, phai != 0, trangthai, mathe);
-
-            // Chen vao cay AVL
-            InsertDocGia(root, docGiaHienTai);
-        } else if(prefix == "MT") {
-            if(docGiaHienTai == nullptr) continue;//Bo qua neu chua co Doc Gia
-            if(!TachTruong(data, '|', fields, 4)) continue;//Tach 4 truong con lai
-
-            MuonTra mt;
-            mt.NgayMuon = fields[1];
-            mt.NgayTra = fields[2];
-            mt.TrangThai = std::stoi(fields[3]);
-
-            //Khoi phuc con tro
-            mt.banSaoSach = MaSach_to_PTRDMS(fields[0], dsDauSach, soLuongDS);
-
-            std::string maSachFile = fields[0];
-
-            //Kiem tra du lieu hong trong file (MT|| )
-            if(!maSachFile.empty()){
-                std::string isbn = TachISBNTuMaSach(maSachFile);
-                PTRDS dauSach = TimDauSachTheoISBN(dsDauSach, soLuongDS, isbn);
-
-                if(dauSach != nullptr){
-                    dauSach->soLuotMuon++;
-
-                    std::cout << "[DEBUG] + 1 Luot muon cho: " << dauSach->tenSach << "\n";
+                    PTRDG node = taoDocGia(hoQ.toStdString(), tenQ.toStdString(), phaiQ != 0, trangQ, maThe);
+                    node->data.soSachDangMuon = soSachDangMuon;
+                    InsertDocGia(root, node);
                 }
-            }
 
-            //Them vao DSLK
-            themMuonTra(docGiaHienTai, mt);
-        } else if(prefix == "END_DG"){
-            docGiaHienTai = nullptr; //reset
+                // Load muon_tra and attach to docGia nodes
+                QSqlQuery q2(DatabaseManager::instance().database());
+                if (q2.exec("SELECT m.ma_the, b.ma_sach, m.ngay_muon, m.ngay_tra, m.trang_thai FROM muon_tra m JOIN ban_sao b ON m.ban_sao_id = b.id ORDER BY m.id")) {
+                    while (q2.next()) {
+                        int maThe = q2.value(0).toInt();
+                        QString maSachQ = q2.value(1).toString();
+                        QString ngayMuonQ = q2.value(2).toString();
+                        QString ngayTraQ = q2.value(3).toString();
+                        int trangQ = q2.value(4).toInt();
+
+                        PTRDG p = timDocGia(root, maThe);
+                        if (!p) continue;
+
+                        MuonTra mt;
+                        mt.NgayMuon = ngayMuonQ.toStdString();
+                        mt.NgayTra = ngayTraQ.toStdString();
+                        mt.TrangThai = trangQ;
+                        // Resolve ban_sao pointer from ma_sach
+                        mt.banSaoSach = MaSach_to_PTRDMS(maSachQ.toStdString(), dsDauSach, soLuongDS);
+                        mt.maSachCached = maSachQ.toStdString();
+
+                        // Ensure the in-memory copy status reflects the loan record we just loaded.
+                        // If the transaction is active (TrangThai == 0) mark the ban_sao as DANG_MUON,
+                        // otherwise mark it as available (CHO_MUON_DUOC). This keeps
+                        // LayThongKeSach() consistent with muon_tra table.
+                        if (mt.banSaoSach != nullptr) {
+                            if (mt.TrangThai == 0) {
+                                mt.banSaoSach->trangThai = DANG_MUON;
+                            } else {
+                                mt.banSaoSach->trangThai = CHO_MUON_DUOC;
+                            }
+                        }
+
+                        if (!maSachQ.isEmpty()) {
+                            std::string isbn = TachISBNTuMaSach(maSachQ.toStdString());
+                            PTRDS dauSach = TimDauSachTheoISBN(dsDauSach, soLuongDS, isbn);
+                            if (dauSach != nullptr) {
+                                dauSach->soLuotMuon++;
+                            }
+                        }
+
+                        themMuonTra(p, mt);
+                    }
+                }
+
+                // After loading muon_tra rows and attaching them to docGia nodes,
+                // recompute `soSachDangMuon` from the attached MUONTRA lists to ensure consistency
+                std::function<void(PTRDG)> recomputeCounts;
+                recomputeCounts = [&](PTRDG node) {
+                    if (!node) return;
+                    recomputeCounts(node->left);
+                    // count active loans
+                    int cnt = 0;
+                    MUONTRA p = node->data.dsmt;
+                    int safety = 0;
+                    while (p != nullptr && safety < SO_VONG_LAP_MT_MAX) {
+                        if (p->next == p) break;
+                        if (p->data.TrangThai == 0) ++cnt;
+                        p = p->next; ++safety;
+                    }
+                    node->data.soSachDangMuon = cnt;
+                    recomputeCounts(node->right);
+                };
+
+                recomputeCounts(root);
+
+                DatabaseManager::instance().close();
+                return root;
+            }
+            DatabaseManager::instance().close();
         }
-    }
-    file.close();
-    return root;
+
+        // Fallback to legacy file-based loader (delegated)
+        std::string filePath = FilePathManager::getDocGiaPathStd();
+        PTRDG rootFromFile = NapDocGiaFile(filePath.c_str(), dsDauSach, soLuongDS);
+        return rootFromFile;
     } catch (const std::exception &e) {
         std::cerr << "Loi ngoai le khi nap doc gia: " << e.what() << std::endl;
         return nullptr;
@@ -1139,11 +1309,15 @@ static void DemDocGiaRecursive(PTRDG node, int& tong, int& hoatDong, int& khoa,
     int sachDangMuonCuaDocGia = 0;
     MUONTRA pTemp = node->data.dsmt;
     bool coSachQuaHan = false;
-    
-    while (pTemp) {
+    int safety = 0;
+    while (pTemp != nullptr && safety < SO_VONG_LAP_MT_MAX) {
+        if (pTemp->next == pTemp) {
+            thongBao(std::cout, "Phat hien node MUONTRA self-loop trong DemDocGiaRecursive. Dung duyet.", CANH_BAO);
+            break;
+        }
         if (pTemp->data.TrangThai == 0) {  // dang muon
             sachDangMuonCuaDocGia++;
-            
+
             // kiem tra qua han
             std::stringstream dummyStream;
             int soNgayQuaHan = tinhSoNgayQuaHan(pTemp->data.NgayMuon, dummyStream);
@@ -1152,6 +1326,10 @@ static void DemDocGiaRecursive(PTRDG node, int& tong, int& hoatDong, int& khoa,
             }
         }
         pTemp = pTemp->next;
+        ++safety;
+    }
+    if (safety >= SO_VONG_LAP_MT_MAX) {
+        thongBao(std::cout, "Phat hien vong lap vo han MUONTRA trong DemDocGiaRecursive.", LOI);
     }
     
     if (sachDangMuonCuaDocGia > 0) {
@@ -1211,12 +1389,21 @@ static void DemDangMuonRec(PTRDG node, int& dem) {
     
     // kiem tra doc gia co sach dang muon khong
     MUONTRA pTemp = node->data.dsmt;
-    while (pTemp) {
+    int safety = 0;
+    while (pTemp != nullptr && safety < SO_VONG_LAP_MT_MAX) {
+        if (pTemp->next == pTemp) {
+            thongBao(std::cout, "Phat hien node MUONTRA self-loop trong DemDangMuonRec. Dung duyet.", CANH_BAO);
+            break;
+        }
         if (pTemp->data.TrangThai == 0) {  // dang muon
             dem++;
             break;  // chi dem 1 lan cho moi doc gia
         }
         pTemp = pTemp->next;
+        ++safety;
+    }
+    if (safety >= SO_VONG_LAP_MT_MAX) {
+        thongBao(std::cout, "Phat hien vong lap vo han MUONTRA trong DemDangMuonRec.", LOI);
     }
     
     DemDangMuonRec(node->left, dem);
@@ -1350,24 +1537,26 @@ int TimDocGiaTheoHoTen(PTRDG root, const std::string& hoTen, PTRDG ketQua[], int
 void MigrateNormalizeDocGiaFile(PTRDG root) {
     try {
         std::string filePath = FilePathManager::getDocGiaPathStd();
-        std::string backupPath = filePath + ".bak";
-
-        // Create backup copy (overwrite if exists with timestamped copy)
-        std::ifstream src(filePath, std::ios::binary);
-        if (src.is_open()) {
-            std::ofstream dst(backupPath, std::ios::binary);
-            if (dst.is_open()) {
-                dst << src.rdbuf();
-                dst.close();
-                src.close();
-                std::cout << "Backup created: " << backupPath << std::endl;
-            } else {
-                src.close();
-                std::cerr << "Khong the tao file backup: " << backupPath << std::endl;
+        // Create centralized backup under data/backup with timestamp
+        std::string filesDir = FilePathManager::getFilesDirectory().toStdString();
+        std::string backupsDir = filesDir + "/backup";
+        try {
+            std::error_code ec;
+            std::filesystem::create_directories(backupsDir, ec);
+            if (ec) {
+                std::cerr << "Warning: could not ensure backup dir: " << ec.message() << std::endl;
             }
+        } catch (...) {
+            // ignore
+        }
+
+        std::string backupPath = backupsDir + "/docgia.bak_" + std::to_string(std::time(nullptr));
+
+        // Create backup copy via centralized helper
+        if (ThaoTacFile_BackupFile(filePath, backupPath)) {
+            std::cout << "Backup created: " << backupPath << std::endl;
         } else {
-            // No source file - nothing to migrate
-            std::cout << "No existing docgia file to backup/migrate." << std::endl;
+            std::cout << "No existing docgia file to backup/migrate or backup failed." << std::endl;
         }
 
         // Now re-save using current in-memory tree (taoDocGia already normalizes names)

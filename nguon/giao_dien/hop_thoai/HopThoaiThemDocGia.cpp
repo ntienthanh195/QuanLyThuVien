@@ -2,6 +2,7 @@
 #include "models/DocGia.h"
 #include "utils/ResponsiveHelper.h"
 #include "utils/XuLyChuoi.h"
+#include "utils/EventBus.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -258,10 +259,14 @@ void HopThoaiThemDocGia::xuLyNutLuu() {
     int trangThai = 1; // 1 = hoạt động
     
     // Gọi hàm backend tạo độc giả với dữ liệu đã chuẩn hóa
-    rootDocGia = taoDocGia(hoChuan, tenChuan, phai, trangThai, rootDocGia);
-    
-    // Tự động lưu file ngay sau khi thêm
-    saveDocGia(rootDocGia);
+    PTRDG newReader = taoDocGia(hoChuan, tenChuan, phai, trangThai, rootDocGia);
+    if (newReader) {
+        InsertDocGia(rootDocGia, newReader);
+        // Tự động lưu file ngay sau khi thêm
+        saveDocGia(rootDocGia);
+        // Global notification
+        EventBus::instance().docGiaAdded(newReader->data.MaThe);
+    }
     
     nhanTrangThai->setText(QString("✓ Đã thêm độc giả: %1 %2")
                           .arg(QString::fromStdString(hoChuan))

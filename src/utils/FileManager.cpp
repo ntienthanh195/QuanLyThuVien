@@ -1,6 +1,8 @@
 #include "utils/FileManager.h"
 #include <QFileInfo>
 #include <QDateTime>
+#include "utils/FilePathManager.h"
+#include <QDir>
 
 bool FileManager::fileExists(const QString &filePath) {
     return QFileInfo::exists(filePath);
@@ -52,10 +54,18 @@ bool FileManager::createBackup(const QString &filePath) {
     if (!fileExists(filePath)) {
         return false;
     }
-    
+    // Ensure centralized backup directory exists under data/backup
+    QString filesDir = FilePathManager::getFilesDirectory();
+    QString backupsDir = QDir(filesDir).filePath("backup");
+    QDir dir;
+    if (!dir.exists(backupsDir)) {
+        dir.mkpath(backupsDir);
+    }
+
     QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
     QFileInfo fileInfo(filePath);
-    QString backupPath = fileInfo.path() + "/backup_" + timestamp + "_" + fileInfo.fileName();
-    
+    QString backupFileName = QString("backup_%1_%2").arg(timestamp, fileInfo.fileName());
+    QString backupPath = QDir(backupsDir).filePath(backupFileName);
+
     return QFile::copy(filePath, backupPath);
 }

@@ -6,6 +6,53 @@
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
+#include <QAbstractTableModel>
+#include <QFont>
+#include <algorithm>
+
+namespace {
+    class Top10Model : public QAbstractTableModel {
+    public:
+        Top10Model(std::vector<TopSachDTO> *data, QObject *parent=nullptr) : QAbstractTableModel(parent), m_data(data) {}
+        int rowCount(const QModelIndex &parent = QModelIndex()) const override { Q_UNUSED(parent); return m_data ? (int)m_data->size() : 0; }
+        int columnCount(const QModelIndex &parent = QModelIndex()) const override { Q_UNUSED(parent); return 6; }
+        QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override {
+            if (!m_data || !index.isValid()) return QVariant();
+            int r = index.row(); if (r < 0 || r >= (int)m_data->size()) return QVariant();
+            PTRDS book = (*m_data)[r].dauSach;
+            if (!book) return QVariant();
+            if (role == Qt::DisplayRole) {
+                switch (index.column()) {
+                case 0: return QString::number(r+1);
+                case 1: return QString::fromStdString(book->ISBN);
+                case 2: return QString::fromStdString(book->tenSach);
+                case 3: return QString::fromStdString(book->tacGia);
+                case 4: return QString::fromStdString(book->theLoai);
+                case 5: return book->soLuotMuon;
+                }
+            }
+            if (role == Qt::FontRole && (index.column() == 0 || index.column() == 5)) { QFont f; f.setBold(true); return f; }
+            if (role == Qt::ForegroundRole && index.column() == 5) return QBrush(QColor("#1BC5BD"));
+            return QVariant();
+        }
+        QVariant headerData(int section, Qt::Orientation orientation, int role=Qt::DisplayRole) const override {
+            if (orientation==Qt::Horizontal && role==Qt::DisplayRole) {
+                switch (section) {
+                case 0: return QStringLiteral("Hạng");
+                case 1: return QStringLiteral("ISBN");
+                case 2: return QStringLiteral("Tên Sách");
+                case 3: return QStringLiteral("Tác Giả");
+                case 4: return QStringLiteral("Thể Loại");
+                case 5: return QStringLiteral("Lượt Mượn");
+                }
+            }
+            return QAbstractTableModel::headerData(section, orientation, role);
+        }
+        void refresh() { beginResetModel(); endResetModel(); }
+    private:
+        std::vector<TopSachDTO> *m_data;
+    };
+}
 
 HopThoaiTop10::HopThoaiTop10(QWidget *cha) : QDialog(cha) {
     setWindowTitle("🏆 Top 10 Sách Mượn Nhiều Nhất");
@@ -29,16 +76,15 @@ void HopThoaiTop10::thieLapGiaoDien() {
     tieuDe->setAlignment(Qt::AlignCenter);
     boTriChinh->addWidget(tieuDe);
     
-    // Bảng top 10
-    bangTop10 = new QTableWidget();
-    bangTop10->setColumnCount(6);
-    bangTop10->setHorizontalHeaderLabels({"Hạng", "ISBN", "Tên Sách", "Tác Giả", "Thể Loại", "Lượt Mượn"});
-    
+    // Bảng top 10 (model/view)
+    bangTop10 = new QTableView();
+    modelTop10 = new Top10Model(&danhSachTop, this);
+    bangTop10->setModel(modelTop10);
     int fontSize = ResponsiveHelper::getScaledFontSize(13, screenSize);
     bangTop10->setStyleSheet(QString(
-        "QTableWidget { background-color: #1E1E2D; color: #FFFFFF; border: 2px solid #2B2B40; border-radius: 12px; font-size: %1px; }"
-        "QTableWidget::item { padding: 10px; }"
-        "QTableWidget::item:selected { background-color: #3699FF; }"
+        "QTableView { background-color: #1E1E2D; color: #FFFFFF; border: 2px solid #2B2B40; border-radius: 12px; font-size: %1px; }"
+        "QTableView::item { padding: 10px; }"
+        "QTableView::item:selected { background-color: #3699FF; }"
         "QHeaderView::section { background-color: #252534; color: #FFFFFF; padding: 12px; border: none; font-weight: bold; }"
     ).arg(fontSize));
     
@@ -79,46 +125,7 @@ void HopThoaiTop10::taiDuLieuTop10() {
     TopSachDTO topSach[10];
     int soLuong = LayTopSach(dsDauSach, soLuongDauSach, topSach);
     
-    bangTop10->setRowCount(soLuong);
-    
-    for (int i = 0; i < soLuong; i++) {
-        if (!topSach[i].dauSach) continue;
-        
-        // Hạng
-        QTableWidgetItem *itemHang = new QTableWidgetItem(QString::number(i + 1));
-        itemHang->setTextAlignment(Qt::AlignCenter);
-        if (i == 0) itemHang->setForeground(QBrush(QColor("#FFD700"))); // Vàng
-        else if (i == 1) itemHang->setForeground(QBrush(QColor("#C0C0C0"))); // Bạc
-        else if (i == 2) itemHang->setForeground(QBrush(QColor("#CD7F32"))); // Đồng
-        bangTop10->setItem(i, 0, itemHang);
-        
-        // ISBN
-        QTableWidgetItem *itemISBN = new QTableWidgetItem(QString::fromStdString(topSach[i].dauSach->ISBN));
-        bangTop10->setItem(i, 1, itemISBN);
-        
-        // Tên sách
-        QTableWidgetItem *itemTen = new QTableWidgetItem(QString::fromStdString(topSach[i].dauSach->tenSach));
-        itemTen->setFont(QFont("Segoe UI", 10, QFont::Bold));
-        bangTop10->setItem(i, 2, itemTen);
-        
-        // Tác giả
-        QTableWidgetItem *itemTacGia = new QTableWidgetItem(QString::fromStdString(topSach[i].dauSach->tacGia));
-        bangTop10->setItem(i, 3, itemTacGia);
-        
-        // Thể loại
-        QTableWidgetItem *itemTheLoai = new QTableWidgetItem(QString::fromStdString(topSach[i].dauSach->theLoai));
-        bangTop10->setItem(i, 4, itemTheLoai);
-        
-        // Lượt mượn
-        QTableWidgetItem *itemLuotMuon = new QTableWidgetItem(QString::number(topSach[i].dauSach->soLuotMuon));
-        itemLuotMuon->setTextAlignment(Qt::AlignCenter);
-        itemLuotMuon->setFont(QFont("Segoe UI", 11, QFont::Bold));
-        itemLuotMuon->setForeground(QBrush(QColor("#1BC5BD")));
-        bangTop10->setItem(i, 5, itemLuotMuon);
-    }
-    
-    // Thêm emoji cho 3 hàng đầu
-    if (soLuong > 0) bangTop10->item(0, 0)->setText("🥇");
-    if (soLuong > 1) bangTop10->item(1, 0)->setText("🥈");
-    if (soLuong > 2) bangTop10->item(2, 0)->setText("🥉");
+    danhSachTop.clear();
+    for (int i = 0; i < soLuong; ++i) if (topSach[i].dauSach) danhSachTop.push_back(topSach[i]);
+    if (modelTop10) { if (auto m = dynamic_cast<Top10Model*>(modelTop10)) m->refresh(); }
 }

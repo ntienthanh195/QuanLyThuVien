@@ -8,10 +8,20 @@
 #include "models/QuanLySach.h"
 #include "models/DocGia.h"
 #include "utils/PrintHelper.h"
+#include "utils/EventBus.h"
+#if defined(__has_include)
+#  if __has_include("utils/DBBatcher.h")
+#    include "utils/DBBatcher.h"
+#  endif
+#endif
+#include <QDateTime>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGridLayout>
-#include <QTableWidget>
+#include <QTableView>
+#include <QAbstractTableModel>
+#include <vector>
+#include <algorithm>
 #include <QHeaderView>
 #include <QScrollArea>
 #include <QFont>
@@ -19,6 +29,56 @@
 #include <QChart>
 #include <QInputDialog>
 #include <QMessageBox>
+
+namespace {
+    // File-local ActivityModel used by the dashboard activity view
+    struct GiaoDichInfoLocal { QString thoiGian; QString tenDocGia; QString tenSach; int trangThai; };
+    class ActivityModel : public QAbstractTableModel {
+    public:
+        using Item = GiaoDichInfoLocal;
+        ActivityModel(QObject *parent = nullptr) : QAbstractTableModel(parent) {}
+        int rowCount(const QModelIndex &parent = QModelIndex()) const override { Q_UNUSED(parent); return (int)m_items.size(); }
+        int columnCount(const QModelIndex &parent = QModelIndex()) const override { Q_UNUSED(parent); return 4; }
+        QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override {
+            if (!index.isValid()) return QVariant();
+            int r = index.row(); if (r < 0 || r >= (int)m_items.size()) return QVariant();
+            const Item &it = m_items[r];
+            if (role == Qt::DisplayRole) {
+                switch (index.column()) {
+                    case 0: return it.thoiGian;
+                    case 1: return it.tenDocGia;
+                    case 2: return it.tenSach;
+                    case 3: {
+                        if (it.trangThai == 0) return QString("● Mượn");
+                        if (it.trangThai == 1) return QString("✓ Trả");
+                        return QString("✕ Mất");
+                    }
+                }
+            }
+            if (role == Qt::ForegroundRole && index.column() == 3) {
+                if (it.trangThai == 0) return QColor("#fbbf24");
+                if (it.trangThai == 1) return QColor("#34d399");
+                return QColor("#f87171");
+            }
+            return QVariant();
+        }
+        QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override {
+            if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
+                switch (section) {
+                    case 0: return QStringLiteral("Thời gian");
+                    case 1: return QStringLiteral("Tên độc giả");
+                    case 2: return QStringLiteral("Tiêu đề sách");
+                    case 3: return QStringLiteral("Trạng thái");
+                }
+            }
+            return QAbstractTableModel::headerData(section, orientation, role);
+        }
+        void setList(const std::vector<Item> &list) { beginResetModel(); m_items = list; endResetModel(); }
+        void prepend(const Item &it) { beginResetModel(); m_items.insert(m_items.begin(), it); if (m_items.size() > 30) m_items.resize(30); endResetModel(); }
+    private:
+        std::vector<Item> m_items;
+    };
+}
 
 BangDieuKhien::BangDieuKhien(QWidget *cha) : QWidget(cha),
     labelSoLieuTongSach(nullptr),
@@ -32,6 +92,65 @@ BangDieuKhien::BangDieuKhien(QWidget *cha) : QWidget(cha),
     thieLapGiaoDien();
     qDebug() << "Hoàn thành thieLapGiaoDien, bỏ qua capNhatThongKe trong constructor";
     // KHÔNG gọi capNhatThongKe() ở đây - sẽ gọi sau khi window hiển thị
+
+    // Kết nối EventBus để nhận các sự kiện và ghi vào bảng Hoạt động gần đây
+    try {
+        connect(&EventBus::instance(), &EventBus::docGiaAdded, this, [this](int maThe){
+            QString msg = QString("Thêm độc giả: Mã thẻ %1").arg(maThe);
+            appendActivity(msg);
+            capNhatRealtimeTuWidget();
+        });
+        connect(&EventBus::instance(), &EventBus::docGiaUpdated, this, [this](int maThe){
+            QString msg = QString("Cập nhật độc giả: Mã thẻ %1").arg(maThe);
+            appendActivity(msg);
+            capNhatRealtimeTuWidget();
+        });
+        connect(&EventBus::instance(), &EventBus::docGiaRemoved, this, [this](int maThe){
+            QString msg = QString("Xóa độc giả: Mã thẻ %1").arg(maThe);
+            appendActivity(msg);
+            capNhatRealtimeTuWidget();
+        });
+
+        connect(&EventBus::instance(), &EventBus::dauSachAdded, this, [this](const QString &isbn){
+            QString msg = QString("Thêm đầu sách: %1").arg(isbn);
+            appendActivity(msg);
+            capNhatRealtimeTuWidget();
+        });
+        connect(&EventBus::instance(), &EventBus::dauSachUpdated, this, [this](const QString &isbn){
+            QString msg = QString("Cập nhật đầu sách: %1").arg(isbn);
+            appendActivity(msg);
+            capNhatRealtimeTuWidget();
+        });
+        connect(&EventBus::instance(), &EventBus::dauSachRemoved, this, [this](const QString &isbn){
+            QString msg = QString("Xóa đầu sách: %1").arg(isbn);
+            appendActivity(msg);
+            capNhatRealtimeTuWidget();
+        });
+
+        connect(&EventBus::instance(), &EventBus::muonTraAdded, this, [this](int maThe, const QString &maSach){
+            QString msg = QString("Mượn sách: Mã thẻ %1 - Mã sách %2").arg(maThe).arg(maSach);
+            appendActivity(msg);
+            capNhatRealtimeTuWidget();
+        });
+        connect(&EventBus::instance(), &EventBus::muonTraUpdated, this, [this](int maThe, const QString &maSach){
+            QString msg = QString("Cập nhật mượn/trả: Mã thẻ %1 - Mã sách %2").arg(maThe).arg(maSach);
+            appendActivity(msg);
+            capNhatRealtimeTuWidget();
+        });
+        connect(&EventBus::instance(), &EventBus::muonTraRemoved, this, [this](int maThe, const QString &maSach){
+            QString msg = QString("Xóa giao dịch mượn/trả: Mã thẻ %1 - Mã sách %2").arg(maThe).arg(maSach);
+            appendActivity(msg);
+            capNhatRealtimeTuWidget();
+        });
+
+        connect(&EventBus::instance(), &EventBus::dataChanged, this, [this](){
+            QString msg = QString("Dữ liệu bên ngoài thay đổi (import/backup/khác)");
+            appendActivity(msg);
+            capNhatRealtimeTuWidget();
+        });
+    } catch (...) {
+        qWarning() << "Không thể kết nối EventBus trong BangDieuKhien constructor";
+    }
 }
 
 BangDieuKhien::~BangDieuKhien() {}
@@ -367,7 +486,13 @@ void BangDieuKhien::capNhatRealtimeTuWidget() {
                 // Xây dựng lại danhSachGiaoDich giống như trong taoBangHoatDongGanDay
                 PTRDG dsDocGia[100];
                 int dem = 0;
+#if defined(__has_include) && __has_include("utils/DBBatcher.h")
+                std::vector<PTRDG> _tmp = DBBatcher::snapshotDocGia();
+                dem = static_cast<int>(std::min<size_t>(_tmp.size(), 100));
+                for (int _i = 0; _i < dem; ++_i) dsDocGia[_i] = _tmp[_i];
+#else
                 DuyetCayRaMang(rootDocGia, dsDocGia, dem);
+#endif
 
                 struct GiaoDichInfo { QString thoiGian; QString tenDocGia; QString tenSach; int trangThai; };
                 std::vector<GiaoDichInfo> danhSachGiaoDich;
@@ -405,28 +530,22 @@ void BangDieuKhien::capNhatRealtimeTuWidget() {
                     }
                 }
 
-                // Refresh table in-place: clear rows and repopulate
-                bangHoatDong->setRowCount(0);
+                // Build model data and set into modelHoatDong (if available)
                 int maxRows = qMin(9, (int)danhSachGiaoDich.size());
+                std::vector<GiaoDichInfoLocal> modelList;
+                modelList.reserve(maxRows);
                 for (int i = 0; i < maxRows; ++i) {
-                    int row = bangHoatDong->rowCount();
-                    bangHoatDong->insertRow(row);
-                    auto &gd = danhSachGiaoDich[i];
-                    bangHoatDong->setItem(row, 0, new QTableWidgetItem(gd.thoiGian));
-                    bangHoatDong->setItem(row, 1, new QTableWidgetItem(gd.tenDocGia));
-                    bangHoatDong->setItem(row, 2, new QTableWidgetItem(gd.tenSach));
-                    QTableWidgetItem *itemTrangThai = new QTableWidgetItem();
-                    if (gd.trangThai == 0) {
-                        itemTrangThai->setText("● Mượn");
-                        itemTrangThai->setForeground(QBrush(QColor("#fbbf24")));
-                    } else if (gd.trangThai == 1) {
-                        itemTrangThai->setText("✓ Trả");
-                        itemTrangThai->setForeground(QBrush(QColor("#34d399")));
-                    } else {
-                        itemTrangThai->setText("✕ Mất");
-                        itemTrangThai->setForeground(QBrush(QColor("#f87171")));
+                    GiaoDichInfoLocal it;
+                    it.thoiGian = danhSachGiaoDich[i].thoiGian;
+                    it.tenDocGia = danhSachGiaoDich[i].tenDocGia;
+                    it.tenSach = danhSachGiaoDich[i].tenSach;
+                    it.trangThai = danhSachGiaoDich[i].trangThai;
+                    modelList.push_back(it);
+                }
+                if (modelHoatDong) {
+                    if (auto am = dynamic_cast<ActivityModel*>(modelHoatDong)) {
+                        am->setList(modelList);
                     }
-                    bangHoatDong->setItem(row, 3, itemTrangThai);
                 }
             } catch (...) {
                 qWarning() << "Lỗi khi cập nhật bangHoatDong realtime";
@@ -444,6 +563,24 @@ void BangDieuKhien::capNhatRealtimeTuWidget() {
 
 void BangDieuKhien::capNhatBieuDo() {
     // Sẽ implement sau
+}
+
+void BangDieuKhien::appendActivity(const QString &text) {
+    if (!bangHoatDong) return;
+    QString ts = QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss");
+    // Best-effort: push into model if available
+    if (modelHoatDong) {
+        if (auto am = dynamic_cast<ActivityModel*>(modelHoatDong)) {
+            GiaoDichInfoLocal it;
+            it.thoiGian = ts;
+            it.tenDocGia = text;
+            it.tenSach = QString();
+            it.trangThai = 0;
+            am->prepend(it);
+            return;
+        }
+    }
+    // Fallback: nothing to do (view not ready)
 }
 
 void BangDieuKhien::xuLyNutQuanLySach() {
@@ -575,46 +712,43 @@ QWidget* BangDieuKhien::taoBangHoatDongGanDay() {
     headerLayout->addStretch();
     headerLayout->addWidget(nutMenu);
     
-    // Table
-    QTableWidget *bang = new QTableWidget();
-    // Keep pointer to table for realtime updates
-    this->bangHoatDong = bang;
-    bang->setColumnCount(4);
-    bang->setHorizontalHeaderLabels({"Thời gian", "Tên độc giả", "Tiêu đề sách", "Trạng thái"});
-    bang->horizontalHeader()->setStretchLastSection(false);
-    bang->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
-    bang->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
-    bang->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
-    bang->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
-    bang->verticalHeader()->setVisible(false);
-    bang->setSelectionBehavior(QAbstractItemView::SelectRows);
-    bang->setSelectionMode(QAbstractItemView::SingleSelection);
-    bang->setShowGrid(false);
-    bang->setAlternatingRowColors(true);
-    
-    bang->setStyleSheet(
-        "QTableWidget {"
+    // Table (model/view)
+    QTableView *view = new QTableView();
+    this->bangHoatDong = view;
+    view->setSelectionBehavior(QAbstractItemView::SelectRows);
+    view->setSelectionMode(QAbstractItemView::SingleSelection);
+    view->setShowGrid(false);
+    view->setAlternatingRowColors(true);
+    view->verticalHeader()->setVisible(false);
+    view->horizontalHeader()->setStretchLastSection(false);
+    view->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+    view->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    view->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
+    view->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
+
+    view->setStyleSheet(
+        "QTableView {"
         "    background-color: #1e2230;"
         "    border: none;"
         "    gridline-color: #2d3140;"
         "    font-size: 13px;"
         "}"
-        "QTableWidget::item {"
+        "QTableView::item {"
         "    padding: 12px 10px;"
         "    color: #E0E0E0;"
         "    border-bottom: 1px solid #252830;"
         "}"
-        "QTableWidget::item:alternate {"
+        "QTableView::item:alternate {"
         "    background-color: #252830;"
         "}"
-        "QTableWidget::item:hover {"
+        "QTableView::item:hover {"
         "    background-color: rgba(0, 120, 212, 0.08);"
         "}"
-        "QTableWidget::item:selected {"
+        "QTableView::item:selected {"
         "    background-color: #2d5f8d;"
         "    color: #ffffff;"
         "}"
-        "QTableWidget::item:alternate:selected {"
+        "QTableView::item:alternate:selected {"
         "    background-color: #2d5f8d;"
         "    color: #ffffff;"
         "}"
@@ -713,36 +847,27 @@ QWidget* BangDieuKhien::taoBangHoatDongGanDay() {
             }
         }
         
-        // Hiển thị 9 giao dịch gần nhất
+        // Build model data and attach to view
         int maxRows = qMin(9, (int)danhSachGiaoDich.size());
-        for (int i = 0; i < maxRows; i++) {
-            bang->insertRow(soHang);
-            auto& gd = danhSachGiaoDich[i];
-
-            bang->setItem(soHang, 0, new QTableWidgetItem(gd.thoiGian));
-            bang->setItem(soHang, 1, new QTableWidgetItem(gd.tenDocGia));
-            bang->setItem(soHang, 2, new QTableWidgetItem(gd.tenSach));
-
-            // Tạo badge cho trạng thái
-            QTableWidgetItem *itemTrangThai = new QTableWidgetItem();
-            if (gd.trangThai == 0) {
-                itemTrangThai->setText("● Mượn");
-                itemTrangThai->setForeground(QBrush(QColor("#fbbf24")));
-            } else if (gd.trangThai == 1) {
-                itemTrangThai->setText("✓ Trả");
-                itemTrangThai->setForeground(QBrush(QColor("#34d399")));
-            } else {
-                itemTrangThai->setText("✕ Mất");
-                itemTrangThai->setForeground(QBrush(QColor("#f87171")));
-            }
-            bang->setItem(soHang, 3, itemTrangThai);
-
-            soHang++;
+        std::vector<GiaoDichInfoLocal> modelList;
+        modelList.reserve(maxRows);
+        for (int i = 0; i < maxRows; ++i) {
+            GiaoDichInfoLocal it;
+            it.thoiGian = danhSachGiaoDich[i].thoiGian;
+            it.tenDocGia = danhSachGiaoDich[i].tenDocGia;
+            it.tenSach = danhSachGiaoDich[i].tenSach;
+            it.trangThai = danhSachGiaoDich[i].trangThai;
+            modelList.push_back(it);
         }
+
+        ActivityModel *model = new ActivityModel(this);
+        model->setList(modelList);
+        this->modelHoatDong = model;
+        view->setModel(model);
     }
     
     boTri->addWidget(header);
-    boTri->addWidget(bang);
+    boTri->addWidget(view);
     
     return khung;
 }
