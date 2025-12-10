@@ -15,6 +15,7 @@
 #include <QShortcut>
 #include <QItemSelectionModel>
 #include "models/DocGia.h"
+#include "views/BadgeStyledItemDelegate.h"
 #include <vector>
 
 class ReaderTableModel : public QAbstractTableModel {
@@ -111,6 +112,7 @@ private:
     QShortcut *shortcutEdit;
     QShortcut *shortcutDelete;
     QShortcut *shortcutRefresh;
+    BadgeStyledItemDelegate *badgeDelegate;
     
     // TAB 2: Độc giả quá hạn
     QWidget *tabQuaHan;

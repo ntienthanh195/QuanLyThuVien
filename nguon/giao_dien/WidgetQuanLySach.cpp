@@ -108,7 +108,7 @@ public:
 
 // Local helper fallback: lấy danh sách PTRDMS cho một ISBN bằng API cũ.
 // Việc này giúp file trong `nguon/` biên dịch độc lập khi include chung chưa sẵn sàng.
-static std::vector<PTRDMS> local_layBanSaoTheoISBN_fallback(const std::string &isbn) {
+[[maybe_unused]] static std::vector<PTRDMS> local_layBanSaoTheoISBN_fallback(const std::string &isbn) {
     std::vector<PTRDMS> out;
     // dự đoán số lượng tối đa
     PTRDMS buf[MAX_BAN_SAO];
@@ -124,7 +124,7 @@ WidgetQuanLySach::WidgetQuanLySach(QWidget *cha)
     setStyleSheet(
         "QWidget#WidgetQuanLySach {"
         "    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
-        "        stop:0 #1a1d29, stop:0.5 #1e2230, stop:1 #1a1d29);"
+        "        stop:0 #1a1d23, stop:0.5 #242933, stop:1 #1a1d23);"
         "}"
     );
     setObjectName("WidgetQuanLySach");
@@ -196,11 +196,27 @@ void WidgetQuanLySach::thieLapHeaderBar() {
         QPushButton *btn = new QPushButton(icon + " " + text);
         btn->setFixedHeight(36);
         btn->setMinimumWidth(110);
-        
-        // Simple hover/pressed colors
-        QString hoverColor = (color == "#0078D4") ? "#106EBE" : "#3E3E42";
-        QString pressedColor = (color == "#0078D4") ? "#005A9E" : "#2D2D30";
-        
+
+        // Map legacy gray token to navy palette for consistency
+        QString base = color;
+        if (color.compare("#2D2D30", Qt::CaseInsensitive) == 0) {
+            base = "#242933"; // neutral dark slate surface for buttons
+        }
+
+        // Simple hover/pressed colors (keep accents for primary / danger)
+        QString hoverColor;
+        QString pressedColor;
+        if (base.compare("#3B82F6", Qt::CaseInsensitive) == 0 || base.compare("#0078D4", Qt::CaseInsensitive) == 0) {
+            hoverColor = "#3a7bc8";
+            pressedColor = "#2a5a8a";
+        } else if (base.compare("#C42B1C", Qt::CaseInsensitive) == 0) {
+            hoverColor = "#f56565";
+            pressedColor = "#fc8181";
+        } else {
+            hoverColor = "#2d3541";  // subtle hover for neutral
+            pressedColor = "#1a1d23"; // darker on press
+        }
+
         btn->setStyleSheet(QString(
             "QPushButton {"
             "    background-color: %1;"
@@ -217,7 +233,7 @@ void WidgetQuanLySach::thieLapHeaderBar() {
             "QPushButton:pressed {"
             "    background-color: %3;"
             "}"
-        ).arg(color, hoverColor, pressedColor));
+        ).arg(base, hoverColor, pressedColor));
         return btn;
     };
     
@@ -226,16 +242,16 @@ void WidgetQuanLySach::thieLapHeaderBar() {
     nutNhapFile = createButton("⇩", "Nhập Excel", "#2D2D30");
     nutNhapFile->setStyleSheet(
         "QPushButton {"
-        "    background-color: #2D2D30;"
-        "    color: #CCCCCC;"
-        "    border: 1px solid #3E3E42;"
+        "    background-color: #242933;"
+        "    color: #E2E8F0;"
+        "    border: 1px solid #151820;"
         "    border-radius: 4px;"
         "    font-size: 13px;"
         "    padding: 0 16px;"
         "}"
         "QPushButton:hover {"
-        "    background-color: #3E3E42;"
-        "    border: 1px solid #0078D4;"
+        "    background-color: #2d3541;"
+        "    border: 1px solid #4A90E2;"
         "}"
     );
     
@@ -286,16 +302,16 @@ void WidgetQuanLySach::thieLapTimKiem() {
     oNhapTimKiem->setFixedHeight(36);
     oNhapTimKiem->setStyleSheet(
         "QLineEdit {"
-        "    background-color: #252830;"
+        "    background-color: #1a1d23;"
         "    color: #E0E0E0;"
-        "    border: 1px solid #3E4451;"
+        "    border: 1px solid #151820;"
         "    border-radius: 5px;"
         "    padding: 0 12px;"
         "    font-size: 13px;"
         "}"
         "QLineEdit:focus {"
-        "    border: 1px solid #0078D4;"
-        "    background-color: #1E1E1E;"
+        "    border: 1px solid #4A90E2;"
+        "    background-color: #1a1d23;"
         "}"
     );
     
@@ -305,15 +321,15 @@ void WidgetQuanLySach::thieLapTimKiem() {
     hopChonTheLoai->setFixedHeight(36);
     hopChonTheLoai->setStyleSheet(
         "QComboBox {"
-        "    background-color: #252830;"
+        "    background-color: #1a1d23;"
         "    color: #E0E0E0;"
-        "    border: 1px solid #3E4451;"
+        "    border: 1px solid #151820;"
         "    border-radius: 5px;"
         "    padding: 0 12px;"
         "    font-size: 13px;"
         "}"
         "QComboBox:hover {"
-        "    border: 1px solid #0078D4;"
+        "    border: 1px solid #4A90E2;"
         "}"
         "QComboBox::drop-down {"
         "    border: none;"
@@ -323,15 +339,15 @@ void WidgetQuanLySach::thieLapTimKiem() {
         "    image: none;"
         "    border-left: 4px solid transparent;"
         "    border-right: 4px solid transparent;"
-        "    border-top: 5px solid #858585;"
+        "    border-top: 5px solid #8A9AA8;"
         "    margin-right: 5px;"
         "}"
         "QComboBox QAbstractItemView {"
-        "    background-color: #252526;"
+        "    background-color: #242933;"
         "    color: #CCCCCC;"
-        "    selection-background-color: #37373D;"
+        "    selection-background-color: #4A90E2;"
         "    selection-color: #CCCCCC;"
-        "    border: 1px solid #3E3E42;"
+        "    border: 1px solid #151820;"
         "    padding: 4px;"
         "}"
     );
@@ -342,12 +358,12 @@ void WidgetQuanLySach::thieLapTimKiem() {
     hopChonTrangThai->setStyleSheet(hopChonTheLoai->styleSheet());
     
     // Search button
-    nutTimKiem = new QPushButton("🔍 Tìm");
+    nutTimKiem = new QPushButton("Tìm");
     nutTimKiem->setFixedHeight(36);
     nutTimKiem->setFixedWidth(80);
     nutTimKiem->setStyleSheet(
         "QPushButton {"
-        "    background-color: #0078D4;"
+        "    background-color: #5ba3f5;"
         "    color: white;"
         "    border: none;"
         "    border-radius: 4px;"
@@ -355,28 +371,28 @@ void WidgetQuanLySach::thieLapTimKiem() {
         "    font-weight: 500;"
         "}"
         "QPushButton:hover {"
-        "    background-color: #106EBE;"
+        "    background-color: #4a93e3;"
         "}"
         "QPushButton:pressed {"
-        "    background-color: #005A9E;"
+        "    background-color: #3d7dc4;"
         "}"
     );
     
     // Refresh button
-    nutLamMoi = new QPushButton("🔄 Làm mới");
+    nutLamMoi = new QPushButton("Làm mới");
     nutLamMoi->setFixedHeight(36);
     nutLamMoi->setFixedWidth(100);
     nutLamMoi->setStyleSheet(
         "QPushButton {"
-        "    background-color: #2D2D30;"
+        "    background-color: #242933;"
         "    color: #CCCCCC;"
-        "    border: 1px solid #3E3E42;"
+        "    border: 1px solid #151820;"
         "    border-radius: 4px;"
         "    font-size: 13px;"
         "}"
         "QPushButton:hover {"
-        "    background-color: #3E3E42;"
-        "    border: 1px solid #0078D4;"
+        "    background-color: #2d3541;"
+        "    border: 1px solid #4A90E2;"
         "}"
     );
     
@@ -412,56 +428,8 @@ void WidgetQuanLySach::thieLapBangSach() {
     bangSach->setSelectionMode(QAbstractItemView::SingleSelection);
     bangSach->setAlternatingRowColors(true);
     
-    // Natural color table styling
-    bangSach->setStyleSheet(
-        "QTableWidget {"
-        "    background-color: #1e2230;"
-        "    color: #E0E0E0;"
-        "    gridline-color: #2d3140;"
-        "    border: 1px solid #3E4451;"
-        "    border-radius: 6px;"
-        "    font-size: 12px;"
-        "}"
-        "QTableWidget::item {"
-        "    padding: 10px 8px;"
-        "    border-bottom: 1px solid #252830;"
-        "}"
-        "QTableWidget::item:selected {"
-        "    background-color: #2d5f8d;"
-        "    color: #FFFFFF;"
-        "}"
-        "QTableWidget::item:alternate {"
-        "    background-color: #252830;"
-        "}"
-        "QTableWidget::item:alternate:selected {"
-        "    background-color: #2d5f8d;"
-        "    color: #FFFFFF;"
-        "}"
-        "QHeaderView::section {"
-        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-        "        stop:0 #2d3140, stop:1 #252830);"
-        "    color: #E0E0E0;"
-        "    padding: 11px 8px;"
-        "    border: none;"
-        "    border-right: 1px solid #3E4451;"
-        "    border-bottom: 2px solid #3E4451;"
-        "    font-weight: 600;"
-        "    font-size: 12px;"
-        "}"
-        "QTableWidget QScrollBar:vertical {"
-        "    background: #1E1E1E;"
-        "    width: 12px;"
-        "    border: none;"
-        "}"
-        "QTableWidget QScrollBar::handle:vertical {"
-        "    background: #3E3E42;"
-        "    border-radius: 6px;"
-        "    min-height: 20px;"
-        "}"
-        "QTableWidget QScrollBar::handle:vertical:hover {"
-        "    background: #4E4E52;"
-        "}"
-    );
+    // Use centralized InnerTable styling defined in resources/modern-dashboard.qss
+    bangSach->setProperty("class", "InnerTable");
     
     // Set column widths
     bangSach->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
@@ -515,8 +483,8 @@ void WidgetQuanLySach::thieLapNutChucNang() {
     int padding = ResponsiveHelper::getScaledSpacing(15, screenSize);
     nhomChucNang->setStyleSheet(QString(
         "QGroupBox {"
-        "    background-color: #1E1E2D;"
-        "    border: 1px solid #2B2B40;"
+        "    background-color: #242933;"
+        "    border: 1px solid #151820;"
         "    border-radius: 12px;"
         "    padding: %1px;"
         "    font-size: 14px;"
@@ -560,14 +528,14 @@ void WidgetQuanLySach::thieLapNutChucNang() {
     
     QString kieuSuaSach = QString(
         "QPushButton {"
-        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #3699FF, stop:1 #1565c0);"
+        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #4A90E2, stop:1 #2a5a8a);"
         "    color: white; border: none; border-radius: 8px;"
         "    padding: %1px 25px; font-weight: bold; font-size: %2px;"
         "}"
         "QPushButton:hover {"
-        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #187DE4, stop:1 #0d47a1);"
+        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #3a7bc8, stop:1 #2a5a8a);"
         "}"
-        "QPushButton:disabled { background-color: #2B2B40; color: #6C6C80; }"
+        "QPushButton:disabled { background-color: #242933; color: #6C6C80; }"
     ).arg(buttonPadding).arg(fontSize);
     
     QString kieuXoaSach = QString(

@@ -111,7 +111,7 @@ void WidgetBangDieuKhien::taoKhungCanhBao() {
     fontPhan.setPointSize(18);
     fontPhan.setBold(true);
     tieuDePhan->setFont(fontPhan);
-    tieuDePhan->setStyleSheet("color: #F1F5F9; margin-top: 8px; margin-bottom: 12px; background: transparent;");
+    tieuDePhan->setProperty("class", "SectionTitle");
     layoutChinh->addWidget(tieuDePhan);
     
     // Layout ngang cho 2 card cảnh báo
@@ -120,13 +120,7 @@ void WidgetBangDieuKhien::taoKhungCanhBao() {
     
     // Card 1: Sách quá hạn - tạo card với placeholder, sẽ cập nhật sau
     cardSachQuaHan = new QWidget(this);
-    cardSachQuaHan->setStyleSheet(
-        "QWidget { "
-        "  background: #1E1E2D;"
-        "  border-radius: 12px; "
-        "  border-left: 4px solid #EF4444;"
-        "}"
-    );
+    cardSachQuaHan->setProperty("class", "AlertCardDanger");
     cardSachQuaHan->setMinimumHeight(120);
     
     QGraphicsDropShadowEffect *shadow1 = new QGraphicsDropShadowEffect();
@@ -142,7 +136,7 @@ void WidgetBangDieuKhien::taoKhungCanhBao() {
     
     // Icon
     QWidget *iconWidget1 = new QWidget();
-    iconWidget1->setStyleSheet("QWidget { background-color: #FEE2E2; border-radius: 12px; border: none; }");
+    iconWidget1->setProperty("class", "IconWidgetDanger");
     iconWidget1->setFixedSize(64, 64);
     QVBoxLayout *iconLayout1 = new QVBoxLayout(iconWidget1);
     iconLayout1->setContentsMargins(0, 0, 0, 0);
@@ -152,7 +146,7 @@ void WidgetBangDieuKhien::taoKhungCanhBao() {
     iconFont1.setBold(true);
     iconLabel1->setFont(iconFont1);
     iconLabel1->setAlignment(Qt::AlignCenter);
-    iconLabel1->setStyleSheet("background: transparent; border: none; color: #DC2626;");
+    iconLabel1->setProperty("class", "IconLabelDanger");
     iconLayout1->addWidget(iconLabel1);
     
     // Content
@@ -164,20 +158,14 @@ void WidgetBangDieuKhien::taoKhungCanhBao() {
     fontTieuDe1.setPointSize(15);
     fontTieuDe1.setBold(true);
     labelSachQuaHan->setFont(fontTieuDe1);
-    labelSachQuaHan->setStyleSheet("color: #EF4444; background: transparent;");
+    labelSachQuaHan->setProperty("class", "DangerStat");
     
     labelMoTaSachQuaHan = new QLabel("Đang kiểm tra dữ liệu...");
     labelMoTaSachQuaHan->setWordWrap(true);
-    labelMoTaSachQuaHan->setStyleSheet("color: #A0A0B0; font-size: 12px; background: transparent;");
+    labelMoTaSachQuaHan->setProperty("class", "CardDescription");
     
     btnXemSachQuaHan = new QPushButton("Xem chi tiết");
-    btnXemSachQuaHan->setStyleSheet(
-        "QPushButton {"
-        "  background: #3B82F6; color: white; border: none; border-radius: 6px;"
-        "  padding: 8px 16px; font-weight: 600; font-size: 12px;"
-        "}"
-        "QPushButton:hover { background: #2563EB; }"
-    );
+    btnXemSachQuaHan->setProperty("class", "Primary");
     btnXemSachQuaHan->setCursor(Qt::PointingHandCursor);
     connect(btnXemSachQuaHan, &QPushButton::clicked, this, [this]() {
         emit yeuCauXemChiTiet("sachQuaHan");
@@ -193,13 +181,7 @@ void WidgetBangDieuKhien::taoKhungCanhBao() {
     
     // Card 2: Thẻ sắp hết hạn
     cardTheSapHet = new QWidget(this);
-    cardTheSapHet->setStyleSheet(
-        "QWidget { "
-        "  background: #1E1E2D;"
-        "  border-radius: 12px; "
-        "  border-left: 4px solid #F59E0B;"
-        "}"
-    );
+    cardTheSapHet->setProperty("class", "AlertCardWarning");
     cardTheSapHet->setMinimumHeight(120);
     
     QGraphicsDropShadowEffect *shadow2 = new QGraphicsDropShadowEffect();
@@ -215,7 +197,7 @@ void WidgetBangDieuKhien::taoKhungCanhBao() {
     
     // Icon
     QWidget *iconWidget2 = new QWidget();
-    iconWidget2->setStyleSheet("QWidget { background-color: #FEF3C7; border-radius: 12px; border: none; }");
+    iconWidget2->setProperty("class", "IconWidgetWarning");
     iconWidget2->setFixedSize(64, 64);
     QVBoxLayout *iconLayout2 = new QVBoxLayout(iconWidget2);
     iconLayout2->setContentsMargins(0, 0, 0, 0);
@@ -370,7 +352,7 @@ QWidget* WidgetBangDieuKhien::taoCardCanhBao(const QString &tieuDe, const QStrin
     // Card với nền tối và border màu
     card->setStyleSheet(QString(
         "QWidget { "
-        "  background: #1E1E2D;"
+        "  background: #071233;"
         "  border-radius: 12px; "
         "  border-left: 4px solid %1;"
         "}"
@@ -469,9 +451,9 @@ QWidget* WidgetBangDieuKhien::taoCardThongKe(const QString &icon, const QString 
     // Card với nền tối
     card->setStyleSheet(
         "QWidget {"
-        "  background: #1E1E2D;"
+        "  background: #071233;"
         "  border-radius: 12px;"
-        "  border: 1px solid #2B2B40;"
+        "  border: 1px solid #08314f;"
         "}"
     );
     

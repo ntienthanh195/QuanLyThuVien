@@ -100,6 +100,15 @@ private:
 
 WidgetQuanLyDocGia::WidgetQuanLyDocGia(QWidget *cha) 
     : QWidget(cha), docGiaDangChon(nullptr), maTheDangChon(-1) {
+    // Apply same overall background and object name as the book management UI
+    setStyleSheet(
+        "QWidget#WidgetQuanLyDocGia {"
+        "    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+        "        stop:0 #071233, stop:0.5 #08283d, stop:1 #071233);"
+        "}"
+    );
+    setObjectName("WidgetQuanLyDocGia");
+
     thieLapGiaoDien();
     taiLaiDanhSach();
 
@@ -142,86 +151,192 @@ void WidgetQuanLyDocGia::thieLapGiaoDien() {
     layoutTieuDe->addStretch();
     boTriChinh->addLayout(layoutTieuDe);
     
+    // Header action bar (match style & behavior of WidgetQuanLySach)
+    {
+        QWidget *headerBar = new QWidget();
+        headerBar->setStyleSheet("QWidget { background: transparent; }");
+        QHBoxLayout *hLayout = new QHBoxLayout(headerBar);
+        hLayout->setContentsMargins(0,0,0,0);
+        hLayout->setSpacing(12);
+
+        auto createButton = [](const QString &icon, const QString &text, const QString &color) -> QPushButton* {
+            QPushButton *btn = new QPushButton(icon + " " + text);
+            btn->setFixedHeight(30);
+            btn->setMinimumWidth(90);
+            // Map legacy neutral gray to navy surface
+            QString base = color;
+            if (color.compare("#2D2D30", Qt::CaseInsensitive) == 0) base = "#08283d";
+            QString hoverColor;
+            QString pressedColor;
+            if (base.compare("#0078D4", Qt::CaseInsensitive) == 0) {
+                hoverColor = "#106EBE"; pressedColor = "#005A9E";
+            } else if (base.compare("#C42B1C", Qt::CaseInsensitive) == 0) {
+                hoverColor = "#A32218"; pressedColor = "#8A1A12";
+            } else {
+                hoverColor = "#08314f"; pressedColor = "#041726";
+            }
+            btn->setStyleSheet(QString(
+                "QPushButton { background-color: %1; color: white; border: none; border-radius: 4px; font-size: 12px; font-weight: 500; padding: 0 10px; }"
+                "QPushButton:hover { background-color: %2; }"
+                "QPushButton:pressed { background-color: %3; }"
+            ).arg(base, hoverColor, pressedColor));
+            return btn;
+        };
+
+        // assign header buttons to member variables so they replace bottom duplicates
+        nutThemDocGia = createButton("+", "Thêm Độc Giả", "#0078D4");
+        nutNhapFile = createButton("⇩", "Nhập Excel", "#2D2D30");
+        nutNhapFile->setStyleSheet(
+            "QPushButton { background-color: #08283d; color: #E0E0E0; border: 1px solid #08314f; border-radius: 4px; font-size: 13px; padding: 0 16px; }"
+            "QPushButton:hover { background-color: #08314f; border: 1px solid #1076C9; }"
+        );
+        // header In and Chi Tiết stored as members so we can enable/disable them
+        nutHeaderIn = createButton("⎙", "In", "#2D2D30");
+        nutHeaderIn->setStyleSheet(nutNhapFile->styleSheet());
+        nutSuaDocGia = createButton("✏", "Sửa", "#2D2D30");
+        nutSuaDocGia->setStyleSheet(nutNhapFile->styleSheet());
+        nutHeaderChiTiet = createButton("ⓘ", "Chi Tiết", "#2D2D30");
+        nutHeaderChiTiet->setStyleSheet(nutNhapFile->styleSheet());
+        // Add header lock/unlock/history buttons (these will replace bottom duplicates)
+        nutHeaderKhoa = createButton("🔒", "Khóa Thẻ", "#2D2D30");
+        nutHeaderKhoa->setStyleSheet(nutNhapFile->styleSheet());
+        nutHeaderMoKhoa = createButton("🔓", "Mở Khóa", "#2D2D30");
+        nutHeaderMoKhoa->setStyleSheet(nutNhapFile->styleSheet());
+        nutHeaderLichSu = createButton("⎘", "Lịch Sử", "#2D2D30");
+        nutHeaderLichSu->setStyleSheet(nutNhapFile->styleSheet());
+        nutXoaDocGia = createButton("✖", "Xóa", "#C42B1C");
+
+        hLayout->addWidget(nutThemDocGia);
+        hLayout->addWidget(nutNhapFile);
+        hLayout->addWidget(nutHeaderIn);
+        hLayout->addWidget(nutSuaDocGia);
+        hLayout->addWidget(nutHeaderChiTiet);
+        hLayout->addWidget(nutHeaderKhoa);
+        hLayout->addWidget(nutHeaderMoKhoa);
+        hLayout->addWidget(nutHeaderLichSu);
+        hLayout->addWidget(nutXoaDocGia);
+        hLayout->addStretch();
+
+        boTriChinh->addWidget(headerBar);
+
+        // Connect a subset to existing slots
+        connect(nutThemDocGia, &QPushButton::clicked, this, &WidgetQuanLyDocGia::xuLyNutThemDocGia);
+        connect(nutSuaDocGia, &QPushButton::clicked, this, &WidgetQuanLyDocGia::xuLyNutSuaDocGia);
+        connect(nutXoaDocGia, &QPushButton::clicked, this, &WidgetQuanLyDocGia::xuLyNutXoaDocGia);
+        connect(nutNhapFile, &QPushButton::clicked, this, &WidgetQuanLyDocGia::xuLyNhapDuLieuTu);
+        // Header: In -> try to delegate to main window (CuaSoChinh::hienThiIn)
+        connect(nutHeaderIn, &QPushButton::clicked, this, [this]() {
+            QWidget *w = this->window();
+            if (!w) { QMessageBox::warning(this, "In", "Không tìm thấy cửa sổ chính để thực hiện in."); return; }
+            // Try to call hienThiIn on parent main window via meta-object
+            if (!QMetaObject::invokeMethod(w, "hienThiIn")) {
+                QMessageBox::information(this, "In", "Chức năng in chưa được hỗ trợ ở đây.");
+            }
+        });
+        // Header: Chi Tiết -> open edit dialog same as double-click
+        connect(nutHeaderChiTiet, &QPushButton::clicked, this, [this]() {
+            if (!docGiaDangChon) { QMessageBox::warning(this, "Chi Tiết", "Vui lòng chọn một độc giả!"); return; }
+            HopThoaiSuaDocGia *dialog = new HopThoaiSuaDocGia(docGiaDangChon->data.MaThe, this);
+            dialog->exec();
+            delete dialog;
+            taiLaiDanhSach();
+        });
+        // Header: Khóa / Mở Khóa / Lịch Sử -> connect to existing handlers
+        connect(nutHeaderKhoa, &QPushButton::clicked, this, &WidgetQuanLyDocGia::xuLyNutKhoaThe);
+        connect(nutHeaderMoKhoa, &QPushButton::clicked, this, &WidgetQuanLyDocGia::xuLyNutMoKhoaThe);
+        connect(nutHeaderLichSu, &QPushButton::clicked, this, &WidgetQuanLyDocGia::xuLyNutXemLichSu);
+    }
+
     thieLapTimKiem();
     thieLapBangDocGia();
-    thieLapNutChucNang();
     
     qDebug() << "WidgetQuanLyDocGia: Responsive layout applied";
 }
 
 void WidgetQuanLyDocGia::thieLapTimKiem() {
-    nhomTimKiem = new QGroupBox("  Tìm Kiếm & Lọc");
-    nhomTimKiem->setStyleSheet(
-        "QGroupBox { background-color: #1E1E2D; border: 1px solid #2B2B40; "
-        "border-radius: 12px; padding: 15px; font-size: 14px; font-weight: bold; color: #FFFFFF; }"
-        "QLineEdit { background-color: #2B2B40; border: 1px solid #3F3F55; border-radius: 8px; "
-        "padding: 8px 12px; color: #FFFFFF; font-size: 13px; }"
-        "QLineEdit:focus { border: 2px solid #3699FF; background-color: #1E1E2D; }"
-        "QComboBox { background-color: #2B2B40; border: 1px solid #3F3F55; border-radius: 8px; "
-        "padding: 8px 12px; color: #FFFFFF; font-size: 13px; }"
-        "QComboBox:focus { border: 2px solid #3699FF; }"
-        "QComboBox::drop-down { border: none; width: 30px; }"
-        "QComboBox::down-arrow { image: url(:/icons/filter.svg); width: 12px; height: 12px; }"
-    );
-    
-    QHBoxLayout *boTri = new QHBoxLayout(nhomTimKiem);
-    
+    // Make search bar visually identical to the book management search bar
+    QWidget *searchBar = new QWidget();
+    searchBar->setStyleSheet("QWidget { background: transparent; }");
+    QHBoxLayout *layout = new QHBoxLayout(searchBar);
+    layout->setContentsMargins(0,0,0,0);
+    layout->setSpacing(10);
+
     oNhapTimKiem = new QLineEdit();
     oNhapTimKiem->setPlaceholderText("Nhập mã thẻ, họ, tên...");
-    oNhapTimKiem->setMinimumHeight(40);
-    
+    oNhapTimKiem->setFixedHeight(32);
+    oNhapTimKiem->setStyleSheet(
+        "QLineEdit {"
+        "    background-color: #08283d;"
+        "    color: #E0E0E0;"
+        "    border: 1px solid #08314f;"
+        "    border-radius: 5px;"
+        "    padding: 0 12px;"
+        "    font-size: 13px;"
+        "}"
+        "QLineEdit:focus {"
+        "    border: 1px solid #1076C9;"
+        "    background-color: #071233;"
+        "}"
+    );
+
     hopChonTrangThai = new QComboBox();
     hopChonTrangThai->addItems({"Tất cả", "Hoạt động", "Bị khóa"});
-    hopChonTrangThai->setMinimumHeight(40);
-    
+    hopChonTrangThai->setFixedHeight(32);
+    hopChonTrangThai->setStyleSheet(
+        "QComboBox { background-color: #08283d; color: #E0E0E0; border: 1px solid #08314f; border-radius: 5px; padding: 0 12px; font-size: 13px; }"
+        "QComboBox:hover { border: 1px solid #1076C9; }"
+        "QComboBox::drop-down { border: none; width: 20px; }"
+    );
+
     hopChonGioiTinh = new QComboBox();
     hopChonGioiTinh->addItems({"Tất cả giới tính", "Nam", "Nữ"});
-    hopChonGioiTinh->setMinimumHeight(40);
-    
-    nutTimKiem = new QPushButton();
-    nutTimKiem->setIcon(QIcon(":/icons/search.svg"));
-    nutTimKiem->setText(" Tìm");
-    nutTimKiem->setIconSize(QSize(18, 18));
-    nutTimKiem->setMinimumHeight(40);
-    nutTimKiem->setMinimumWidth(100);
+    hopChonGioiTinh->setFixedHeight(32);
+    hopChonGioiTinh->setStyleSheet(hopChonTrangThai->styleSheet());
+
+    nutTimKiem = new QPushButton("Tìm");
+    nutTimKiem->setFixedHeight(32);
+    nutTimKiem->setFixedWidth(72);
     nutTimKiem->setStyleSheet(
-        "QPushButton { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-        "stop:0 #3699FF, stop:1 #187DE4); color: white; border: none; "
-        "border-radius: 8px; font-weight: bold; padding: 8px 16px; }"
-        "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-        "stop:0 #187DE4, stop:1 #0C5EBF); }"
-        "QPushButton:pressed { background: #0C5EBF; }"
+        "QPushButton {"
+        "    background-color: #0078D4;"
+        "    color: white;"
+        "    border: none;"
+        "    border-radius: 4px;"
+        "    font-size: 13px;"
+        "    font-weight: 500;"
+        "}"
+        "QPushButton:hover { background-color: #106EBE; }"
+        "QPushButton:pressed { background-color: #005A9E; }"
     );
-    
-    nutLamMoi = new QPushButton();
-    nutLamMoi->setIcon(QIcon(":/icons/refresh.svg"));
-    nutLamMoi->setText(" Làm mới");
-    nutLamMoi->setIconSize(QSize(18, 18));
-    nutLamMoi->setMinimumHeight(40);
-    nutLamMoi->setMinimumWidth(100);
+
+    nutLamMoi = new QPushButton("Làm mới");
+    nutLamMoi->setFixedHeight(32);
+    nutLamMoi->setFixedWidth(86);
     nutLamMoi->setStyleSheet(
-        "QPushButton { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-        "stop:0 #1BC5BD, stop:1 #0D9488); color: white; border: none; "
-        "border-radius: 8px; font-weight: bold; padding: 8px 16px; }"
-        "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-        "stop:0 #0D9488, stop:1 #0A7368); }"
-        "QPushButton:pressed { background: #0A7368; }"
+        "QPushButton { background-color: #08283d; color: #E0E0E0; border: 1px solid #08314f; border-radius: 4px; font-size: 13px; }"
+        "QPushButton:hover { background-color: #08314f; border: 1px solid #1076C9; }"
     );
-    
-    boTri->addWidget(oNhapTimKiem, 3);
-    boTri->addWidget(hopChonTrangThai, 1);
-    boTri->addWidget(hopChonGioiTinh, 1);
-    boTri->addWidget(nutTimKiem);
-    
-    boTriChinh->addWidget(nhomTimKiem);
-    
+
+    layout->addWidget(oNhapTimKiem, 3);
+    layout->addWidget(hopChonTrangThai, 1);
+    layout->addWidget(hopChonGioiTinh, 1);
+    layout->addWidget(nutTimKiem);
+    layout->addWidget(nutLamMoi);
+
+    boTriChinh->addWidget(searchBar);
+
+    // Result label for search feedback (kept from book UI)
+    QLabel *nhanKetQuaTimKiem = new QLabel("");
+    nhanKetQuaTimKiem->setStyleSheet("color: #CFCFCF; font-size: 12px; padding-left: 6px;");
+    nhanKetQuaTimKiem->setFixedHeight(20);
+    boTriChinh->addWidget(nhanKetQuaTimKiem);
+
     // Connect signals - tìm kiếm real-time
     connect(oNhapTimKiem, &QLineEdit::textChanged, this, &WidgetQuanLyDocGia::xuLyTimKiem);
-    connect(hopChonTrangThai, QOverload<int>::of(&QComboBox::currentIndexChanged), 
-            this, &WidgetQuanLyDocGia::xuLyLocTrangThai);
-    connect(hopChonGioiTinh, QOverload<int>::of(&QComboBox::currentIndexChanged), 
-            this, &WidgetQuanLyDocGia::xuLyLocGioiTinh);
+    connect(hopChonTrangThai, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &WidgetQuanLyDocGia::xuLyLocTrangThai);
+    connect(hopChonGioiTinh, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &WidgetQuanLyDocGia::xuLyLocGioiTinh);
     connect(nutTimKiem, &QPushButton::clicked, this, [this]() { xuLyTimKiem(oNhapTimKiem->text()); });
+    connect(nutLamMoi, &QPushButton::clicked, this, [this]() { taiLaiDanhSach(); });
 }
 
 void WidgetQuanLyDocGia::thieLapBangDocGia() {
@@ -230,34 +345,8 @@ void WidgetQuanLyDocGia::thieLapBangDocGia() {
     modelDocGia = new DocGiaTableModel(&danhSachDocGia, this);
     bangDocGia->setModel(modelDocGia);
     
-    // Styling chuyên nghiệp
-    bangDocGia->setStyleSheet(
-        "QTableView {"
-        "    background-color: #1E1E2D;"
-        "    border: 1px solid #2B2B40;"
-        "    border-radius: 12px;"
-        "    gridline-color: #2B2B40;"
-        "    color: #FFFFFF;"
-        "    selection-background-color: #3699FF;"
-        "}"
-        "QTableView::item {"
-        "    padding: 8px;"
-        "    border-bottom: 1px solid #2B2B40;"
-        "}"
-        "QTableView::item:selected {"
-        "    background-color: #3699FF;"
-        "    color: #FFFFFF;"
-        "}"
-        "QHeaderView::section {"
-        "    background-color: #1E1E2D;"
-        "    color: #FFFFFF;"
-        "    padding: 12px;"
-        "    border: none;"
-        "    border-bottom: 2px solid #3699FF;"
-        "    font-weight: bold;"
-        "    font-size: 13px;"
-        "}"
-    );
+    // Use centralized InnerTable styling instead of inline stylesheet
+    bangDocGia->setProperty("class", "InnerTable");
     
     bangDocGia->setSelectionBehavior(QAbstractItemView::SelectRows);
     bangDocGia->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -276,6 +365,8 @@ void WidgetQuanLyDocGia::thieLapBangDocGia() {
     bangDocGia->setColumnWidth(6, 130);  // Sách Đang Mượn
     bangDocGia->setColumnWidth(7, 100);  // Quá Hạn
     bangDocGia->horizontalHeader()->setStretchLastSection(true);
+    // Row height similar to screenshot
+    bangDocGia->verticalHeader()->setDefaultSectionSize(48);
 
     boTriChinh->addWidget(bangDocGia, 1);
 
@@ -301,83 +392,32 @@ void WidgetQuanLyDocGia::thieLapBangDocGia() {
 void WidgetQuanLyDocGia::thieLapNutChucNang() {
     nhomChucNang = new QGroupBox("  Chức Năng");
     nhomChucNang->setStyleSheet(
-        "QGroupBox { background-color: #1E1E2D; border: 1px solid #2B2B40; "
-        "border-radius: 12px; padding: 15px; font-size: 14px; font-weight: bold; color: #FFFFFF; }"
+        "QGroupBox { background-color: transparent; border: none; padding: 6px; }"
     );
-    
+
     QHBoxLayout *boTri = new QHBoxLayout(nhomChucNang);
-    
-    nutThemDocGia = new QPushButton();
-    nutThemDocGia->setText("+ Thêm Độc Giả");
-    nutThemDocGia->setStyleSheet(
-        "QPushButton { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-        "stop:0 #1BC5BD, stop:1 #0D9488); color: white; border: none; "
-        "border-radius: 8px; font-weight: bold; padding: 10px 16px; }"
-        "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-        "stop:0 #0D9488, stop:1 #0A7368); }"
-        "QPushButton:pressed { background: #0A7368; }"
-    );
-    
-    nutSuaDocGia = new QPushButton();
-    nutSuaDocGia->setText("Sửa");
-    nutSuaDocGia->setStyleSheet(
-        "QPushButton { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-        "stop:0 #FFA800, stop:1 #CC8600); color: white; border: none; "
-        "border-radius: 8px; font-weight: bold; padding: 10px 16px; }"
-        "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-        "stop:0 #CC8600, stop:1 #996600); }"
-        "QPushButton:pressed { background: #996600; }"
-        "QPushButton:disabled { background: #2B2B40; color: #6C6C80; }"
-    );
-    
-    nutXoaDocGia = new QPushButton();
-    nutXoaDocGia->setText("Xóa");
-    nutXoaDocGia->setStyleSheet(
-        "QPushButton { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-        "stop:0 #F64E60, stop:1 #C9384A); color: white; border: none; "
-        "border-radius: 8px; font-weight: bold; padding: 10px 16px; }"
-        "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-        "stop:0 #C9384A, stop:1 #A32A3A); }"
-        "QPushButton:pressed { background: #A32A3A; }"
-        "QPushButton:disabled { background: #2B2B40; color: #6C6C80; }"
-    );
-    
-    nutKhoaThe = new QPushButton();
-    nutKhoaThe->setText("Khóa Thẻ");
-    nutKhoaThe->setStyleSheet(
-        "QPushButton { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-        "stop:0 #8950FC, stop:1 #6B3FCC); color: white; border: none; "
-        "border-radius: 8px; font-weight: bold; padding: 10px 16px; }"
-        "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-        "stop:0 #6B3FCC, stop:1 #5430A3); }"
-        "QPushButton:pressed { background: #5430A3; }"
-        "QPushButton:disabled { background: #2B2B40; color: #6C6C80; }"
-    );
-    
-    nutMoKhoaThe = new QPushButton();
-    nutMoKhoaThe->setText("Mở Khóa");
-    nutMoKhoaThe->setStyleSheet(
-        "QPushButton { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-        "stop:0 #3699FF, stop:1 #187DE4); color: white; border: none; "
-        "border-radius: 8px; font-weight: bold; padding: 10px 16px; }"
-        "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-        "stop:0 #187DE4, stop:1 #0C5EBF); }"
-        "QPushButton:pressed { background: #0C5EBF; }"
-        "QPushButton:disabled { background: #2B2B40; color: #6C6C80; }"
-    );
-    
-    nutXemLichSu = new QPushButton();
-    nutXemLichSu->setText("Lịch Sử");
-    nutXemLichSu->setStyleSheet(
-        "QPushButton { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-        "stop:0 #3699FF, stop:1 #187DE4); color: white; border: none; "
-        "border-radius: 8px; font-weight: bold; padding: 10px 16px; }"
-        "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-        "stop:0 #187DE4, stop:1 #0C5EBF); }"
-        "QPushButton:pressed { background: #0C5EBF; }"
-        "QPushButton:disabled { background: #2B2B40; color: #6C6C80; }"
-    );
-    
+
+    auto createButton = [](const QString &icon, const QString &text, const QString &color) -> QPushButton* {
+        QPushButton *btn = new QPushButton(icon + " " + text);
+        btn->setFixedHeight(30);
+        btn->setMinimumWidth(90);
+        QString hoverColor = (color == "#0078D4") ? "#106EBE" : "#3E3E42";
+        QString pressedColor = (color == "#0078D4") ? "#005A9E" : "#2D2D30";
+        btn->setStyleSheet(QString(
+            "QPushButton { background-color: %1; color: white; border: none; border-radius: 4px; font-size: 12px; font-weight: 500; padding: 0 10px; }"
+            "QPushButton:hover { background-color: %2; }"
+            "QPushButton:pressed { background-color: %3; }"
+        ).arg(color, hoverColor, pressedColor));
+        return btn;
+    };
+
+    nutThemDocGia = createButton("+", "Thêm Độc Giả", "#0078D4");
+    nutSuaDocGia = createButton("✏", "Sửa", "#2D2D30");
+    nutXoaDocGia = createButton("✖", "Xóa", "#C42B1C");
+    nutKhoaThe = createButton("🔒", "Khóa Thẻ", "#2D2D30");
+    nutMoKhoaThe = createButton("🔓", "Mở Khóa", "#2D2D30");
+    nutXemLichSu = createButton("ⓘ", "Lịch Sử", "#2D2D30");
+
     boTri->addWidget(nutThemDocGia);
     boTri->addWidget(nutSuaDocGia);
     boTri->addWidget(nutXoaDocGia);
@@ -385,9 +425,19 @@ void WidgetQuanLyDocGia::thieLapNutChucNang() {
     boTri->addWidget(nutMoKhoaThe);
     boTri->addWidget(nutXemLichSu);
     boTri->addStretch();
-    
+
     boTriChinh->addWidget(nhomChucNang);
-    
+
+    // Initially disable actions that require a selected row
+    nutSuaDocGia->setEnabled(false);
+    nutXoaDocGia->setEnabled(false);
+    // header buttons are the primary action controls
+    if (nutHeaderKhoa) nutHeaderKhoa->setEnabled(false);
+    if (nutHeaderMoKhoa) nutHeaderMoKhoa->setEnabled(false);
+    if (nutHeaderLichSu) nutHeaderLichSu->setEnabled(false);
+    if (nutHeaderChiTiet) nutHeaderChiTiet->setEnabled(false);
+    if (nutHeaderIn) nutHeaderIn->setEnabled(false);
+
     connect(nutThemDocGia, &QPushButton::clicked, this, &WidgetQuanLyDocGia::xuLyNutThemDocGia);
     connect(nutSuaDocGia, &QPushButton::clicked, this, &WidgetQuanLyDocGia::xuLyNutSuaDocGia);
     connect(nutXoaDocGia, &QPushButton::clicked, this, &WidgetQuanLyDocGia::xuLyNutXoaDocGia);
@@ -661,7 +711,26 @@ void WidgetQuanLyDocGia::xuLyChonDong(int dong, int) {
             .arg(QString::fromStdString(docGiaDangChon->data.Ho))
             .arg(QString::fromStdString(docGiaDangChon->data.Ten))
             .arg(maThe));
+        // Enable actions that require a selection (use header buttons as primary controls)
+        nutSuaDocGia->setEnabled(true);
+        nutXoaDocGia->setEnabled(true);
+        if (nutHeaderChiTiet) nutHeaderChiTiet->setEnabled(true);
+        if (nutHeaderIn) nutHeaderIn->setEnabled(true);
+        if (nutHeaderKhoa) nutHeaderKhoa->setEnabled(true);
+        if (nutHeaderMoKhoa) nutHeaderMoKhoa->setEnabled(true);
+        if (nutHeaderLichSu) nutHeaderLichSu->setEnabled(true);
+        return;
     }
+    // If we reach here, clear selection
+    docGiaDangChon = nullptr;
+    maTheDangChon = -1;
+    nutSuaDocGia->setEnabled(false);
+    nutXoaDocGia->setEnabled(false);
+    if (nutHeaderChiTiet) nutHeaderChiTiet->setEnabled(false);
+    if (nutHeaderIn) nutHeaderIn->setEnabled(false);
+    if (nutHeaderKhoa) nutHeaderKhoa->setEnabled(false);
+    if (nutHeaderMoKhoa) nutHeaderMoKhoa->setEnabled(false);
+    if (nutHeaderLichSu) nutHeaderLichSu->setEnabled(false);
 }
 
 void WidgetQuanLyDocGia::xuLyLocKetHopToanBo() {

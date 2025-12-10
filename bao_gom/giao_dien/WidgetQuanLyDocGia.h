@@ -110,6 +110,12 @@ private:
     QPushButton *nutXemSachDangMuon;
     QPushButton *nutNhapFile;
     QPushButton *nutXuatFile;
+    // Header action buttons (top bar)
+    QPushButton *nutHeaderIn;
+    QPushButton *nutHeaderChiTiet;
+    QPushButton *nutHeaderKhoa;
+    QPushButton *nutHeaderMoKhoa;
+    QPushButton *nutHeaderLichSu;
     
     // Dữ liệu hiện tại
     PTRDG docGiaDangChon;

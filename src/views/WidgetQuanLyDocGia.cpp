@@ -3,6 +3,7 @@
 #include "views/dialogs/ManHinhSuaDocGia.h"
 #include "models/DocGia.h"
 #include "models/QuanLySach.h"
+#include "models/DauSach.h"
 #include "utils/ConfirmationDialog.h"
 #include "utils/AnimationHelper.h"
 #include "utils/DBBatcher.h"
@@ -30,6 +31,7 @@
 #include <QFuture>
 #include <QFutureWatcher>
 #include <QtConcurrent>
+#include <QIcon>
 
 extern PTRDG rootDocGia;
 
@@ -52,7 +54,7 @@ void WidgetQuanLyDocGia::onSearchFinished() {
     QFuture<std::vector<PTRDG>> f = searchWatcher->future();
     std::vector<PTRDG> results = f.result();
     readerModel->setSearchResults(results);
-    showMessage(QString("👤 Tìm thấy %1 độc giả").arg((int)results.size()));
+    showMessage(QString("Tìm thấy %1 độc giả").arg((int)results.size()));
     btnSearch->setEnabled(true);
     searchProgress->setVisible(false);
 }
@@ -84,7 +86,7 @@ QVariant ReaderTableModel::data(const QModelIndex &index, int role) const {
             case 4: {
                 QString status = reader->data.TrangThai ? "Hoạt động" : "Khóa";
                 if (isReaderOverdue(reader)) {
-                    status += " ⚠ Quá hạn";
+                    status += " Quá hạn";
                 }
                 return status;
             }
@@ -109,6 +111,16 @@ QVariant ReaderTableModel::data(const QModelIndex &index, int role) const {
             font.setBold(true);
             return font;
         }
+    }
+
+    // Provide enum for delegate drawing: map reader status -> TrangThaiSach
+    if (role == Qt::UserRole && index.column() == 4) {
+        // Map: Active (no overdue) -> CHO_MUON_DUOC (green)
+        // Overdue -> DANG_MUON (orange)
+        // Locked -> THANH_LY (red)
+        if (!reader->data.TrangThai) return QVariant::fromValue<int>(THANH_LY);
+        if (isReaderOverdue(reader)) return QVariant::fromValue<int>(DANG_MUON);
+        return QVariant::fromValue<int>(CHO_MUON_DUOC);
     }
     
     return QVariant();
@@ -253,6 +265,8 @@ WidgetQuanLyDocGia::WidgetQuanLyDocGia(QWidget *parent)
     : QWidget(parent)
     , selectedReader(nullptr)
 {
+    // Ensure QSS selectors targeting object name also apply
+    this->setObjectName("WidgetQuanLyDocGia");
     searchTimer = new QTimer(this);
     searchTimer->setSingleShot(true);
     searchTimer->setInterval(300);
@@ -261,6 +275,9 @@ WidgetQuanLyDocGia::WidgetQuanLyDocGia(QWidget *parent)
     searchWatcher = new QFutureWatcher<std::vector<PTRDG>>(this);
     connect(searchWatcher, &QFutureWatcher<std::vector<PTRDG>>::finished,
             this, &WidgetQuanLyDocGia::onSearchFinished);
+
+    // Badge delegate for status column (reuse existing badge styling)
+    badgeDelegate = new BadgeStyledItemDelegate(this);
 
     setupUI();
     setupConnections();
@@ -309,26 +326,27 @@ void WidgetQuanLyDocGia::setupUI() {
     filterRow->setSpacing(10);
     
     searchTypeCombo = new QComboBox(headerCard);
-    searchTypeCombo->addItem("◈ Tìm kiếm", 0);
+    searchTypeCombo->addItem("Tìm kiếm", 0);
     searchTypeCombo->setMinimumHeight(40);
     searchTypeCombo->setMinimumWidth(120);
     filterRow->addWidget(searchTypeCombo);
     
     searchEdit = new QLineEdit(headerCard);
-    searchEdit->setPlaceholderText("🔍 Tìm kiếm theo Mã thẻ, Họ tên...");
+    searchEdit->setPlaceholderText("Tìm kiếm theo Mã thẻ, Họ tên...");
     searchEdit->setMinimumHeight(40);
+    searchEdit->setProperty("class", "InputDark");
     filterRow->addWidget(searchEdit, 1);
     
     filterStatusCombo = new QComboBox(headerCard);
     filterStatusCombo->addItem("Tất cả trạng thái", -1);
-    filterStatusCombo->addItem("● Hoạt động", 1);
-    filterStatusCombo->addItem("● Khóa", 0);
+    filterStatusCombo->addItem("Hoạt động", 1);
+    filterStatusCombo->addItem("Khóa", 0);
     filterStatusCombo->setMinimumHeight(40);
     filterStatusCombo->setMinimumWidth(150);
     filterRow->addWidget(filterStatusCombo);
     
     btnSearch = new QPushButton("Tìm kiếm", headerCard);
-    btnSearch->setProperty("class", "Secondary");
+    btnSearch->setProperty("class", "GradientPrimary");
     btnSearch->setMinimumHeight(40);
     filterRow->addWidget(btnSearch);
     
@@ -346,6 +364,53 @@ void WidgetQuanLyDocGia::setupUI() {
     headerLayout->addLayout(filterRow);
     mainLayout->addWidget(headerCard);
     
+    // --- ACTION BAR: Buttons above the table (match WidgetQuanLySach layout) ---
+    QFrame *nhomChucNang = new QFrame(this);
+    nhomChucNang->setFrameShape(QFrame::NoFrame);
+    nhomChucNang->setProperty("class", "ActionBar");
+    QHBoxLayout *layChucNang = new QHBoxLayout(nhomChucNang);
+    layChucNang->setSpacing(12);
+    layChucNang->setContentsMargins(6, 6, 6, 6);
+
+    QPushButton *btnAddReader = new QPushButton(QIcon(":/icons/plus.svg"), " + Thêm Độc Giả", nhomChucNang);
+    QPushButton *btnImport = new QPushButton(QIcon(":/icons/upload.svg"), " Nhập Excel", nhomChucNang);
+    QPushButton *btnPrint = new QPushButton(QIcon(":/icons/print.svg"), " In", nhomChucNang);
+    QPushButton *btnEditTop = new QPushButton(QIcon(":/icons/edit.svg"), " Sửa", nhomChucNang);
+    QPushButton *btnDetailTop = new QPushButton(QIcon(":/icons/info.svg"), " Chi Tiết", nhomChucNang);
+    QPushButton *btnDeleteTop = new QPushButton(QIcon(":/icons/trash.svg"), " Xóa", nhomChucNang);
+
+    // Use QSS classes for consistent look
+    btnAddReader->setProperty("class", "Primary");
+    btnImport->setProperty("class", "Secondary");
+    btnPrint->setProperty("class", "Secondary");
+    btnEditTop->setProperty("class", "Secondary");
+    btnDetailTop->setProperty("class", "Secondary");
+    btnDeleteTop->setProperty("class", "Danger");
+
+    // Set minimum heights to match other controls
+    QList<QPushButton*> topButtons = {btnAddReader, btnImport, btnPrint, btnEditTop, btnDetailTop, btnDeleteTop};
+    for (QPushButton *b : topButtons) {
+        b->setMinimumHeight(40);
+        b->setProperty("compact", true);
+    }
+
+    // Add subtle shadow to primary button for emphasis
+    QGraphicsDropShadowEffect *shadowPrimary = new QGraphicsDropShadowEffect(btnAddReader);
+    shadowPrimary->setBlurRadius(12);
+    shadowPrimary->setOffset(0, 3);
+    shadowPrimary->setColor(QColor(0,0,0,80));
+    btnAddReader->setGraphicsEffect(shadowPrimary);
+
+    layChucNang->addWidget(btnAddReader);
+    layChucNang->addWidget(btnImport);
+    layChucNang->addWidget(btnPrint);
+    layChucNang->addWidget(btnEditTop);
+    layChucNang->addWidget(btnDetailTop);
+    layChucNang->addWidget(btnDeleteTop);
+    layChucNang->addStretch();
+
+    mainLayout->addWidget(nhomChucNang);
+    
     // --- CARD 2: BẢNG DỮ LIỆU ---
     QFrame *tableCard = new QFrame(this);
     tableCard->setProperty("class", "Card");
@@ -356,15 +421,18 @@ void WidgetQuanLyDocGia::setupUI() {
     // Toolbar
     toolbar = new QToolBar(tableCard);
     toolbar->setIconSize(QSize(18, 18));
-    toolbar->addAction("◫ Export CSV");
+    QAction *actExportTop = toolbar->addAction(QIcon(":/icons/copy.svg"), "Xuất CSV");
+    connect(actExportTop, &QAction::triggered, this, &WidgetQuanLyDocGia::onExportCSV);
     toolbar->addSeparator();
-    QAction *actPrint = toolbar->addAction("▣ In Danh Sách");
-    actPrint->setShortcut(QKeySequence::Print);
+    QAction *actPrintTop = toolbar->addAction(QIcon(":/icons/info.svg"), "In Danh Sách");
+    actPrintTop->setShortcut(QKeySequence::Print);
     tableLayout->addWidget(toolbar);
     
     tableView = new QTableView(tableCard);
     readerModel = new ReaderTableModel(this);
     tableView->setModel(readerModel);
+    // Use badge delegate for status column
+    tableView->setItemDelegateForColumn(4, badgeDelegate);
     
     // Cấu hình bảng
     tableView->setShowGrid(false);
@@ -376,8 +444,11 @@ void WidgetQuanLyDocGia::setupUI() {
     tableView->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
     tableView->setSortingEnabled(true);
     tableView->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    // Row height aligned with Quản Lý Sách for visual parity
     tableView->verticalHeader()->setDefaultSectionSize(45);
-    tableView->setMinimumHeight(400);
+    tableView->setMinimumHeight(420);
+    // Use centralized InnerTable styling
+    tableView->setProperty("class", "InnerTable");
     
     tableLayout->addWidget(tableView);
     
@@ -388,20 +459,30 @@ void WidgetQuanLyDocGia::setupUI() {
     statusLabel = new QLabel("Tổng số: 0 độc giả", tableCard);
     statusLabel->setProperty("class", "SubText");
     
-    btnEdit = new QPushButton("✎ Sửa", tableCard);
+    btnEdit = new QPushButton("Sửa", tableCard);
     btnEdit->setProperty("class", "Secondary");
+    btnEdit->setIcon(QIcon(":/icons/edit.svg"));
+    btnEdit->setProperty("compact", true);
     
-    btnDelete = new QPushButton("× Xóa", tableCard);
+    btnDelete = new QPushButton("Xóa", tableCard);
     btnDelete->setProperty("class", "Danger");
+    btnDelete->setIcon(QIcon(":/icons/trash.svg"));
+    btnDelete->setProperty("compact", true);
     
-    btnDetails = new QPushButton("◈ Chi Tiết", tableCard);
-    btnDetails->setProperty("class", "Success");
+    btnDetails = new QPushButton("Chi Tiết", tableCard);
+    btnDetails->setProperty("class", "Secondary");
+    btnDetails->setIcon(QIcon(":/icons/info.svg"));
+    btnDetails->setProperty("compact", true);
     
-    btnUnlock = new QPushButton("🔓 Mở Khóa", tableCard);
-    btnUnlock->setProperty("class", "Success");
+    btnUnlock = new QPushButton("Mở Khóa", tableCard);
+    btnUnlock->setProperty("class", "Secondary");
+    btnUnlock->setIcon(QIcon(":/icons/unlock.svg"));
+    btnUnlock->setProperty("compact", true);
     
-    btnBack = new QPushButton("← Quay Lại", tableCard);
+    btnBack = new QPushButton("Quay Lại", tableCard);
     btnBack->setProperty("class", "Secondary");
+    btnBack->setIcon(QIcon(":/icons/refresh.svg"));
+    btnBack->setProperty("compact", true);
     
     footerLayout->addWidget(statusLabel);
     footerLayout->addStretch();
@@ -421,58 +502,39 @@ void WidgetQuanLyDocGia::setupTabQuanLy() {
     layout->setSpacing(12);
     layout->setContentsMargins(12, 12, 12, 12);
     
-    // Toolbar
+    // Toolbar - use dark modern style consistent with WidgetQuanLySach
     toolbar = new QToolBar(tabQuanLy);
     toolbar->setIconSize(QSize(20, 20));
-    toolbar->setStyleSheet(
-        "QToolBar {"
-        "    background: #F8FAFC;"
-        "    border: 1px solid #E2E8F0;"
-        "    border-radius: 6px;"
-        "    padding: 8px;"
-        "}"
-        "QToolButton {"
-        "    background: white;"
-        "    border: 1px solid #E2E8F0;"
-        "    border-radius: 4px;"
-        "    padding: 6px 12px;"
-        "    color: #475569;"
-        "    font-weight: 500;"
-        "}"
-        "QToolButton:hover {"
-        "    background: #5B7FFF;"
-        "    color: white;"
-        "    border-color: #5B7FFF;"
-        "}"
-    );
+    // Use QSS class for toolbar styling to keep styles centralized
+    toolbar->setProperty("class", "ToolbarDark");
     
-    QAction *actToggleStatus = toolbar->addAction("⇄ Đổi Trạng Thái");
+    QAction *actToggleStatus = toolbar->addAction(QIcon(":/icons/lock.svg"), "Đổi Trạng Thái");
     actToggleStatus->setToolTip("Khóa/Mở khóa độc giả được chọn");
     connect(actToggleStatus, &QAction::triggered, this, &WidgetQuanLyDocGia::onToggleStatus);
     
-    QAction *actHistory = toolbar->addAction("◫ Lịch Sử Mượn");
+    QAction *actHistory = toolbar->addAction(QIcon(":/icons/exchange.svg"), "Lịch Sử Mượn");
     actHistory->setToolTip("Xem lịch sử mượn trả của độc giả");
     connect(actHistory, &QAction::triggered, this, &WidgetQuanLyDocGia::onViewHistory);
     
-    QAction *actPrintCard = toolbar->addAction("▣ In Thẻ");
+    QAction *actPrintCard = toolbar->addAction(QIcon(":/icons/user.svg"), "In Thẻ");
     actPrintCard->setToolTip("In thẻ độc giả (Ctrl+P)");
     actPrintCard->setShortcut(QKeySequence::Print);
     connect(actPrintCard, &QAction::triggered, this, &WidgetQuanLyDocGia::onPrintCard);
     
     toolbar->addSeparator();
     
-    QAction *actWarnings = toolbar->addAction("⚠ Cảnh Báo");
+    QAction *actWarnings = toolbar->addAction(QIcon(":/icons/stats.svg"), "Cảnh Báo");
     actWarnings->setToolTip("Xem các cảnh báo (quá hạn, khóa đang mượn...)");
     connect(actWarnings, &QAction::triggered, this, &WidgetQuanLyDocGia::onShowWarnings);
     
     toolbar->addSeparator();
     
-    QAction *actExport = toolbar->addAction("◫ Export CSV");
-    actExport->setToolTip("Export danh sách độc giả ra CSV");
+    QAction *actExport = toolbar->addAction(QIcon(":/icons/copy.svg"), "Xuất CSV");
+    actExport->setToolTip("Xuất danh sách độc giả ra CSV");
     connect(actExport, &QAction::triggered, this, &WidgetQuanLyDocGia::onExportCSV);
     
-    QAction *actImport = toolbar->addAction("◫ Import CSV");
-    actImport->setToolTip("Import độc giả từ file CSV");
+    QAction *actImport = toolbar->addAction(QIcon(":/icons/copy.svg"), "Nhập CSV");
+    actImport->setToolTip("Nhập độc giả từ file CSV");
     connect(actImport, &QAction::triggered, this, &WidgetQuanLyDocGia::onImportCSV);
     
     layout->addWidget(toolbar);
@@ -482,15 +544,17 @@ void WidgetQuanLyDocGia::setupTabQuanLy() {
     searchLayout->addWidget(new QLabel("Tìm kiếm:", tabQuanLy));
     searchEdit = new QLineEdit(tabQuanLy);
     searchEdit->setPlaceholderText("Nhập mã thẻ, tên, họ...");
+    searchEdit->setMinimumHeight(40);
+    searchEdit->setProperty("class", "InputDark");
     searchLayout->addWidget(searchEdit);
     
     // Advanced search combo
     searchTypeCombo = new QComboBox(tabQuanLy);
-    searchTypeCombo->addItem("🔍 Tìm theo mã", 0);
-    searchTypeCombo->addItem("👤 Tìm theo tên", 1);
-    searchTypeCombo->addItem("👥 Tìm theo họ", 2);
-    searchTypeCombo->addItem("👤👥 Tìm theo họ tên", 3);
-    searchTypeCombo->addItem("📊 Lọc theo trạng thái", 4);
+    searchTypeCombo->addItem("Tìm theo mã", 0);
+    searchTypeCombo->addItem("Tìm theo tên", 1);
+    searchTypeCombo->addItem("Tìm theo họ", 2);
+    searchTypeCombo->addItem("Tìm theo họ tên", 3);
+    searchTypeCombo->addItem("Lọc theo trạng thái", 4);
     searchTypeCombo->setToolTip(
         "Loại tìm kiếm:\n"
         "• Theo mã: Nhập mã thẻ độc giả (số nguyên)\n"
@@ -499,12 +563,18 @@ void WidgetQuanLyDocGia::setupTabQuanLy() {
         "• Theo họ tên: Tìm theo họ và tên\n"
         "• Lọc trạng thái: 0=Khóa, 1=Hoạt động"
     );
+    searchTypeCombo->setMinimumHeight(40);
+    searchTypeCombo->setMinimumWidth(180);
     searchLayout->addWidget(searchTypeCombo);
-    
-    btnSearch = new QPushButton("🔍 Tìm", tabQuanLy);
+
+    btnSearch = new QPushButton("Tìm", tabQuanLy);
     btnSearch->setToolTip("Tìm kiếm độc giả (Enter hoặc Ctrl+F)");
     btnSearch->setShortcut(QKeySequence(Qt::Key_Return));
-    btnClearSearch = new QPushButton("❌ Xóa", tabQuanLy);
+    btnSearch->setMinimumHeight(40);
+    btnSearch->setProperty("class", "GradientPrimary");
+    btnClearSearch = new QPushButton("Xóa", tabQuanLy);
+    btnClearSearch->setMinimumHeight(40);
+    btnClearSearch->setProperty("class", "Secondary");
     searchLayout->addWidget(btnSearch);
     searchLayout->addWidget(btnClearSearch);
     
@@ -514,8 +584,8 @@ void WidgetQuanLyDocGia::setupTabQuanLy() {
     QHBoxLayout *filterLayout = new QHBoxLayout();
     filterLayout->setSpacing(12);
     
-    QLabel *filterLabel = new QLabel("🔎 Lọc nhanh:", tabQuanLy);
-    filterLabel->setStyleSheet("font-weight: bold; color: #64B5F6;");
+    QLabel *filterLabel = new QLabel("Lọc nhanh:", tabQuanLy);
+    filterLabel->setProperty("class", "CardTitle");
     filterLayout->addWidget(filterLabel);
     
     filterGioiTinhCombo = new QComboBox(tabQuanLy);
@@ -548,6 +618,8 @@ void WidgetQuanLyDocGia::setupTabQuanLy() {
     tableView = new QTableView(tabQuanLy);
     readerModel = new ReaderTableModel(this);
     tableView->setModel(readerModel);
+    // Use badge delegate for status column in tab view as well
+    tableView->setItemDelegateForColumn(4, badgeDelegate);
     tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
     tableView->setSelectionMode(QAbstractItemView::SingleSelection);
     tableView->setAlternatingRowColors(true);
@@ -555,34 +627,48 @@ void WidgetQuanLyDocGia::setupTabQuanLy() {
     tableView->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
     tableView->setEditTriggers(QAbstractItemView::NoEditTriggers);
     tableView->setSortingEnabled(true); // Enable column sorting
+    // Match visual style to WidgetQuanLySach
+    tableView->verticalHeader()->setDefaultSectionSize(45);
+    tableView->setProperty("class", "InnerTable");
     
     layout->addWidget(tableView);
     
     // Thanh trang thai
     statusLabel = new QLabel("", tabQuanLy);
-    statusLabel->setStyleSheet("color: #27ae60; font-weight: bold;");
+    statusLabel->setProperty("class", "SubText");
     layout->addWidget(statusLabel);
     
     // Cac nut chuc nang
     QHBoxLayout *buttonLayout = new QHBoxLayout();
-    btnAdd = new QPushButton("➕ Thêm Độc Giả", tabQuanLy);
-    btnEdit = new QPushButton("✏️ Sửa", tabQuanLy);
-    btnDelete = new QPushButton("🗑️ Xóa", tabQuanLy);
-    btnViewLoans = new QPushButton("📖 Xem Mượn Trả", tabQuanLy);
-    btnBack = new QPushButton("⬅️ Quay Lại", tabQuanLy);
-    
+    btnAdd = new QPushButton("+ Thêm Độc Giả", tabQuanLy);
+    btnAdd->setIcon(QIcon(":/icons/plus.svg"));
+    btnAdd->setMinimumHeight(40);
+    btnEdit = new QPushButton("Sửa", tabQuanLy);
+    btnEdit->setIcon(QIcon(":/icons/edit.svg"));
+    btnEdit->setMinimumHeight(40);
+    btnDelete = new QPushButton("Xóa", tabQuanLy);
+    btnDelete->setIcon(QIcon(":/icons/trash.svg"));
+    btnDelete->setMinimumHeight(40);
+    btnViewLoans = new QPushButton("Xem Mượn Trả", tabQuanLy);
+    btnViewLoans->setIcon(QIcon(":/icons/exchange.svg"));
+    btnViewLoans->setMinimumHeight(40);
+    btnBack = new QPushButton("Quay Lại", tabQuanLy);
+    btnBack->setIcon(QIcon(":/icons/refresh.svg"));
+    btnBack->setMinimumHeight(40);
+
     // Add keyboard shortcut tooltips
     btnAdd->setToolTip("Thêm độc giả mới (Ctrl+N)");
     btnEdit->setToolTip("Sửa thông tin độc giả (Ctrl+E)");
     btnDelete->setToolTip("Xóa độc giả đã chọn (Delete hoặc Ctrl+D)");
     btnViewLoans->setToolTip("Xem lịch sử mượn trả");
     btnBack->setToolTip("Quay lại màn hình chính (ESC)");
-    
-    btnAdd->setStyleSheet("background-color: #27ae60; color: white; padding: 8px; font-weight: bold;");
-    btnEdit->setStyleSheet("background-color: #f39c12; color: white; padding: 8px; font-weight: bold;");
-    btnDelete->setStyleSheet("background-color: #e74c3c; color: white; padding: 8px; font-weight: bold;");
-    btnViewLoans->setStyleSheet("background-color: #3498db; color: white; padding: 8px; font-weight: bold;");
-    btnBack->setStyleSheet("background-color: #7f8c8d; color: white; padding: 8px; font-weight: bold;");
+
+    // Use QSS classes instead of inline styles for consistency
+    btnAdd->setProperty("class", "Primary");
+    btnEdit->setProperty("class", "Secondary");
+    btnDelete->setProperty("class", "Danger");
+    btnViewLoans->setProperty("class", "Success");
+    btnBack->setProperty("class", "Secondary");
     
     buttonLayout->addWidget(btnAdd);
     buttonLayout->addWidget(btnEdit);
@@ -593,7 +679,7 @@ void WidgetQuanLyDocGia::setupTabQuanLy() {
     
     layout->addLayout(buttonLayout);
     
-    tabWidget->addTab(tabQuanLy, "◉ Danh Sách Độc Giả");
+    tabWidget->addTab(tabQuanLy, "Danh Sách Độc Giả");
 }
 
 void WidgetQuanLyDocGia::setupTabQuaHan() {
@@ -603,55 +689,35 @@ void WidgetQuanLyDocGia::setupTabQuaHan() {
     layout->setContentsMargins(16, 16, 16, 16);
     
     // Hướng dẫn
-    QLabel *lblHuongDan = new QLabel("⚠ DANH SÁCH ĐỘC GIẢ QUÁ HẠN", tabQuaHan);
+    QLabel *lblHuongDan = new QLabel("DANH SÁCH ĐỘC GIẢ QUÁ HẠN", tabQuaHan);
     QFont font = lblHuongDan->font();
     font.setPointSize(16);
     font.setBold(true);
     lblHuongDan->setFont(font);
-    lblHuongDan->setStyleSheet("color: #DC2626; padding: 12px; background: transparent;");
+    lblHuongDan->setProperty("class", "DangerTitle");
     layout->addWidget(lblHuongDan);
     
     // Thống kê
     lblThongKeQuaHan = new QLabel("Đang tải dữ liệu...", tabQuaHan);
-    lblThongKeQuaHan->setStyleSheet(
-        "padding: 12px;"
-        "background: #FEE2E2;"
-        "border: 1px solid #FCA5A5;"
-        "border-radius: 8px;"
-        "color: #991B1B;"
-    );
+    lblThongKeQuaHan->setProperty("class", "DangerStat");
     layout->addWidget(lblThongKeQuaHan);
     
     // Placeholder message
-    QLabel *placeholderMsg = new QLabel("📊 Chức năng đang được phát triển...\n\n"
+    QLabel *placeholderMsg = new QLabel("Chức năng đang được phát triển...\n\n"
         "Sẽ hiển thị danh sách độc giả có sách mượn quá hạn.", tabQuaHan);
     placeholderMsg->setAlignment(Qt::AlignCenter);
-    placeholderMsg->setStyleSheet(
-        "padding: 40px;"
-        "color: #64748B;"
-        "font-size: 14px;"
-    );
+    placeholderMsg->setProperty("class", "PlaceholderMsg");
     layout->addWidget(placeholderMsg, 1);
     
     // Refresh button
-    QPushButton *btnRefresh = new QPushButton("🔄 Làm Mới Dữ Liệu", tabQuaHan);
-    btnRefresh->setStyleSheet(
-        "QPushButton {"
-        "    background: #EF4444;"
-        "    color: white;"
-        "    border: none;"
-        "    border-radius: 6px;"
-        "    padding: 10px 20px;"
-        "    font-weight: 600;"
-        "}"
-        "QPushButton:hover {"
-        "    background: #DC2626;"
-        "}"
-    );
+    QPushButton *btnRefresh = new QPushButton("Làm Mới Dữ Liệu", tabQuaHan);
+    btnRefresh->setIcon(QIcon(":/icons/refresh.svg"));
+    btnRefresh->setProperty("class", "Danger");
+    btnRefresh->setMinimumHeight(36);
     connect(btnRefresh, &QPushButton::clicked, this, &WidgetQuanLyDocGia::onRefreshQuaHan);
     layout->addWidget(btnRefresh, 0, Qt::AlignRight);
     
-    tabWidget->addTab(tabQuaHan, "⚠ Độc Giả Quá Hạn");
+    tabWidget->addTab(tabQuaHan, "Độc Giả Quá Hạn");
 }
 
 void WidgetQuanLyDocGia::setupConnections() {
@@ -789,7 +855,7 @@ void WidgetQuanLyDocGia::onSearchClicked() {
     
     // Validate root pointer
     if (!rootDocGia) {
-        showMessage("❌ Danh sách độc giả trống!", true);
+        showMessage("Danh sách độc giả trống!", true);
         return;
     }
     
@@ -799,7 +865,7 @@ void WidgetQuanLyDocGia::onSearchClicked() {
         int maThe = keyword.toInt(&ok);
         
         if (!ok || maThe <= 0) {
-            showMessage("⚠️ Vui lòng nhập mã thẻ hợp lệ!", true);
+            showMessage("Vui lòng nhập mã thẻ hợp lệ!", true);
             return;
         }
         
@@ -807,7 +873,7 @@ void WidgetQuanLyDocGia::onSearchClicked() {
         try {
             reader = timDocGia(rootDocGia, maThe);
         } catch (...) {
-            showMessage("❌ Lỗi khi tìm kiếm độc giả!", true);
+            showMessage("Lỗi khi tìm kiếm độc giả!", true);
             return;
         }
 
@@ -818,7 +884,7 @@ void WidgetQuanLyDocGia::onSearchClicked() {
                 .arg(QString::fromStdString(reader->data.Ho),
                      QString::fromStdString(reader->data.Ten)));
         } else {
-            showMessage("❌ Không tìm thấy độc giả!", true);
+            showMessage("Không tìm thấy độc giả!", true);
             // clear model
             readerModel->setSearchResults(std::vector<PTRDG>());
         }
@@ -826,7 +892,7 @@ void WidgetQuanLyDocGia::onSearchClicked() {
     } else if (searchType == 1) {
         // Search by first name
         if (keyword.isEmpty()) {
-            showMessage("⚠️ Vui lòng nhập tên!", true);
+            showMessage("Vui lòng nhập tên!", true);
             return;
         }
         
@@ -838,7 +904,7 @@ void WidgetQuanLyDocGia::onSearchClicked() {
                 QFuture<std::vector<PTRDG>> future = QtConcurrent::run(&DBBatcher::timDocGiaTheoTen, keyword.toStdString(), 1000);
                 searchWatcher->setFuture(future);
             } catch (...) {
-                showMessage("❌ Lỗi khi tìm kiếm!", true);
+                showMessage("Lỗi khi tìm kiếm!", true);
                 btnSearch->setEnabled(true);
                 return;
             }
@@ -846,7 +912,7 @@ void WidgetQuanLyDocGia::onSearchClicked() {
     } else if (searchType == 2) {
         // Search by last name
         if (keyword.isEmpty()) {
-            showMessage("⚠️ Vui lòng nhập họ!", true);
+            showMessage("Vui lòng nhập họ!", true);
             return;
         }
         
@@ -857,7 +923,7 @@ void WidgetQuanLyDocGia::onSearchClicked() {
             QFuture<std::vector<PTRDG>> future = QtConcurrent::run(&DBBatcher::timDocGiaTheoHo, keyword.toStdString(), 1000);
             searchWatcher->setFuture(future);
         } catch (...) {
-            showMessage("❌ Lỗi khi tìm kiếm!", true);
+            showMessage("Lỗi khi tìm kiếm!", true);
             btnSearch->setEnabled(true);
             return;
         }
@@ -865,7 +931,7 @@ void WidgetQuanLyDocGia::onSearchClicked() {
     } else if (searchType == 3) {
         // Search by full name
         if (keyword.isEmpty()) {
-            showMessage("⚠️ Vui lòng nhập họ tên!", true);
+            showMessage("Vui lòng nhập họ tên!", true);
             return;
         }
         
@@ -876,7 +942,7 @@ void WidgetQuanLyDocGia::onSearchClicked() {
             QFuture<std::vector<PTRDG>> future = QtConcurrent::run(&DBBatcher::timDocGiaTheoHoTen, keyword.toStdString(), 1000);
             searchWatcher->setFuture(future);
         } catch (...) {
-            showMessage("❌ Lỗi khi tìm kiếm!", true);
+            showMessage("Lỗi khi tìm kiếm!", true);
             btnSearch->setEnabled(true);
             return;
         }
@@ -899,7 +965,7 @@ void WidgetQuanLyDocGia::onSearchClicked() {
             QFuture<std::vector<PTRDG>> future = QtConcurrent::run(&DBBatcher::timDocGiaTheoTrangThai, status, 1000);
             searchWatcher->setFuture(future);
         } catch (...) {
-            showMessage("❌ Lỗi khi tìm kiếm!", true);
+            showMessage("Lỗi khi tìm kiếm!", true);
             btnSearch->setEnabled(true);
             return;
         }
@@ -936,20 +1002,20 @@ void WidgetQuanLyDocGia::onDeleteReaderClicked() {
     bool isOverdue = readerModel->isReaderOverdue(selectedReader);
     
     detail += QString("📇 <b>Mã thẻ:</b> %1<br>").arg(selectedReader->data.MaThe);
-    detail += QString("👤 <b>Họ tên:</b> %1 %2<br>")
+    detail += QString("<b>Họ tên:</b> %1 %2<br>")
               .arg(QString::fromStdString(selectedReader->data.Ho))
               .arg(QString::fromStdString(selectedReader->data.Ten));
-    detail += QString("👤 <b>Giới tính:</b> %1<br>")
+    detail += QString("<b>Giới tính:</b> %1<br>")
               .arg(selectedReader->data.Phai ? "Nam" : "Nữ");
-    detail += QString("📊 <b>Trạng thái:</b> %1<br>")
+    detail += QString("<b>Trạng thái:</b> %1<br>")
               .arg(selectedReader->data.TrangThai ? "Hoạt động" : "Khóa");
     
     // Borrowing status with warnings
     if (borrowedCount > 0) {
-        detail += QString("<br><span style='color: #F59E0B; font-weight: bold;'>⚠ Đang mượn: %1 cuốn</span><br>")
+        detail += QString("<br><span style='color: #F59E0B; font-weight: bold;'>Đang mượn: %1 cuốn</span><br>")
                   .arg(borrowedCount);
         if (isOverdue) {
-            detail += QString("<span style='color: #EF4444; font-weight: bold;'>⚠ CÓ SÁCH QUÁ HẠN!</span><br>");
+            detail += QString("<span style='color: #EF4444; font-weight: bold;'>CÓ SÁCH QUÁ HẠN!</span><br>");
         }
     } else {
         detail += QString("<br><span style='color: #10B981;'>✓ Không có sách đang mượn</span><br>");
@@ -958,7 +1024,7 @@ void WidgetQuanLyDocGia::onDeleteReaderClicked() {
     // Warning messages
     QString warningMsg;
     if (borrowedCount > 0) {
-        warningMsg = "\n\n⚠ LƯU Ý:\n";
+        warningMsg = "\n\nLƯU Ý:\n";
         warningMsg += "• Độc giả đang mượn sách, nên xử lý trả sách trước\n";
         warningMsg += "• Xóa sẽ mất toàn bộ lịch sử mượn trả\n";
         warningMsg += "• Hành động này không thể hoàn tác";
@@ -984,7 +1050,7 @@ void WidgetQuanLyDocGia::onDeleteReaderClicked() {
         // For now, just show placeholder
         AnimationHelper::shake(this);
         QMessageBox::information(this, "Xóa Độc Giả", 
-            "⚠ Chức năng xóa độc giả đang được phát triển.\n"
+            "Chức năng xóa độc giả đang được phát triển.\n"
             "Cần implement hàm XoaDocGia() trong backend.");
         
         // When implemented:
@@ -1034,7 +1100,7 @@ void WidgetQuanLyDocGia::performSearch() {
         try {
             onSearchClicked();
         } catch (...) {
-            showMessage("❌ Lỗi khi thực hiện tìm kiếm!", true);
+            showMessage("Lỗi khi thực hiện tìm kiếm!", true);
         }
     }
 }
@@ -1283,7 +1349,7 @@ void WidgetQuanLyDocGia::onShowWarnings() {
             }
             
             if (borrowing > 0) {
-                warnings += QString("⚠️ Độc giả KHÓA nhưng còn %1 sách chưa trả: %2 %3 (Mã: %4)\n")
+                warnings += QString("Độc giả KHÓA nhưng còn %1 sách chưa trả: %2 %3 (Mã: %4)\n")
                             .arg(borrowing)
                             .arg(QString::fromStdString(reader->data.Ho))
                             .arg(QString::fromStdString(reader->data.Ten))
@@ -1320,7 +1386,7 @@ void WidgetQuanLyDocGia::onShowWarnings() {
             "Không có cảnh báo nào!\n\n"
             "✓ Tất cả độc giả đều ổn định.");
     } else {
-        QMessageBox::warning(this, QString("Cảnh Báo ⚠️ (%1)").arg(warnCount),
+        QMessageBox::warning(this, QString("Cảnh Báo (%1)").arg(warnCount),
             QString("Phát hiện %1 vấn đề:\n\n%2").arg(warnCount).arg(warnings));
     }
 }

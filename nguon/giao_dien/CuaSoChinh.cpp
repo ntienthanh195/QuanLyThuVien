@@ -127,14 +127,10 @@ void CuaSoChinh::thieLapGiaoDien() {
         bangDieuKhien = new BangDieuKhien();
         qDebug() << "✓ bangDieuKhien";
         
-        widgetSach = new WidgetQuanLySach();
-        qDebug() << "✓ widgetSach";
-        
-        widgetDocGia = new WidgetQuanLyDocGia();
-        qDebug() << "✓ widgetDocGia";
-        
-        widgetMuonTra = new WidgetMuonTraSach();
-        qDebug() << "✓ widgetMuonTra";
+        // Defer creation of heavy management widgets to on-demand (lazy load)
+        widgetSach = nullptr;
+        widgetDocGia = nullptr;
+        widgetMuonTra = nullptr;
         
     } catch (const std::exception& e) {
         qCritical() << "LỖI khi khởi tạo widgets:" << e.what();
@@ -246,11 +242,8 @@ void CuaSoChinh::thieLapGiaoDien() {
         if (bangDieuKhien) bangDieuKhien->capNhatRealtimeTuWidget();
     });
     
-    // Thêm vào stack
+    // Thêm vào stack - chỉ thêm dashboard lúc khởi tạo
     boChuyenManHinh->addWidget(bangDieuKhien);      // Index 0
-    boChuyenManHinh->addWidget(widgetSach);         // Index 1
-    boChuyenManHinh->addWidget(widgetDocGia);       // Index 2
-    boChuyenManHinh->addWidget(widgetMuonTra);      // Index 3
     
     // Thanh trạng thái - responsive padding
     int statusPadding = ResponsiveHelper::getScaledSpacing(5, screenSize);
@@ -486,6 +479,12 @@ void CuaSoChinh::hienThiManHinhChinh() {
 }
 
 void CuaSoChinh::hienThiQuanLySach() {
+    // Lazy-create the widget if needed to speed up startup
+    if (!widgetSach) {
+        qDebug() << "Lazy-loading WidgetQuanLySach";
+        widgetSach = new WidgetQuanLySach();
+        boChuyenManHinh->addWidget(widgetSach);
+    }
     boChuyenManHinh->setCurrentWidget(widgetSach);
     widgetSach->taiLaiDanhSach();
     danhSachMenu->setCurrentRow(1);
@@ -494,6 +493,11 @@ void CuaSoChinh::hienThiQuanLySach() {
 }
 
 void CuaSoChinh::hienThiQuanLyDocGia() {
+    if (!widgetDocGia) {
+        qDebug() << "Lazy-loading WidgetQuanLyDocGia";
+        widgetDocGia = new WidgetQuanLyDocGia();
+        boChuyenManHinh->addWidget(widgetDocGia);
+    }
     boChuyenManHinh->setCurrentWidget(widgetDocGia);
     widgetDocGia->taiLaiDanhSach();
     danhSachMenu->setCurrentRow(2);
@@ -502,6 +506,11 @@ void CuaSoChinh::hienThiQuanLyDocGia() {
 }
 
 void CuaSoChinh::hienThiMuonTraSach() {
+    if (!widgetMuonTra) {
+        qDebug() << "Lazy-loading WidgetMuonTraSach";
+        widgetMuonTra = new WidgetMuonTraSach();
+        boChuyenManHinh->addWidget(widgetMuonTra);
+    }
     boChuyenManHinh->setCurrentWidget(widgetMuonTra);
     widgetMuonTra->lamMoi();
     danhSachMenu->setCurrentRow(3);

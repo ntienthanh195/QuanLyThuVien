@@ -178,8 +178,8 @@ void WidgetMuonTraSach::setupUI() {
     // Status label cần được tạo tại widget cha, không nằm trong stacked
     statusLabel = new QLabel(this);
     statusLabel->setWordWrap(true);
-    statusLabel->setProperty("class", "SubText");
-    statusLabel->setStyleSheet("padding: 14px 20px; border: 1px solid #2B2B40; border-radius: 8px; background: #1E1E2D;");
+    // Use centralized InfoBox styling instead of inline stylesheet
+    statusLabel->setProperty("class", "InfoBox");
     
     // Thêm statusLabel vào layout chính nếu cần
     containerLayout->addWidget(statusLabel);
@@ -214,14 +214,22 @@ void WidgetMuonTraSach::setupStateNhapMaThe() {
     
     // Icon 64px
     QLabel *iconLabel = new QLabel("👤");
-    iconLabel->setStyleSheet("font-size: 64px; color: #3699FF; background: transparent;");
+    // Set size via font rather than inline stylesheet
+    QFont iconFont = iconLabel->font();
+    iconFont.setPointSize(64);
+    iconLabel->setFont(iconFont);
+    // Keep background transparent via class
+    iconLabel->setProperty("class", "IconTransparent");
     iconLabel->setAlignment(Qt::AlignCenter);
     
     // Title
     QLabel *titleLabel = new QLabel("Chào mừng");
     titleLabel->setProperty("class", "CardTitle");
     titleLabel->setAlignment(Qt::AlignCenter);
-    titleLabel->setStyleSheet("border: none; padding: 0; font-size: 24px; background: transparent;");
+    QFont titleFont = titleLabel->font();
+    titleFont.setPointSize(24);
+    titleFont.setBold(true);
+    titleLabel->setFont(titleFont);
     
     // Subtitle
     lblHuongDan = new QLabel("Vui lòng nhập mã thẻ độc giả để truy cập");
@@ -345,9 +353,13 @@ void WidgetMuonTraSach::setupStateThongTinDocGia() {
     tableSachDangMuon->setEditTriggers(QAbstractItemView::NoEditTriggers);
     tableSachDangMuon->verticalHeader()->setDefaultSectionSize(45);
     tableSachDangMuon->setMinimumHeight(300);
-    
-    tableLayout->addWidget(tableSachDangMuon);
-    rightLayout->addWidget(tableCard);
+    // Let table expand to use vertical/horizontal empty space
+    tableSachDangMuon->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    // Make the 'Tên Sách' column expand to fill remaining width
+    tableSachDangMuon->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+
+    tableLayout->addWidget(tableSachDangMuon, 1);
+    rightLayout->addWidget(tableCard, 1);
     
     // Action Buttons (To, nổi bật)
     QHBoxLayout *actionLayout = new QHBoxLayout();
@@ -368,11 +380,11 @@ void WidgetMuonTraSach::setupStateThongTinDocGia() {
     btnBaoMat->setMinimumHeight(55);
     btnBaoMat->setMinimumWidth(180);
     
+    // Right-align action buttons to use empty space effectively
     actionLayout->addStretch();
     actionLayout->addWidget(btnMuonSachMoi);
     actionLayout->addWidget(btnTraSach);
     actionLayout->addWidget(btnBaoMat);
-    actionLayout->addStretch();
     
     rightLayout->addLayout(actionLayout);
     

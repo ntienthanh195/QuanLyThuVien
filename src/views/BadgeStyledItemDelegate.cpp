@@ -12,7 +12,8 @@ void BadgeStyledItemDelegate::paint(QPainter *painter, const QStyleOptionViewIte
                                      const QModelIndex &index) const
 {
     // Kiểm tra xem đây có phải là cột trạng thái không
-    if (index.column() == 7) { // Giả sử cột 7 là cột trạng thái
+    // WidgetQuanLyDocGia uses column 4 for trạng thái; make delegate respond to that column
+    if (index.column() == 4) {
         painter->save();
         
         // Vẽ background nếu được chọn hoặc hover - Deep Dark Theme
@@ -21,11 +22,11 @@ void BadgeStyledItemDelegate::paint(QPainter *painter, const QStyleOptionViewIte
         } else if (option.state & QStyle::State_MouseOver) {
             painter->fillRect(option.rect, QColor(54, 153, 255, 20)); // Hover lighter
         } else {
-            // Alternating row colors for deep dark theme
+            // Alternating row colors adjusted to navy theme
             if (index.row() % 2 == 0) {
-                painter->fillRect(option.rect, QColor("#1E1E2D"));
+                painter->fillRect(option.rect, QColor("#071233"));
             } else {
-                painter->fillRect(option.rect, QColor("#232334"));
+                painter->fillRect(option.rect, QColor("#08283d"));
             }
         }
         
@@ -33,11 +34,11 @@ void BadgeStyledItemDelegate::paint(QPainter *painter, const QStyleOptionViewIte
         int trangThaiInt = index.data(Qt::UserRole).toInt();
         TrangThaiSach trangThai = static_cast<TrangThaiSach>(trangThaiInt);
         
-        // Vẽ badge nhỏ gọn hơn ở giữa cell
+        // Vẽ badge gọn giữa ô với kích thước tương đồng Quản Lý Sách
         QRect badgeRect = option.rect;
-        badgeRect.setWidth(90);  // Giảm từ 100 xuống 90
+        badgeRect.setWidth(84);
+        badgeRect.setHeight(28);
         badgeRect.moveCenter(option.rect.center());
-        badgeRect.setHeight(26); // Tăng từ 24 lên 26 để dễ đọc hơn
         
         veBadgeTrangThai(painter, badgeRect, trangThai);
         
@@ -52,8 +53,8 @@ QSize BadgeStyledItemDelegate::sizeHint(const QStyleOptionViewItem &option,
                                          const QModelIndex &index) const
 {
     QSize size = QStyledItemDelegate::sizeHint(option, index);
-    if (index.column() == 7) {
-        size.setHeight(qMax(32, size.height()));
+    if (index.column() == 4) {
+        size.setHeight(qMax(36, size.height()));
     }
     return size;
 }
@@ -87,12 +88,12 @@ void BadgeStyledItemDelegate::veBadgeTrangThai(QPainter *painter, const QRect &r
             break;
     }
     
-    // Vẽ nền badge với bo góc nhỏ hơn và border
+    // Vẽ nền badge với bo góc vừa phải và border
     painter->setPen(QPen(borderColor, 1));
     painter->setBrush(bgColor);
-    painter->drawRoundedRect(rect, 6, 6); // Giảm từ 12 xuống 6 để badge gọn hơn
-    
-    // Vẽ text với font nhỏ hơn
+    painter->drawRoundedRect(rect, 6, 6);
+
+    // Vẽ text với font vừa phải để cân bằng không gian
     painter->setPen(textColor);
     QFont font = painter->font();
     font.setWeight(QFont::DemiBold);

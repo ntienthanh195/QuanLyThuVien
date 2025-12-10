@@ -117,7 +117,6 @@ private:
     QPushButton *nutTrangSau;
     QLabel *nhanTrangHienTai;
     QLabel *nhanTongDocGia;
-    QPushButton *nutHuyChonDocGia;
     
     // Panel chi tiết (cột phải)
     QLabel *nhanThongTinDocGia;

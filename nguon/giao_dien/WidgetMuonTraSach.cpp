@@ -78,7 +78,7 @@ public:
 
     int columnCount(const QModelIndex &parent = QModelIndex()) const override {
         Q_UNUSED(parent)
-        return 6; // STT, MaThe, HoTen, Phai, TrangThai, Sach
+        return 7; // STT, MaThe, Ho, Ten, Phai, TrangThai, Sach
     }
 
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override {
@@ -90,12 +90,18 @@ public:
         if (!docGia) return QVariant();
 
         switch (index.column()) {
-        case 0: return QString::number(absIdx + 1); // STT (absolute)
+        case 0: // STT: relative within current page for clearer UX
+            return QString::number(index.row() + 1);
         case 1: return QString::number(docGia->data.MaThe);
-        case 2: return QString::fromStdString(std::string(docGia->data.Ho + std::string(" ")) + docGia->data.Ten);
-        case 3: return docGia->data.Phai ? QStringLiteral("Nữ") : QStringLiteral("Nam");
-        case 4: return docGia->data.TrangThai == 1 ? QStringLiteral("Hoạt động") : QStringLiteral("Khoá");
-        case 5: return QString("%1/3").arg(docGia->data.soSachDangMuon);
+        case 2: { // Hiển thị cả Họ và Tên trong cùng một cột để tránh bị rút gọn
+            QString ho = QString::fromStdString(docGia->data.Ho);
+            QString ten = QString::fromStdString(docGia->data.Ten);
+            return QString("%1 %2").arg(ho, ten).trimmed();
+        }
+        case 3: return QString::fromStdString(docGia->data.Ten);
+        case 4: return docGia->data.Phai ? QStringLiteral("Nữ") : QStringLiteral("Nam");
+        case 5: return docGia->data.TrangThai == 1 ? QStringLiteral("Hoạt động") : QStringLiteral("Khoá");
+        case 6: return QString("%1/3").arg(docGia->data.soSachDangMuon);
         default: return QVariant();
         }
     }
@@ -105,10 +111,11 @@ public:
             switch (section) {
             case 0: return QStringLiteral("STT");
             case 1: return QStringLiteral("Mã Thẻ");
-            case 2: return QStringLiteral("Họ Tên");
-            case 3: return QStringLiteral("Phái");
-            case 4: return QStringLiteral("Trạng Thái");
-            case 5: return QStringLiteral("Sách");
+            case 2: return QStringLiteral("Họ & Tên");
+            case 3: return QStringLiteral("Tên");
+            case 4: return QStringLiteral("Phái");
+            case 5: return QStringLiteral("Trạng Thái");
+            case 6: return QStringLiteral("Sách");
             }
         }
         return QAbstractTableModel::headerData(section, orientation, role);
@@ -197,11 +204,15 @@ void WidgetMuonTraSach::thieLapGiaoDien() {
     iconTieuDe->setIcon(QIcon(":/icons/exchange.svg"));
     iconTieuDe->setIconSize(QSize(28, 28));
     iconTieuDe->setFlat(true);
-    iconTieuDe->setStyleSheet("border: none; background: transparent;");
+    iconTieuDe->setProperty("class", "IconTransparent");
     
     int titleSize = ResponsiveHelper::getScaledFontSize(28, screenSize);
     QLabel *tieuDe = new QLabel("MƯỢN TRẢ SÁCH");
-    tieuDe->setStyleSheet(QString("font-size: %1px; font-weight: bold; color: #FFFFFF;").arg(titleSize));
+    QFont ft = tieuDe->font();
+    ft.setPointSize(titleSize);
+    ft.setBold(true);
+    tieuDe->setFont(ft);
+    tieuDe->setProperty("class", "PageTitle");
     
     layoutTieuDe->addWidget(iconTieuDe);
     layoutTieuDe->addWidget(tieuDe);
@@ -209,15 +220,9 @@ void WidgetMuonTraSach::thieLapGiaoDien() {
     boTriChinh->addLayout(layoutTieuDe);
     
     // Tab widget với SVG icons
-    int tabPadding = ResponsiveHelper::getScaledSpacing(12, screenSize);
-    int tabFontSize = ResponsiveHelper::getScaledFontSize(14, screenSize);
+    // Tab padding and font size are now controlled via QSS classes
     hopTab = new QTabWidget();
-    hopTab->setStyleSheet(QString(
-        "QTabWidget::pane { background-color: #1E1E2D; border: 1px solid #2B2B40; border-radius: 12px; }"
-        "QTabBar::tab { background-color: #252534; color: #B5B5C3; padding: %1px 30px; "
-        "border-top-left-radius: 8px; border-top-right-radius: 8px; font-size: %2px; }"
-        "QTabBar::tab:selected { background-color: #3699FF; color: white; font-weight: bold; }"
-    ).arg(tabPadding).arg(tabFontSize));
+    hopTab->setProperty("class", "TabCustom");
     
     thieLapTabMuonSach();
     thieLapTabTraSach();
@@ -242,83 +247,86 @@ void WidgetMuonTraSach::thieLapTabMuonSach() {
     
     // Tìm kiếm độc giả
     QLabel *tieuDeTim = new QLabel("Tìm Kiếm:");
-    tieuDeTim->setStyleSheet("color: #B5B5C3; font-size: 13px; font-weight: bold;");
+    tieuDeTim->setProperty("class", "LabelSearchTitle");
     
     QHBoxLayout *boTriTim = new QHBoxLayout();
     oNhapTimDocGia = new QLineEdit();
     oNhapTimDocGia->setPlaceholderText("Nhập tên, mã thẻ để tìm kiếm...");
     oNhapTimDocGia->setMinimumHeight(40);
-    oNhapTimDocGia->setStyleSheet(
-        "QLineEdit { background-color: #252534; color: #FFFFFF; border: 1px solid #2B2B40; "
-        "border-radius: 8px; padding: 8px 12px; font-size: 13px; }"
-        "QLineEdit:focus { border: 1px solid #3699FF; }"
-    );
+    oNhapTimDocGia->setProperty("class", "InputDark");
     
     nutTimDocGia = new QPushButton();
     nutTimDocGia->setIcon(QIcon(":/icons/search.svg"));
     nutTimDocGia->setIconSize(QSize(18, 18));
     nutTimDocGia->setMinimumHeight(40);
-    nutTimDocGia->setMinimumWidth(80);
-    nutTimDocGia->setStyleSheet(
-        "QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #3699FF, stop:1 #1BC5BD); "
-        "color: white; border: none; border-radius: 8px; font-weight: bold; }"
-        "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #187DE4, stop:1 #0F9A94); }"
-    );
+    nutTimDocGia->setMinimumWidth(90);
+    nutTimDocGia->setText("Tìm");
+    nutTimDocGia->setProperty("class", "GradientPrimary");
+    nutTimDocGia->setToolTip("Tìm độc giả (Enter hoặc nhấn nút)");
+    nutTimDocGia->setCursor(Qt::PointingHandCursor);
     
     QPushButton *nutLamMoi = new QPushButton();
     nutLamMoi->setIcon(QIcon(":/icons/refresh.svg"));
     nutLamMoi->setIconSize(QSize(18, 18));
     nutLamMoi->setMinimumHeight(40);
-    nutLamMoi->setMinimumWidth(40);
-    nutLamMoi->setStyleSheet(
-        "QPushButton { background-color: #252534; color: #B5B5C3; border: 1px solid #2B2B40; "
-        "border-radius: 8px; }"
-        "QPushButton:hover { background-color: #2B2B40; border: 1px solid #3699FF; }"
-    );
+    nutLamMoi->setMinimumWidth(90);
+    nutLamMoi->setText(QString::fromUtf8("Làm mới"));
+    nutLamMoi->setProperty("class", "IconButton");
+    nutLamMoi->setProperty("role", "withText");
+    nutLamMoi->setToolTip("Làm mới danh sách độc giả");
+    nutLamMoi->setCursor(Qt::PointingHandCursor);
     
-    // Nút quét mã độc giả
-    nutQuetMaDocGia = new QPushButton("🔍");
+    // Nút quét mã độc giả (icon-only)
+    nutQuetMaDocGia = new QPushButton();
+    nutQuetMaDocGia->setIcon(QIcon(":/icons/search.svg"));
+    nutQuetMaDocGia->setIconSize(QSize(18,18));
     nutQuetMaDocGia->setMinimumHeight(40);
-    nutQuetMaDocGia->setMinimumWidth(40);
+    nutQuetMaDocGia->setMinimumWidth(90);
+    nutQuetMaDocGia->setText(QString::fromUtf8("Quét"));
     nutQuetMaDocGia->setToolTip("Quét mã thẻ độc giả");
-    nutQuetMaDocGia->setStyleSheet(
-        "QPushButton { background-color: #1BC5BD; color: white; border: none; "
-        "border-radius: 8px; font-size: 18px; }"
-        "QPushButton:hover { background-color: #0BB7AF; }"
-    );
+    nutQuetMaDocGia->setProperty("class", "IconButton");
+    nutQuetMaDocGia->setProperty("role", "withText");
+    nutQuetMaDocGia->setCursor(Qt::PointingHandCursor);
     
     boTriTim->addWidget(oNhapTimDocGia, 1);
     boTriTim->addWidget(nutTimDocGia);
-    boTriTim->addWidget(nutQuetMaDocGia);
-    boTriTim->addWidget(nutLamMoi);
     
     boTriTrai->addWidget(tieuDeTim);
     boTriTrai->addLayout(boTriTim);
+
+    // Legacy cancel button removed — no visible 'HỦY CHỌN ĐỘC GIẢ'
+
+    // Action bar: các nút thao tác nhanh phía trên bảng độc giả
+    QWidget *actionBar = new QWidget();
+    actionBar->setProperty("class", "ActionBar");
+    QHBoxLayout *actionBarLayout = new QHBoxLayout(actionBar);
+    actionBarLayout->setContentsMargins(0, 0, 0, 0);
+    actionBarLayout->setSpacing(8);
+    // left-side quick actions (keep only useful ones)
+    actionBarLayout->addWidget(nutQuetMaDocGia);
+    actionBarLayout->addWidget(nutLamMoi);
+    // stretch to push following widgets to the right
+    actionBarLayout->addStretch();
+    boTriTrai->addWidget(actionBar);
     
     // Bảng độc giả (view + model)
     bangDocGia = new QTableView();
     modelDocGia = new DocGiaTableModel(&danhSachDocGia, this);
     bangDocGia->setModel(modelDocGia);
     thieLapBangDocGia();
+    // Match row height to Quản Lý Sách
+    bangDocGia->verticalHeader()->setDefaultSectionSize(45);
+    // Hide the vertical header numbers to avoid duplicate numbering UX
+    bangDocGia->verticalHeader()->setVisible(false);
     boTriTrai->addWidget(bangDocGia, 1);
     
     // Thông tin tổng
     nhanTongDocGia = new QLabel("Tổng: 0 độc giả");
-    nhanTongDocGia->setStyleSheet("color: #B5B5C3; font-size: 13px; padding: 8px 0;");
+    nhanTongDocGia->setProperty("class", "SubText");
     
     boTriTrai->addWidget(nhanTongDocGia);
     
-    // Nút hủy chọn
-    nutHuyChonDocGia = new QPushButton("HỦY CHỎN ĐỘC GIẢ");
-    nutHuyChonDocGia->setMinimumHeight(40);
-    nutHuyChonDocGia->setEnabled(false);
-    nutHuyChonDocGia->setStyleSheet(
-        "QPushButton { background-color: #F64E60; color: white; border: none; "
-        "border-radius: 8px; font-weight: bold; font-size: 13px; }"
-        "QPushButton:hover { background-color: #D12E40; }"
-        "QPushButton:disabled { background-color: #2B2B40; color: #6C6C80; }"
-    );
-    boTriTrai->addWidget(nutHuyChonDocGia);
+    // Legacy cancel button removed earlier
     
     // === CỘT PHẢI: THÔNG TIN CHI TIẾT (50%) ===
     QWidget *cotPhai = new QWidget();
@@ -328,28 +336,20 @@ void WidgetMuonTraSach::thieLapTabMuonSach() {
     
     // Panel thông tin độc giả
     QGroupBox *nhomDocGia = new QGroupBox("ĐỘC GIẢ");
-    nhomDocGia->setStyleSheet(
-        "QGroupBox { background-color: #252534; border: 1px solid #2B2B40; "
-        "border-radius: 8px; padding: 15px; font-weight: bold; color: #FFA800; font-size: 13px; }"
-    );
+    nhomDocGia->setProperty("class", "GroupBoxProfile");
     QVBoxLayout *boTriDocGia = new QVBoxLayout(nhomDocGia);
     
     nhanThongTinDocGia = new QLabel("* Click vào danh sách độc giả để chọn");
-    nhanThongTinDocGia->setStyleSheet(
-        "color: #B5B5C3; font-size: 13px; padding: 15px; "
-        "background-color: #1E1E2D; border-radius: 6px;"
-    );
+    nhanThongTinDocGia->setProperty("class", "SelectedInfo");
+    nhanThongTinDocGia->setProperty("state", "empty");
     nhanThongTinDocGia->setWordWrap(true);
     nhanThongTinDocGia->setMinimumHeight(140);
     boTriDocGia->addWidget(nhanThongTinDocGia);
     boTriPhai->addWidget(nhomDocGia);
     
-    // Panel sÃ¡ch Ä‘ang mÆ°á»£n
-    QGroupBox *nhomSachDangMuon = new QGroupBox("SÃCH ÄANG MÆ¯á»¢N (0/3)");
-    nhomSachDangMuon->setStyleSheet(
-        "QGroupBox { background-color: #252534; border: 1px solid #2B2B40; "
-        "border-radius: 8px; padding: 15px; font-weight: bold; color: #3699FF; font-size: 13px; }"
-    );
+    // Panel sách đang mượn
+    QGroupBox *nhomSachDangMuon = new QGroupBox("SÁCH ĐANG MƯỢN (0/3)");
+    nhomSachDangMuon->setProperty("class", "GroupBoxBooks");
     nhanTieuDeSachDangMuon = nhomSachDangMuon;
     QVBoxLayout *boTriSachDangMuon = new QVBoxLayout(nhomSachDangMuon);
     
@@ -364,47 +364,30 @@ void WidgetMuonTraSach::thieLapTabMuonSach() {
     bangSachDangMuon->setSelectionMode(QAbstractItemView::SingleSelection);
     bangSachDangMuon->setEditTriggers(QAbstractItemView::NoEditTriggers);
     bangSachDangMuon->setMinimumHeight(280);
-    bangSachDangMuon->setStyleSheet(
-        "QTableView { background-color: #1E1E2D; color: #FFFFFF; gridline-color: #2B2B40; "
-        "border: 1px solid #2B2B40; border-radius: 6px; font-size: 12px; }"
-        "QHeaderView::section { background-color: #2B2B40; color: #B5B5C3; "
-        "border: none; padding: 8px; font-weight: bold; }"
-        "QTableView::item:selected { background-color: #3699FF; color: white; }"
-    );
+    bangSachDangMuon->setProperty("class", "InnerTable");
     boTriSachDangMuon->addWidget(bangSachDangMuon);
     
     // Nút In Lại Phiếu Mượn
     nutInLaiPhieu = new QPushButton("🖨️ In Lại Phiếu Mượn");
     nutInLaiPhieu->setMinimumHeight(35);
     nutInLaiPhieu->setEnabled(false);
-    nutInLaiPhieu->setStyleSheet(
-        "QPushButton { background-color: #8950FC; color: white; border: none; "
-        "border-radius: 6px; font-weight: bold; font-size: 13px; }"
-        "QPushButton:hover { background-color: #7337EE; }"
-        "QPushButton:disabled { background-color: #2B2B40; color: #6C6C80; }"
-    );
-    boTriSachDangMuon->addWidget(nutInLaiPhieu);
+    nutInLaiPhieu->setProperty("class", "AccentPurple");
+    nutInLaiPhieu->setProperty("compact", true);
+    nutInLaiPhieu->setToolTip("In lại phiếu mượn cho độc giả hiện tại");
+    nutInLaiPhieu->setIcon(QIcon(":/icons/print.svg"));
     
     boTriPhai->addWidget(nhomSachDangMuon);
     
     // Form nhập ISBN/Mã sách
     QGroupBox *nhomNhapSach = new QGroupBox("NHẬP ISBN SÁCH CẦN MƯỢN");
-    nhomNhapSach->setStyleSheet(
-        "QGroupBox { background-color: #252534; border: 1px solid #2B2B40; "
-        "border-radius: 8px; padding: 15px; font-weight: bold; color: #1BC5BD; font-size: 13px; }"
-    );
+    nhomNhapSach->setProperty("class", "GroupBoxInput");
     QHBoxLayout *boTriNhapSach = new QHBoxLayout(nhomNhapSach);
     
     oNhapISBN = new QLineEdit();
     oNhapISBN->setPlaceholderText("Mã Sách (*)");
     oNhapISBN->setMinimumHeight(40);
     oNhapISBN->setEnabled(false);
-    oNhapISBN->setStyleSheet(
-        "QLineEdit { background-color: #1E1E2D; color: #FFFFFF; border: 1px solid #2B2B40; "
-        "border-radius: 8px; padding: 8px 12px; font-size: 13px; }"
-        "QLineEdit:focus { border: 1px solid #1BC5BD; }"
-        "QLineEdit:disabled { background-color: #1E1E2D; color: #6C6C80; }"
-    );
+    oNhapISBN->setProperty("class", "InputISBN");
     
     // Tự động submit khi nhấn Enter (cho máy quét barcode/QR)
     connect(oNhapISBN, &QLineEdit::returnPressed, this, [this]() {
@@ -418,23 +401,11 @@ void WidgetMuonTraSach::thieLapTabMuonSach() {
     nutQuetMaSach = new QPushButton("🔍 Quét");
     nutQuetMaSach->setMinimumHeight(40);
     nutQuetMaSach->setEnabled(false);
-    nutQuetMaSach->setStyleSheet(
-        "QPushButton { background-color: #1BC5BD; color: white; border: none; "
-        "border-radius: 8px; padding: 0 15px; font-weight: bold; font-size: 13px; }"
-        "QPushButton:hover { background-color: #0BB7AF; }"
-        "QPushButton:disabled { background-color: #2B2B40; color: #6C6C80; }"
-    );
+    nutQuetMaSach->setProperty("class", "Accent");
     
     hopXacNhanMuon = new QCheckBox("Xác Nhận Mượn");
     hopXacNhanMuon->setEnabled(false);
-    hopXacNhanMuon->setStyleSheet(
-        "QCheckBox { color: #B5B5C3; font-size: 13px; font-weight: bold; spacing: 8px; }"
-        "QCheckBox::indicator { width: 20px; height: 20px; }"
-        "QCheckBox::indicator:unchecked { border: 2px solid #2B2B40; border-radius: 4px; background-color: #1E1E2D; }"
-        "QCheckBox::indicator:checked { border: 2px solid #1BC5BD; border-radius: 4px; background-color: #1BC5BD; "
-        "image: url(:/icons/check.svg); }"
-        "QCheckBox:disabled { color: #6C6C80; }"
-    );
+    hopXacNhanMuon->setProperty("class", "CheckboxBold");
     
     boTriNhapSach->addWidget(oNhapISBN, 1);
     boTriNhapSach->addWidget(nutQuetMaSach);
@@ -447,43 +418,50 @@ void WidgetMuonTraSach::thieLapTabMuonSach() {
     nutXacNhanMuon = new QPushButton("MƯỢN SÁCH");
     nutXacNhanMuon->setMinimumHeight(35);
     nutXacNhanMuon->setEnabled(false);
-    nutXacNhanMuon->setStyleSheet(
-        "QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #1BC5BD, stop:1 #0BB7AF); "
-        "color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 13px; }"
-        "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0F9A94, stop:1 #0A9A93); }"
-        "QPushButton:disabled { background-color: #2B2B40; color: #6C6C80; }"
-    );
+    nutXacNhanMuon->setProperty("class", "Success");
+    nutXacNhanMuon->setProperty("compact", true);
+    nutXacNhanMuon->setToolTip("Xác nhận mượn sách cho độc giả");
+    nutXacNhanMuon->setIcon(QIcon(":/icons/plus.svg"));
     
     nutXacNhanTra = new QPushButton("TRẢ SÁCH");
     nutXacNhanTra->setMinimumHeight(35);
     nutXacNhanTra->setEnabled(false);
-    nutXacNhanTra->setStyleSheet(
-        "QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #3699FF, stop:1 #0D7DFF); "
-        "color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 13px; }"
-        "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #187DE4, stop:1 #0C6FE6); }"
-        "QPushButton:disabled { background-color: #2B2B40; color: #6C6C80; }"
-    );
+    nutXacNhanTra->setProperty("class", "Primary");
+    nutXacNhanTra->setProperty("compact", true);
+    nutXacNhanTra->setToolTip("Xác nhận trả sách");
+    nutXacNhanTra->setIcon(QIcon(":/icons/check.svg"));
     
     nutBaoMat = new QPushButton("BÁO MẤT");
     nutBaoMat->setMinimumHeight(35);
     nutBaoMat->setEnabled(false);
-    nutBaoMat->setStyleSheet(
-        "QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #F64E60, stop:1 #E63950); "
-        "color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 13px; }"
-        "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #D12E40, stop:1 #C72838); }"
-        "QPushButton:disabled { background-color: #2B2B40; color: #6C6C80; }"
-    );
+    nutBaoMat->setProperty("class", "Danger");
+    nutBaoMat->setProperty("compact", true);
+    nutBaoMat->setToolTip("Báo mất sách (đánh dấu và xử lý phạt)");
+    nutBaoMat->setIcon(QIcon(":/icons/trash.svg"));
     
     boTriNut->addWidget(nutXacNhanMuon);
     boTriNut->addWidget(nutXacNhanTra);
     boTriNut->addWidget(nutBaoMat);
-    
-    boTriPhai->addLayout(boTriNut);
+
+    // Right-side action bar: nhóm các nút thao tác cho phần sách
+    QWidget *actionBarRight = new QWidget();
+    actionBarRight->setProperty("class", "ActionBar");
+    QHBoxLayout *actionBarRightLayout = new QHBoxLayout(actionBarRight);
+    actionBarRightLayout->setContentsMargins(0, 0, 0, 0);
+    actionBarRightLayout->setSpacing(8);
+    // Arrange actions: primary actions first (Mượn/Trả/Báo Mất), print last
+    actionBarRightLayout->addStretch();
+    actionBarRightLayout->addWidget(nutXacNhanMuon);
+    actionBarRightLayout->addWidget(nutXacNhanTra);
+    actionBarRightLayout->addWidget(nutBaoMat);
+    actionBarRightLayout->addWidget(nutInLaiPhieu);
+
+    boTriPhai->addWidget(actionBarRight);
     boTriPhai->addStretch();
-    
-    // ThÃªm 2 cá»™t vÃ o layout chÃ­nh
-    boTriChinh->addWidget(cotTrai, 1);
-    boTriChinh->addWidget(cotPhai, 1);
+
+    // Thêm 2 cột vào layout chính - tăng tỷ lệ cho cột trái (danh sách) để tận dụng không gian
+    boTriChinh->addWidget(cotTrai, 3);
+    boTriChinh->addWidget(cotPhai, 2);
     
     hopTab->addTab(widgetMuonSach, "Mượn Sách");
     
@@ -497,7 +475,6 @@ void WidgetMuonTraSach::thieLapTabMuonSach() {
     connect(nutLamMoi, &QPushButton::clicked, this, &WidgetMuonTraSach::xuLyLamMoiDanhSach);
     connect(nutQuetMaDocGia, &QPushButton::clicked, this, &WidgetMuonTraSach::xuLyNutQuetMaDocGia);
     connect(bangDocGia, &QTableView::clicked, this, [this](const QModelIndex &idx){ this->xuLyChonDocGia(idx.row(), idx.column()); });
-    connect(nutHuyChonDocGia, &QPushButton::clicked, this, &WidgetMuonTraSach::xuLyHuyChonDocGia);
     connect(hopXacNhanMuon, &QCheckBox::checkStateChanged, this, &WidgetMuonTraSach::xuLyThayDoiCheckbox);
     connect(nutQuetMaSach, &QPushButton::clicked, this, &WidgetMuonTraSach::xuLyNutQuetMaSach);
     connect(nutXacNhanMuon, &QPushButton::clicked, this, &WidgetMuonTraSach::xuLyNutXacNhanMuon);
@@ -509,7 +486,7 @@ void WidgetMuonTraSach::thieLapTabMuonSach() {
                 this, [this](const QModelIndex &current, const QModelIndex &){ this->xuLyChonSachTra(current.row(), current.column()); });
     }
     
-    // Load dá»¯ liá»‡u ban Ä‘áº§u
+    // Load dữ liệu ban đầu
     hienThiDanhSachDocGia();
 }
 
@@ -522,23 +499,26 @@ void WidgetMuonTraSach::thieLapBangDocGia() {
     bangDocGia->setAlternatingRowColors(true);
     bangDocGia->setMinimumHeight(350);
 
-    // Default column widths
-    bangDocGia->setColumnWidth(0, 50);
-    bangDocGia->setColumnWidth(1, 80);
-    bangDocGia->setColumnWidth(2, 180);
-    bangDocGia->setColumnWidth(3, 70);
-    bangDocGia->setColumnWidth(4, 110);
-    bangDocGia->setColumnWidth(5, 70);
+    // Default column widths (adjusted for separated 'Họ' and 'Tên')
+    bangDocGia->setColumnWidth(0, 50);   // STT
+    bangDocGia->setColumnWidth(1, 80);   // Mã Thẻ
+    bangDocGia->setColumnWidth(2, 120);  // Họ
+    bangDocGia->setColumnWidth(3, 180);  // Tên (stretch)
+    bangDocGia->setColumnWidth(4, 70);   // Giới tính
+    bangDocGia->setColumnWidth(5, 110);  // Trạng Thái
+    bangDocGia->setColumnWidth(6, 70);   // Sách
 
-    bangDocGia->setStyleSheet(
-        "QTableView { background-color: #1E1E2D; color: #FFFFFF; gridline-color: #2B2B40; "
-        "border: 1px solid #2B2B40; border-radius: 8px; font-size: 13px; }"
-        "QHeaderView::section { background-color: #2B2B40; color: #B5B5C3; "
-        "border: none; padding: 10px; font-weight: bold; }"
-        "QTableView::item { padding: 8px; }"
-        "QTableView::item:selected { background-color: #3699FF; color: white; }"
-        "QTableView::item:alternate { background-color: #1A1A27; }"
-    );
+    // Make the table expand to fill available space and let the 'Tên' column take remaining width
+    bangDocGia->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    // Show full Họ & Tên in a single column: make it stretch and disable eliding
+    bangDocGia->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
+    // Hide the separate 'Tên' column (we combine Họ + Tên into column 2)
+    bangDocGia->setColumnHidden(3, true);
+    // Prevent Qt from eliding long text with '...'
+    bangDocGia->setTextElideMode(Qt::ElideNone);
+
+    // Use centralized InnerTable styling instead of inline stylesheet
+    bangDocGia->setProperty("class", "InnerTable");
 
     // Ensure header labels are shown (model provides them via headerData)
     bangDocGia->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
@@ -557,7 +537,7 @@ void WidgetMuonTraSach::hienThiDanhSachDocGia() {
     DuyetCayRaMang(rootDocGia, danhSach, tongSo);
 #endif
     
-    // LÆ°u danh sÃ¡ch Ä‘áº§y Ä‘á»§
+    // Lưu danh sách đầy đủ
     danhSachDocGia.clear();
     for (int i = 0; i < tongSo; i++) {
         danhSachDocGia.push_back(danhSach[i]);
@@ -592,20 +572,20 @@ void WidgetMuonTraSach::xuLyTimKiem() {
     
     extern PTRDG rootDocGia;
     
-    // Kiá»ƒm tra xem lÃ  mÃ£ tháº» hay tÃªn
+    // Kiểm tra xem là mã thẻ hay tên
     bool laMaThe = false;
     int maThe = tuKhoa.toInt(&laMaThe);
     
     danhSachDocGia.clear();
     
     if (laMaThe) {
-        // TÃ¬m theo mÃ£ tháº»
+        // Tìm theo mã thẻ
         PTRDG docGia = timDocGia(rootDocGia, maThe);
         if (docGia) {
             danhSachDocGia.push_back(docGia);
         }
     } else {
-        // TÃ¬m theo tÃªn
+        // Tìm theo tên
         PTRDG ketQua[1000];
         int soKetQua = TimDocGiaTheoHoTen(rootDocGia, tuKhoa.toStdString(), ketQua, 1000);
         for (int i = 0; i < soKetQua; i++) {
@@ -613,7 +593,7 @@ void WidgetMuonTraSach::xuLyTimKiem() {
         }
     }
     
-    // Cáº­p nháº­t phÃ¢n trang
+    // Cập nhật phân trang
     trangHienTai = 1;
     tongSoTrang = (danhSachDocGia.size() + soDocGiaTrenTrang - 1) / soDocGiaTrenTrang;
     if (tongSoTrang < 1) tongSoTrang = 1;
@@ -649,36 +629,40 @@ void WidgetMuonTraSach::xuLyChonDocGia(int hang, int) {
     
     docGiaHienTai = danhSachDocGia[chiSoThucTe];
     
-    // Hiá»ƒn thá»‹ thÃ´ng tin Ä‘á»™c giáº£
+    // Hiển thị thông tin độc giả
     QString thongTin = QString(
-        "<b>MÃ£ Tháº»:</b> %1<br>"
-        "<b>Há» TÃªn:</b> %2 %3<br>"
-        "<b>Giá»›i TÃ­nh:</b> %4<br>"
-        "<b>Tráº¡ng ThÃ¡i:</b> <span style='color:%5'>%6</span><br>"
-        "<b>Äang MÆ°á»£n:</b> <span style='color:%7'>%8/3 cuá»‘n</span>"
+        "<b>Mã Thẻ:</b> %1<br>"
+        "<b>Họ Tên:</b> %2 %3<br>"
+        "<b>Giới Tính:</b> %4<br>"
+        "<b>Trạng Thái:</b> <span style='color:%5'>%6</span><br>"
+        "<b>Đang Mượn:</b> <span style='color:%7'>%8/3 cuốn</span>"
     )
     .arg(docGiaHienTai->data.MaThe)
     .arg(QString::fromStdString(docGiaHienTai->data.Ho))
     .arg(QString::fromStdString(docGiaHienTai->data.Ten))
-    .arg(docGiaHienTai->data.Phai ? "Ná»¯" : "Nam")
+    .arg(docGiaHienTai->data.Phai ? "Nữ" : "Nam")
     .arg(docGiaHienTai->data.TrangThai == 1 ? "#1BC5BD" : "#F64E60")
-    .arg(docGiaHienTai->data.TrangThai == 1 ? "Hoáº¡t Ä‘á»™ng" : "KhÃ³a")
+    .arg(docGiaHienTai->data.TrangThai == 1 ? "Hoạt động" : "Khoá")
     .arg(docGiaHienTai->data.soSachDangMuon >= 3 ? "#F64E60" : "#FFA800")
     .arg(docGiaHienTai->data.soSachDangMuon);
     
     SafeGui::safeSetText(nhanThongTinDocGia, thongTin);
-    SafeGui::safeSetStyleSheet(nhanThongTinDocGia,
-        "color: #FFFFFF; font-size: 13px; padding: 15px; "
-        "background-color: #1E1E2D; border-radius: 6px;"
-    );
+    // Use QSS class instead of inline stylesheet for selected reader info
+    nhanThongTinDocGia->setProperty("class", "SelectedInfo");
+    // compute stripe (odd/even) based on absolute index (human row number)
+    int humanIndex = chiSoThucTe + 1;
+    QString stripe = ((humanIndex % 2) == 1) ? QString("odd") : QString("even");
+    nhanThongTinDocGia->setProperty("state", "filled");
+    nhanThongTinDocGia->setProperty("stripe", stripe);
+    if (nhanThongTinDocGia->style()) { nhanThongTinDocGia->style()->unpolish(nhanThongTinDocGia); nhanThongTinDocGia->style()->polish(nhanThongTinDocGia); }
+    nhanThongTinDocGia->update();
     
-    // Load sÃ¡ch Ä‘ang mÆ°á»£n
+    // Load sách đang mượn
     capNhatBangSachDangMuon();
     
-    // KÃ­ch hoáº¡t cÃ¡c nÃºt
-    nutHuyChonDocGia->setEnabled(true);
-    
-    // Kiá»ƒm tra Ä‘iá»u kiá»‡n mÆ°á»£n
+    // Kích hoạt các nút (nút hủy chọn đã bị loại bỏ; các điều khiển khác vẫn được bật)
+
+    // Kiểm tra điều kiện mượn
     if (docGiaHienTai->data.TrangThai == 1 && docGiaHienTai->data.soSachDangMuon < 3) {
         oNhapISBN->setEnabled(true);
         hopXacNhanMuon->setEnabled(true);
@@ -692,11 +676,12 @@ void WidgetMuonTraSach::xuLyHuyChonDocGia() {
     docGiaHienTai = nullptr;
     bangDocGia->clearSelection();
     
-    SafeGui::safeSetText(nhanThongTinDocGia, "* Click vÃ o danh sÃ¡ch Ä‘á»™c giáº£ Ä‘á»ƒ chá»n");
-    SafeGui::safeSetStyleSheet(nhanThongTinDocGia,
-        "color: #B5B5C3; font-size: 13px; padding: 15px; "
-        "background-color: #1E1E2D; border-radius: 6px;"
-    );
+    SafeGui::safeSetText(nhanThongTinDocGia, "* Click vào danh sách độc giả để chọn");
+    nhanThongTinDocGia->setProperty("class", "SelectedInfo");
+    nhanThongTinDocGia->setProperty("state", "empty");
+    nhanThongTinDocGia->setProperty("stripe", QString());
+    if (nhanThongTinDocGia->style()) { nhanThongTinDocGia->style()->unpolish(nhanThongTinDocGia); nhanThongTinDocGia->style()->polish(nhanThongTinDocGia); }
+    nhanThongTinDocGia->update();
     
     // Clear model-backed data for borrowed books
     danhSachSachDangMuon.clear();
@@ -710,7 +695,6 @@ void WidgetMuonTraSach::xuLyHuyChonDocGia() {
     nutXacNhanMuon->setEnabled(false);
     nutXacNhanTra->setEnabled(false);
     nutBaoMat->setEnabled(false);
-    nutHuyChonDocGia->setEnabled(false);
 }
 
 void WidgetMuonTraSach::capNhatBangSachDangMuon() {
@@ -809,18 +793,18 @@ void WidgetMuonTraSach::xoaThongTinHienThi() {
 
 void WidgetMuonTraSach::xuLyNutXacNhanMuon() {
     if (!docGiaHienTai) {
-        QMessageBox::warning(this, "Cáº£nh BÃ¡o", "Vui lÃ²ng chá»n Ä‘á»™c giáº£ trÆ°á»›c!");
+        QMessageBox::warning(this, "Cảnh Báo", "Vui lòng chọn độc giả trước!");
         return;
     }
     
     if (!hopXacNhanMuon->isChecked()) {
-        QMessageBox::warning(this, "Cáº£nh BÃ¡o", "Vui lÃ²ng Ä‘Ã¡nh dáº¥u 'XÃ¡c Nháº­n MÆ°á»£n'!");
+        QMessageBox::warning(this, "Cảnh Báo", "Vui lòng đánh dấu 'Xác Nhận Mượn'!");
         return;
     }
     
     QString isbn = oNhapISBN->text().trimmed();
     if (isbn.isEmpty()) {
-        QMessageBox::warning(this, "Cáº£nh BÃ¡o", "Vui lÃ²ng nháº­p mÃ£ sÃ¡ch cáº§n mÆ°á»£n!");
+        QMessageBox::warning(this, "Cảnh Báo", "Vui lòng nhập mã sách cần mượn!");
         return;
     }
     
@@ -862,35 +846,35 @@ void WidgetMuonTraSach::xuLyNutXacNhanMuon() {
         GhiDanhSachDauSach(FilePathManager::getDauSachPathStd().c_str(), dsDauSach, soLuongDauSach, true);
         GhiDanhMucSach(FilePathManager::getDanhMucSachPathStd().c_str(), dsDauSach, soLuongDauSach, true);
         
-        QMessageBox::information(this, "ThÃ nh CÃ´ng", QString::fromStdString(ketQua));
-        emit thongBaoCapNhat("ÄÃ£ mÆ°á»£n sÃ¡ch thÃ nh cÃ´ng!");
+        QMessageBox::information(this, "Thành Công", QString::fromStdString(ketQua));
+        emit thongBaoCapNhat("Đã mượn sách thành công!");
         emit duLieuThayDoi(); // Realtime update Dashboard
         
-        // Cáº­p nháº­t láº¡i thÃ´ng tin
+        // Cập nhật lại thông tin
         capNhatBangSachDangMuon();
         oNhapISBN->clear();
         hopXacNhanMuon->setChecked(false);
         nutXacNhanMuon->setEnabled(false);
         
-        // Cáº­p nháº­t thÃ´ng tin Ä‘á»™c giáº£
+        // Cập nhật thông tin độc giả
         int chiSo = (trangHienTai - 1) * soDocGiaTrenTrang + bangDocGia->currentIndex().row();
         if (chiSo >= 0 && chiSo < (int)danhSachDocGia.size()) {
             xuLyChonDocGia(bangDocGia->currentIndex().row(), 0);
         }
     } else {
-        QMessageBox::warning(this, "Lá»—i", QString::fromStdString(ketQua));
+        QMessageBox::warning(this, "Lỗi", QString::fromStdString(ketQua));
     }
 }
 
 void WidgetMuonTraSach::xuLyNutXacNhanTra() {
     if (!docGiaHienTai) {
-        QMessageBox::warning(this, "Cáº£nh BÃ¡o", "Vui lÃ²ng chá»n Ä‘á»™c giáº£ trÆ°á»›c!");
+        QMessageBox::warning(this, "Cảnh Báo", "Vui lòng chọn độc giả trước!");
         return;
     }
     
     int dongChon = bangSachDangMuon->currentIndex().row();
     if (dongChon < 0) {
-        QMessageBox::warning(this, "Cáº£nh BÃ¡o", "Vui lÃ²ng chá»n sÃ¡ch cáº§n tráº£!");
+        QMessageBox::warning(this, "Cảnh Báo", "Vui lòng chọn sách cần trả!");
         return;
     }
     if (dongChon < 0 || dongChon >= (int)danhSachSachDangMuon.size()) {
@@ -902,8 +886,8 @@ void WidgetMuonTraSach::xuLyNutXacNhanTra() {
     QString maSach = QString::fromStdString(dto.maSach);
     QString tenSach = QString::fromStdString(dto.tenSach);
     
-    QMessageBox::StandardButton xacNhan = QMessageBox::question(this, "XÃ¡c Nháº­n Tráº£ SÃ¡ch",
-        QString("XÃ¡c nháº­n tráº£ sÃ¡ch:\n\nMÃ£: %1\nTÃªn: %2")
+    QMessageBox::StandardButton xacNhan = QMessageBox::question(this, "Xác Nhận Trả Sách",
+        QString("Xác nhận trả sách:\n\nMã: %1\nTên: %2")
             .arg(maSach)
             .arg(tenSach),
         QMessageBox::Yes | QMessageBox::No);
@@ -924,8 +908,8 @@ void WidgetMuonTraSach::xuLyNutXacNhanTra() {
             GhiDanhSachDauSach(FilePathManager::getDauSachPathStd().c_str(), dsDauSach, soLuongDauSach, true);
             GhiDanhMucSach(FilePathManager::getDanhMucSachPathStd().c_str(), dsDauSach, soLuongDauSach, true);
             
-            QMessageBox::information(this, "ThÃ nh CÃ´ng", QString::fromStdString(ketQua));
-            emit thongBaoCapNhat("ÄÃ£ tráº£ sÃ¡ch thÃ nh cÃ´ng!");
+            QMessageBox::information(this, "Thành Công", QString::fromStdString(ketQua));
+            emit thongBaoCapNhat("Đã trả sách thành công!");
             emit duLieuThayDoi(); // Realtime update Dashboard
             
             // Cập nhật lại
@@ -940,20 +924,20 @@ void WidgetMuonTraSach::xuLyNutXacNhanTra() {
                 xuLyChonDocGia(bangDocGia->currentIndex().row(), 0);
             }
         } else {
-            QMessageBox::warning(this, "Lá»—i", QString::fromStdString(ketQua));
+            QMessageBox::warning(this, "Lỗi", QString::fromStdString(ketQua));
         }
     }
 }
 
 void WidgetMuonTraSach::xuLyNutBaoMat() {
     if (!docGiaHienTai) {
-        QMessageBox::warning(this, "Cáº£nh BÃ¡o", "Vui lÃ²ng chá»n Ä‘á»™c giáº£ trÆ°á»›c!");
+        QMessageBox::warning(this, "Cảnh Báo", "Vui lòng chọn độc giả trước!");
         return;
     }
     
     int dongChon = bangSachDangMuon->currentIndex().row();
     if (dongChon < 0) {
-        QMessageBox::warning(this, "Cáº£nh BÃ¡o", "Vui lÃ²ng chá»n sÃ¡ch cáº§n bÃ¡o máº¥t!");
+        QMessageBox::warning(this, "Cảnh Báo", "Vui lòng chọn sách cần báo mất!");
         return;
     }
     if (dongChon < 0 || dongChon >= (int)danhSachSachDangMuon.size()) {
@@ -964,8 +948,8 @@ void WidgetMuonTraSach::xuLyNutBaoMat() {
     QString maSach = QString::fromStdString(dto.maSach);
     QString tenSach = QString::fromStdString(dto.tenSach);
     
-    QMessageBox::StandardButton xacNhan = QMessageBox::question(this, "âš ï¸ XÃC NHáº¬N BÃO Máº¤T SÃCH",
-        QString("âš ï¸ BÃO Máº¤T SÃCH lÃ  thao tÃ¡c NGHIÃŠM TRá»ŒNG!\n\nÄá»™c giáº£ sáº½ bá»‹ khÃ³a tÃ i khoáº£n.\n\nMÃ£: %1\nTÃªn: %2\n\nBáº¡n cÃ³ cháº¯c cháº¯n?")
+    QMessageBox::StandardButton xacNhan = QMessageBox::question(this, "⚠️ XÁC NHẬN BÁO MẤT SÁCH",
+        QString("⚠️ BÁO MẤT SÁCH là thao tác NGHIÊM TRỌNG!\n\nĐộc giả sẽ bị khóa tài khoản.\n\nMã: %1\nTên: %2\n\nBạn có chắc chắn?")
             .arg(maSach)
             .arg(tenSach),
         QMessageBox::Yes | QMessageBox::No);
@@ -976,30 +960,30 @@ void WidgetMuonTraSach::xuLyNutBaoMat() {
         
         std::string ketQua = BaoMatSach(docGiaHienTai, maSach.toStdString(), dsDauSach, soLuongDauSach);
         
-        if (ketQua.find("ThÃ nh cÃ´ng") != std::string::npos || ketQua.find("thÃ nh cÃ´ng") != std::string::npos) {
-            // Tá»± Ä‘á»™ng lÆ°u file
+        if (ketQua.find("Thành công") != std::string::npos || ketQua.find("thành công") != std::string::npos) {
+            // Tự động lưu file
             extern PTRDG rootDocGia;
             saveDocGia(rootDocGia);
             GhiDanhSachDauSach(FilePathManager::getDauSachPathStd().c_str(), dsDauSach, soLuongDauSach, true);
             GhiDanhMucSach(FilePathManager::getDanhMucSachPathStd().c_str(), dsDauSach, soLuongDauSach, true);
             
-            QMessageBox::information(this, "ÄÃ£ BÃ¡o Máº¥t", QString::fromStdString(ketQua));
-            emit thongBaoCapNhat("ÄÃ£ bÃ¡o máº¥t sÃ¡ch!");
+            QMessageBox::information(this, "Đã Báo Mất", QString::fromStdString(ketQua));
+            emit thongBaoCapNhat("Đã báo mất sách!");
             emit duLieuThayDoi(); // Realtime update Dashboard
             
-            // Cáº­p nháº­t láº¡i
+            // Cập nhật lại
             capNhatBangSachDangMuon();
             nutXacNhanTra->setEnabled(false);
             nutBaoMat->setEnabled(false);
             
-            // Cáº­p nháº­t thÃ´ng tin Ä‘á»™c giáº£
+            // Cập nhật thông tin độc giả
             int chiSo = (trangHienTai - 1) * soDocGiaTrenTrang + bangDocGia->currentIndex().row();
             if (chiSo >= 0 && chiSo < (int)danhSachDocGia.size()) {
                 xuLyChonDocGia(bangDocGia->currentIndex().row(), 0);
             }
             
         } else {
-            QMessageBox::warning(this, "Lá»—i", QString::fromStdString(ketQua));
+            QMessageBox::warning(this, "Lỗi", QString::fromStdString(ketQua));
         }
     }
 }

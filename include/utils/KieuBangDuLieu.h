@@ -99,15 +99,16 @@ private:
 namespace StyleBang {
     // Deep Dark Theme
     namespace HienDai {
-        const QString MAU_NEN_CHAN = "#1E1E2D";
-        const QString MAU_NEN_LE = "#232334";
-        const QString MAU_HOVER = "rgba(54, 153, 255, 0.08)";
-        const QString MAU_CHON = "rgba(54, 153, 255, 0.15)";
-        const QString MAU_VIEN_CHON = "#3699FF";
-        const QString MAU_CHU = "#B5B5C3";
-        const QString MAU_HEADER_BG = "#232334";
-        const QString MAU_HEADER_TEXT = "#B5B5C3";
-        const QString MAU_BORDER = "#2B2B40";
+        // Slate Grey palette (applied site-wide)
+        const QString MAU_NEN_CHAN = "#1E293B";    // slate background for even rows
+        const QString MAU_NEN_LE = "#16202B";      // slightly lighter for odd rows (card surface)
+        const QString MAU_HOVER = "rgba(59, 130, 246, 0.08)";  // soft blue subtle hover
+        const QString MAU_CHON = "rgba(59, 130, 246, 0.15)";   // selected row highlight
+        const QString MAU_VIEN_CHON = "#3B82F6";  // primary soft-blue accent (focus border)
+        const QString MAU_CHU = "#E2E8F0";        // readable muted text on dark background
+        const QString MAU_HEADER_BG = "#16202B";  // header background
+        const QString MAU_HEADER_TEXT = "#94A3B8";
+        const QString MAU_BORDER = "#0F172A";    // subtle slate border
     }
     
     // Light Theme

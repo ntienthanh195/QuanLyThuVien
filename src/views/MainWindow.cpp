@@ -40,8 +40,8 @@ MainWindow::MainWindow(QWidget *parent)
 {
     setWindowTitle("🏛️ Hệ Thống Quản Lý Thư Viện");
     
-    // Deep Dark Theme - Professional Background
-    setStyleSheet("QMainWindow { background-color: #151521; }");
+    // Deep Dark Theme - use centralized stylesheet
+    this->setProperty("class", "MainWindow");
     
     // **RESPONSIVE**: Auto-detect screen size and apply optimal window size
     ResponsiveHelper::ScreenSize screenSize = ResponsiveHelper::detectScreenSize();
@@ -124,14 +124,7 @@ void MainWindow::setupSidebar() {
     fontTieuDe.setLetterSpacing(QFont::PercentageSpacing, 102);
     tieuDe->setFont(fontTieuDe);
     tieuDe->setAlignment(Qt::AlignCenter);
-    tieuDe->setStyleSheet(
-        "color: #FFFFFF; "
-        "padding: 24px 16px 18px 16px; "
-        "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-        "stop:0 rgba(54, 153, 255, 0.08), stop:1 transparent); "
-        "border-bottom: 2px solid rgba(54, 153, 255, 0.2); "
-        "margin-bottom: 8px;"
-    );
+    tieuDe->setProperty("class", "SidebarTitle");
     
     // Tạo widget container cho tiêu đề
     QListWidgetItem *itemTieuDe = new QListWidgetItem(menuSidebar);
@@ -265,22 +258,22 @@ void MainWindow::setupHomeScreen() {
     QPushButton *btnTop10 = createMenuButton("🏆 TOP 10 SÁCH", ":/icons/top10.png");
     btnTop10->setToolTip("Xem 10 sách được mượn nhiều nhất (Ctrl+T)");
     btnTop10->setShortcut(QKeySequence("Ctrl+T"));
-    btnTop10->setStyleSheet(btnTop10->styleSheet() + "QPushButton { background-color: #f39c12; }");
+    btnTop10->setProperty("class", "MenuButtonOrange");
     
     QPushButton *btnStats = createMenuButton("📊 THỐNG KÊ HỆ THỐNG", ":/icons/stats.png");
     btnStats->setToolTip("Xem thống kê tổng quan hệ thống (Ctrl+S)");
     btnStats->setShortcut(QKeySequence("Ctrl+S"));
-    btnStats->setStyleSheet(btnStats->styleSheet() + "QPushButton { background-color: #9b59b6; }");
+    btnStats->setProperty("class", "MenuButtonPurple");
     
     QPushButton *btnBackup = createMenuButton("💾 SAO LƯU DỮ LIỆU", ":/icons/backup.png");
     btnBackup->setToolTip("Sao lưu và phục hồi dữ liệu (Ctrl+K)");
     btnBackup->setShortcut(QKeySequence("Ctrl+K"));
-    btnBackup->setStyleSheet(btnBackup->styleSheet() + "QPushButton { background-color: #16a085; }");
+    btnBackup->setProperty("class", "MenuButtonTeal");
     
     QPushButton *btnOverdue = createMenuButton("⚠️ ĐỘC GIẢ QUÁ HẠN", ":/icons/overdue.png");
     btnOverdue->setToolTip("Danh sách độc giả mượn quá hạn (Ctrl+O)");
     btnOverdue->setShortcut(QKeySequence("Ctrl+O"));
-    btnOverdue->setStyleSheet(btnOverdue->styleSheet() + "QPushButton { background-color: #e67e22; }");
+    btnOverdue->setProperty("class", "MenuButtonWarning");
     
     QPushButton *btnAbout = createMenuButton("ℹ️ THÔNG TIN", ":/icons/info.png");
     btnAbout->setToolTip("Thông tin ứng dụng (F1)");
@@ -290,7 +283,7 @@ void MainWindow::setupHomeScreen() {
     btnExit->setToolTip("Thoát ứng dụng (Ctrl+Q)");
     btnExit->setShortcut(QKeySequence("Ctrl+Q"));
     
-    btnExit->setStyleSheet(btnExit->styleSheet() + "QPushButton { background-color: #e74c3c; }");
+    btnExit->setProperty("class", "MenuButtonDanger");
     
     buttonLayout->addWidget(btnBooks);
     buttonLayout->addWidget(btnReaders);
@@ -329,23 +322,7 @@ QPushButton* MainWindow::createMenuButton(const QString &text, const QString & /
     font.setBold(true);
     button->setFont(font);
     
-    button->setStyleSheet(
-        "QPushButton {"
-        "   background-color: #5B7FFF;"
-        "   color: white;"
-        "   border: none;"
-        "   border-radius: 8px;"
-        "   padding: 16px 24px;"
-        "   text-align: left;"
-        "}"
-        "QPushButton:hover {"
-        "   background-color: #4C6FE8;"
-        "   transform: translateY(-2px);"
-        "}"
-        "QPushButton:pressed {"
-        "   background-color: #3D5FD9;"
-        "}"
-    );
+    button->setProperty("class", "MenuButton");
     
     return button;
 }

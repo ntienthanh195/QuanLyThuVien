@@ -579,6 +579,8 @@ void WidgetQuanLySach::setupUI() {
     tableView = new QTableView(tableCard);
     bookModel = new BookTableModel(this);
     tableView->setModel(bookModel);
+    // Use centralized InnerTable styling (same as WidgetQuanLyDocGia)
+    tableView->setProperty("class", "InnerTable");
     
     // Cấu hình bảng cho đẹp
     tableView->setShowGrid(false); // Bỏ lưới dọc/ngang kiểu cũ
@@ -677,27 +679,27 @@ void WidgetQuanLySach::setupTabQuanLy() {
     toolbar->setIconSize(QSize(20, 20));
     toolbar->setStyleSheet(
         "QToolBar {"
-        "    background: #1E1E2D;"
-        "    border: 1px solid #2B2B40;"
+        "    background: #071233;"
+        "    border: 1px solid #08314f;"
         "    border-radius: 6px;"
         "    padding: 8px;"
         "    spacing: 6px;"
         "}"
         "QToolButton {"
         "    background: transparent;"
-        "    border: 1px solid #2B2B40;"
+        "    border: 1px solid #08314f;"
         "    border-radius: 6px;"
         "    padding: 8px 16px;"
         "    color: #B5B5C3;"
         "    font-weight: 500;"
         "}"
         "QToolButton:hover {"
-        "    background: #232334;"
+        "    background: #082a3a;"
         "    color: #3699FF;"
         "    border-color: #3699FF;"
         "}"
         "QToolButton:pressed {"
-        "    background: #1A1A26;"
+        "    background: #041726;"
         "}"
     );
     
