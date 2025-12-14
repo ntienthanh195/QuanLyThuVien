@@ -1,9 +1,14 @@
 #include "giao_dien/CuaSoChinh.h"
+#include "views/dialogs/ManHinhGioiThieu.h" // Custom About Dialog
+#include "giao_dien/WidgetQuanLyNguoiDung.h" // Include header
 #include "giao_dien/BangDieuKhien.h"
 #include "giao_dien/WidgetQuanLySach.h"
 #include "giao_dien/WidgetQuanLyDocGia.h"
 #include "giao_dien/WidgetMuonTraSach.h"
-#include "hop_thoai/HopThoaiInAn.h"
+#include "giao_dien/WidgetMuonTraSach.h"
+#include "giao_dien/WidgetQuanLyNguoiDung.h" // New
+#include "hop_thoai/HopThoaiCaiDat.h"    // Legacy Settings Dialog (Restored)
+#include "hop_thoai/ManHinhQuanLyIn.h" // Unified Print Dialog
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -17,11 +22,13 @@
 #include <QIcon>
 #include <QDebug>
 #include <QPropertyAnimation>
+#include "utils/LanguageManager.h"
 
 // Include backend
 #include "models/QuanLySach.h"
 #include "models/DocGia.h"
 #include "models/ThaoTacFile.h"
+#include "models/UserManager.h"
 
 // Include helpers
 #include "utils/ResponsiveHelper.h"
@@ -31,6 +38,9 @@
 #include "utils/EventBus.h"
 #include <QDir>
 #include <QStandardPaths>
+#include "utils/BackupManager.h" // Backup support
+#include "utils/ClipboardHelper.h" // Global copy/paste support
+#include "utils/GlobalScannerFilter.h" // Global scanner support
 
 CuaSoChinh::CuaSoChinh(QWidget *cha) 
     : QMainWindow(cha),
@@ -40,6 +50,7 @@ CuaSoChinh::CuaSoChinh(QWidget *cha)
       widgetSach(nullptr),
       widgetDocGia(nullptr),
       widgetMuonTra(nullptr),
+      widgetNguoiDung(nullptr),
       khungMenuBen(nullptr),
       danhSachMenu(nullptr),
       nutToggleSidebar(nullptr),
@@ -52,9 +63,18 @@ CuaSoChinh::CuaSoChinh(QWidget *cha)
     // Log thông tin màn hình
     qDebug() << "=== KHỞI TẠO HỆ THỐNG QUẢN LÝ THƯ VIỆN V2 ===";
     qDebug() << ResponsiveHelper::getScreenInfo();
+
+    // 1. Run Archive Auto-Cleanup on startup (Monthly/Yearly Zip)
+    AutoArchiveBackups();
+    
+    // 2. Setup Periodic Backup Timer (30 mins = 1800000 ms)
+    backupTimer = new QTimer(this);
+    connect(backupTimer, &QTimer::timeout, this, &CuaSoChinh::onAutoBackup);
+    backupTimer->start(1800000); 
+    qDebug() << "Started Periodic Backup Timer (30 mins)";
     
     // Thiết lập cửa sổ chính với responsive
-    setWindowTitle("📚 HỆ THỐNG QUẢN LÝ THƯ VIỆN V2.0");
+    setWindowTitle("HỆ THỐNG QUẢN LÝ THƯ VIỆN");
     
     // Thiết lập window có thể resize và tự động điều chỉnh
     ResponsiveHelper::setupResizableWindow(this);
@@ -79,6 +99,9 @@ CuaSoChinh::CuaSoChinh(QWidget *cha)
     // GỌI capNhatThongKe SAU KHI tất cả đã sẵn sàng
     QTimer::singleShot(100, bangDieuKhien, &BangDieuKhien::capNhatThongKe);
     
+    // Setup Global Copy/Paste
+    ClipboardHelper::setupGlobalCopyPaste(this);
+
     // Cập nhật thanh trạng thái
     capNhatThanhTrangThai("Hệ thống sẵn sàng - " + ResponsiveHelper::getScreenInfo());
     
@@ -106,7 +129,7 @@ void CuaSoChinh::thieLapGiaoDien() {
     
     // Khung menu bên trái - responsive width với khả năng thu gọn
     sidebarWidthMax = ResponsiveHelper::getScaledWidth(280, screenSize);
-    sidebarWidthMin = ResponsiveHelper::getScaledWidth(70, screenSize);
+    sidebarWidthMin = ResponsiveHelper::getScaledWidth(80, screenSize); // Increased from 70 to 80 for visibility
     khungMenuBen = new QWidget();
     khungMenuBen->setObjectName("SidebarFrame");
     khungMenuBen->setFixedWidth(sidebarWidthMax);
@@ -130,7 +153,10 @@ void CuaSoChinh::thieLapGiaoDien() {
         // Defer creation of heavy management widgets to on-demand (lazy load)
         widgetSach = nullptr;
         widgetDocGia = nullptr;
+        widgetSach = nullptr;
+        widgetDocGia = nullptr;
         widgetMuonTra = nullptr;
+        widgetNguoiDung = nullptr; // Initialize to nullptr
         
     } catch (const std::exception& e) {
         qCritical() << "LỖI khi khởi tạo widgets:" << e.what();
@@ -257,7 +283,7 @@ void CuaSoChinh::thieLapGiaoDien() {
         "}"
     ).arg(statusPadding));
     
-    nhanNguoiDung = new QLabel("👤 Quản trị viên");
+    nhanNguoiDung = new QLabel(" Quản trị viên");
     thanhTrangThai->addPermanentWidget(nhanNguoiDung);
     
     qDebug() << "Sidebar width:" << sidebarWidthMax << "/" << sidebarWidthMin << "| Status padding:" << statusPadding;
@@ -310,7 +336,34 @@ void CuaSoChinh::thieLapMenuBen() {
     // Layout ngang cho nút toggle
     QHBoxLayout *boTriToggle = new QHBoxLayout();
     boTriToggle->addWidget(nutToggleSidebar);
+    
+    // LANGUAGE TOGGLE BUTTON (Member)
+    btnLang = new QPushButton("🇻🇳");
+    btnLang->setFixedSize(40, 40);
+    btnLang->setCursor(Qt::PointingHandCursor);
+    btnLang->setToolTip("Đổi Ngôn Ngữ (Change Language)");
+    btnLang->setStyleSheet(
+        "QPushButton {"
+        "    background-color: transparent;"
+        "    font-size: 20px;"
+        "    border: none;"
+        "}"
+        "QPushButton:hover { background-color: rgba(255,255,255,0.1); border-radius: 5px; }"
+    );
+    connect(btnLang, &QPushButton::clicked, [this](){
+        LanguageManager::instance().cycleLanguage();
+        // Update Button Text based on new lang
+        Language cur = LanguageManager::instance().currentLanguage();
+        if (cur == Language::Vietnamese) btnLang->setText("🇻🇳");
+        else if (cur == Language::Khmer) btnLang->setText("🇰🇭");
+        else btnLang->setText("🇺🇸");
+        
+        // Refresh UI
+        capNhatNgonNgu();
+    });
+
     boTriToggle->addStretch();
+    boTriToggle->addWidget(btnLang);
     boTriTieuDe->addLayout(boTriToggle);
     
     // Logo - Đơn giản hơn, icon đơn sắc
@@ -326,10 +379,11 @@ void CuaSoChinh::thieLapMenuBen() {
     nhanLogo->setAlignment(Qt::AlignCenter);
     
     // Tên hệ thống - Segoe UI, simple
+    // Tên hệ thống - Segoe UI, simple
     int titleFontSize = ResponsiveHelper::getScaledFontSize(13, screenSize);
-    QLabel *nhanTenHeThong = new QLabel("QUẢN LÝ THƯ VIỆN");
-    nhanTenHeThong->setObjectName("TitleLabel");
-    nhanTenHeThong->setStyleSheet(QString(
+    nhanTieuDe = new QLabel("QUẢN LÝ THƯ VIỆN");
+    nhanTieuDe->setObjectName("TitleLabel");
+    nhanTieuDe->setStyleSheet(QString(
         "font-size: %1px;"
         "font-weight: 600;"
         "color: #CCCCCC;"
@@ -337,10 +391,10 @@ void CuaSoChinh::thieLapMenuBen() {
         "letter-spacing: 1px;"
         "background: transparent;"
     ).arg(titleFontSize));
-    nhanTenHeThong->setAlignment(Qt::AlignCenter);
+    nhanTieuDe->setAlignment(Qt::AlignCenter);
     
     boTriTieuDe->addWidget(nhanLogo);
-    boTriTieuDe->addWidget(nhanTenHeThong);
+    boTriTieuDe->addWidget(nhanTieuDe);
     boTriTieuDe->addStretch();
     
     boTriMenuBen->addWidget(widgetTieuDe);
@@ -353,43 +407,64 @@ void CuaSoChinh::thieLapMenuBen() {
     danhSachMenu->setObjectName("MenuList");
     danhSachMenu->setStyleSheet(QString(
         "QListWidget#MenuList {"
-        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-        "    stop:0 #1E1E2D, stop:1 #1A1A26);"
+        "    background: #1E1E2D;" /* Solid background for cleaner look */
         "    border: none;"
         "    outline: none;"
-        "    border-right: 1px solid rgba(54, 153, 255, 0.1);"
+        "    border-right: 1px solid rgba(255, 255, 255, 0.05);"
         "}"
         "QListWidget#MenuList::item {"
-        "    padding: %1px 20px;"
-        "    margin: 6px 12px;"
+        "    padding: 12px 15px;"       /* More breathing room */
+        "    margin: 4px 12px;"         /* Floating effect (spaced from edges) */
         "    color: #9CA3AF;"
-        "    border-left: 3px solid transparent;"
-        "    border-radius: 12px;"
+        "    border: none;"             /* Remove old border-left */
+        "    border-radius: 10px;"      /* Soft rounded corners */
         "    font-size: %2px;"
-        "    font-weight: 600;"
+        "    font-weight: 500;"
+        "    transition: background 0.2s;" /* (Note: Qt Widgets doesn't support CSS transition property natively, but we mimic logic elsewhere) */
         "}"
         "QListWidget#MenuList::item:hover {"
-        "    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, "
-        "    stop:0 rgba(54, 153, 255, 0.12), stop:1 rgba(54, 153, 255, 0.05));"
-        "    color: #3699FF;"
-        "    border-left: 3px solid #3699FF;"
+        "    background-color: rgba(255, 255, 255, 0.05);"
+        "    color: #E0E0E0;"
         "}"
         "QListWidget#MenuList::item:selected {"
-        "    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, "
-        "    stop:0 rgba(54, 153, 255, 0.25), stop:1 rgba(54, 153, 255, 0.15));"
-        "    color: #FFFFFF;"
-        "    border-left: 3px solid #3699FF;"
-        "    font-weight: 800;"
+        "    background-color: rgba(54, 153, 255, 0.15);" /* Floating Blue Pill */
+        "    color: #3699FF;"
+        "    font-weight: 700;"
         "}"
     ).arg(menuPadding).arg(menuFontSize));
     
-    // Thêm các mục menu với icon đơn sắc (không dùng emoji nhiều màu)
-    danhSachMenu->addItem("▣  Trang Chủ");
-    danhSachMenu->addItem("▤  Quản Lý Sách");        // Có tabs: Danh Sách, Top 10, Thống Kê
-    danhSachMenu->addItem("◉  Quản Lý Độc Giả");    // Có tabs: Danh Sách, Quá Hạn
-    danhSachMenu->addItem("⇄  Mượn Trả Sách");
-    danhSachMenu->addItem("⎙  In Ấn");
-    danhSachMenu->addItem("ⓘ  Giới Thiệu");
+    // Thêm các mục menu với SVG Icon chính thức (thay vì ký tự Unicode)
+    danhSachMenu->setIconSize(QSize(20, 20));
+
+    auto themMuc = [&](const QString &ten, const QString &iconPath) {
+        QListWidgetItem *item = new QListWidgetItem(ten);
+        
+        // Load icon with fallback
+        QIcon icon(iconPath);
+        if (icon.isNull()) {
+            if (iconPath.contains("settings")) icon = QIcon(":/icons/settings.svg"); // Explicit ensure
+        }
+        item->setIcon(icon);
+        danhSachMenu->addItem(item);
+    };
+
+    themMuc("  " + LanguageManager::instance().getText("MENU_DASHBOARD"), ":/icons/dashboard.svg");
+    themMuc("  " + LanguageManager::instance().getText("MENU_BOOKS"), ":/icons/book.svg");
+    themMuc("  " + LanguageManager::instance().getText("MENU_READERS"), ":/icons/user.svg");
+    themMuc("  " + LanguageManager::instance().getText("MENU_LOANS"), ":/icons/exchange.svg");
+    // Removed In An button as per request
+    themMuc("  " + LanguageManager::instance().getText("MENU_USERS"), ":/icons/admin.svg");     // New index: 4 (Admin Icon)
+    themMuc("  " + LanguageManager::instance().getText("MENU_SETTINGS"), ":/icons/settings.svg"); // New index: 5 (Settings Icon)
+    themMuc("  " + LanguageManager::instance().getText("MENU_ABOUT"), ":/icons/info.svg");   // New index: 6
+    
+    // Áp dụng phân quyền (RBAC)
+    // Index 4: Nhân Sự, 5: Cài Đặt
+    bool isAdmin = UserManager::instance().hasPermission("ADMIN");
+    bool canManageUsers = isAdmin || UserManager::instance().hasPermission("USER_MANAGE");
+    bool canSettings = isAdmin || UserManager::instance().hasPermission("SETTINGS");
+    
+    danhSachMenu->item(4)->setHidden(!canManageUsers);
+    danhSachMenu->item(5)->setHidden(!canSettings);
     
     danhSachMenu->setCurrentRow(0);
     
@@ -397,17 +472,49 @@ void CuaSoChinh::thieLapMenuBen() {
     
     // Thông tin phiên bản - Minimal
     int versionFontSize = ResponsiveHelper::getScaledFontSize(11, screenSize);
-    int versionPadding = ResponsiveHelper::getScaledSpacing(12, screenSize);
-    QLabel *nhanPhienBan = new QLabel("v2.0.0");
+    
+    // Container cho phần footer
+    QWidget *footerWidget = new QWidget();
+    footerWidget->setStyleSheet("background-color: #252526; border-top: 1px solid #3E3E42;");
+    QVBoxLayout *footerLayout = new QVBoxLayout(footerWidget);
+    footerLayout->setContentsMargins(0, 5, 0, 5);
+    footerLayout->setSpacing(0);
+    
+    // Nút Đăng xuất nhỏ
+    QPushButton *btnDangXuat = new QPushButton("Đăng xuất");
+    btnDangXuat->setCursor(Qt::PointingHandCursor);
+    btnDangXuat->setStyleSheet(QString(
+        "QPushButton {"
+        "    color: #ef4444;" // Red text
+        "    background: transparent;"
+        "    border: none;"
+        "    font-size: %1px;"
+        "    font-weight: 500;"
+        "    padding: 2px;"
+        "    text-align: center;"
+        "}"
+        "QPushButton:hover { text-decoration: underline; color: #f87171; }"
+    ).arg(versionFontSize));
+    connect(btnDangXuat, &QPushButton::clicked, [](){
+        // Exit with RESTART code (1000)
+        qApp->exit(1000); 
+    });
+    
+    QLabel *nhanPhienBan = new QLabel("Phát triển bởi:\nChăm Rốch Thi");
     nhanPhienBan->setStyleSheet(QString(
         "color: #555555;"
         "font-size: %1px;"
-        "padding: %2px 20px;"
-        "background-color: #252526;"
-        "border-top: 1px solid #3E3E42;"
-    ).arg(versionFontSize).arg(versionPadding));
+        "padding: 0px 10px 5px 10px;"
+        "background: transparent;"
+        "border: none;"
+    ).arg(versionFontSize - 1)); 
     nhanPhienBan->setAlignment(Qt::AlignCenter);
-    boTriMenuBen->addWidget(nhanPhienBan);
+    nhanPhienBan->setWordWrap(true);
+    
+    footerLayout->addWidget(btnDangXuat);
+    footerLayout->addWidget(nhanPhienBan);
+    
+    boTriMenuBen->addWidget(footerWidget);
     
     qDebug() << "Menu font size:" << menuFontSize << "| Menu padding:" << menuPadding;
 }
@@ -417,11 +524,20 @@ void CuaSoChinh::thieLapKetNoi() {
     connect(danhSachMenu, &QListWidget::currentRowChanged, [this](int hang) {
         switch(hang) {
             case 0: hienThiManHinhChinh(); break;
-            case 1: hienThiQuanLySach(); break;      // Tab Thống Kê & Top 10 bên trong
-            case 2: hienThiQuanLyDocGia(); break;    // Tab Quá Hạn bên trong
+            case 1: hienThiQuanLySach(); break;
+            case 2: hienThiQuanLyDocGia(); break;
             case 3: hienThiMuonTraSach(); break;
-            case 4: hienThiIn(); break;
-            case 5: hienThiGioiThieu(); break;
+            case 4: // Nhan Su
+                nhanTieuDe->setText("QUẢN LÝ NHÂN SỰ");
+                hienThiQuanLyNguoiDung();
+                break;
+            case 5: // Cai Dat
+                {
+                    HopThoaiCaiDat dialog(this);
+                    dialog.exec();
+                }
+                break;
+            case 6: hienThiGioiThieu(); break;
         }
     });
     
@@ -434,28 +550,9 @@ void CuaSoChinh::thieLapKetNoi() {
             this, &CuaSoChinh::hienThiMuonTraSach);
     
     // Kết nối thông báo từ các widget
-    connect(widgetSach, &WidgetQuanLySach::thongBaoCapNhat, 
-            this, [this](const QString &msg) { capNhatThanhTrangThai(msg); });
-    connect(widgetDocGia, &WidgetQuanLyDocGia::thongBaoCapNhat, 
-            this, [this](const QString &msg) { capNhatThanhTrangThai(msg); });
-    connect(widgetMuonTra, &WidgetMuonTraSach::thongBaoCapNhat, 
-            this, [this](const QString &msg) { capNhatThanhTrangThai(msg); });
-    
-    // Kết nối auto-save từ các widget
-    connect(widgetSach, &WidgetQuanLySach::duLieuThayDoi,
-            this, &CuaSoChinh::triggerAutoSave);
-    connect(widgetDocGia, &WidgetQuanLyDocGia::duLieuThayDoi,
-            this, &CuaSoChinh::triggerAutoSave);
-    connect(widgetMuonTra, &WidgetMuonTraSach::duLieuThayDoi,
-            this, &CuaSoChinh::triggerAutoSave);
-    
-    // Kết nối realtime update đến dashboard
-    connect(widgetSach, &WidgetQuanLySach::duLieuThayDoi,
-            bangDieuKhien, &BangDieuKhien::capNhatRealtimeTuWidget);
-    connect(widgetDocGia, &WidgetQuanLyDocGia::duLieuThayDoi,
-            bangDieuKhien, &BangDieuKhien::capNhatRealtimeTuWidget);
-    connect(widgetMuonTra, &WidgetMuonTraSach::duLieuThayDoi,
-            bangDieuKhien, &BangDieuKhien::capNhatRealtimeTuWidget);
+    // NOTE: Connections for lazy-loaded widgets (Sach, DocGia, MuonTra) 
+    // must be made in their respective creation methods (hienThi...), not here.
+
 }
 
 void CuaSoChinh::apDungKieuMau() {
@@ -483,7 +580,13 @@ void CuaSoChinh::hienThiQuanLySach() {
     if (!widgetSach) {
         qDebug() << "Lazy-loading WidgetQuanLySach";
         widgetSach = new WidgetQuanLySach();
+        ClipboardHelper::setupGlobalCopyPaste(widgetSach);
         boChuyenManHinh->addWidget(widgetSach);
+        
+        // Setup Connections
+        connect(widgetSach, &WidgetQuanLySach::thongBaoCapNhat, this, [this](const QString &msg) { capNhatThanhTrangThai(msg); });
+        connect(widgetSach, &WidgetQuanLySach::duLieuThayDoi, this, &CuaSoChinh::triggerAutoSave);
+        connect(widgetSach, &WidgetQuanLySach::duLieuThayDoi, bangDieuKhien, &BangDieuKhien::capNhatRealtimeTuWidget);
     }
     boChuyenManHinh->setCurrentWidget(widgetSach);
     widgetSach->taiLaiDanhSach();
@@ -496,7 +599,13 @@ void CuaSoChinh::hienThiQuanLyDocGia() {
     if (!widgetDocGia) {
         qDebug() << "Lazy-loading WidgetQuanLyDocGia";
         widgetDocGia = new WidgetQuanLyDocGia();
+        ClipboardHelper::setupGlobalCopyPaste(widgetDocGia);
         boChuyenManHinh->addWidget(widgetDocGia);
+        
+        // Setup Connections
+        connect(widgetDocGia, &WidgetQuanLyDocGia::thongBaoCapNhat, this, [this](const QString &msg) { capNhatThanhTrangThai(msg); });
+        connect(widgetDocGia, &WidgetQuanLyDocGia::duLieuThayDoi, this, &CuaSoChinh::triggerAutoSave);
+        connect(widgetDocGia, &WidgetQuanLyDocGia::duLieuThayDoi, bangDieuKhien, &BangDieuKhien::capNhatRealtimeTuWidget);
     }
     boChuyenManHinh->setCurrentWidget(widgetDocGia);
     widgetDocGia->taiLaiDanhSach();
@@ -509,7 +618,33 @@ void CuaSoChinh::hienThiMuonTraSach() {
     if (!widgetMuonTra) {
         qDebug() << "Lazy-loading WidgetMuonTraSach";
         widgetMuonTra = new WidgetMuonTraSach();
+        ClipboardHelper::setupGlobalCopyPaste(widgetMuonTra);
         boChuyenManHinh->addWidget(widgetMuonTra);
+        
+        // DISABLED: GlobalScannerFilter not in use
+        /*
+        GlobalScannerFilter* globalScanner = qApp->findChild<GlobalScannerFilter*>();
+        if (globalScanner) {
+            connect(globalScanner, &GlobalScannerFilter::scanDetected,
+                    widgetMuonTra, &WidgetMuonTraSach::onGlobalScanReceived);
+            qDebug() << "[CONNECT] GlobalScannerFilter -> WidgetMuonTraSach connected!";
+        } else {
+            qWarning() << "[CONNECT] GlobalScannerFilter not found!";
+        }
+        */
+        
+        // Setup Connections
+        connect(widgetMuonTra, &WidgetMuonTraSach::thongBaoCapNhat, this, [this](const QString &msg) { capNhatThanhTrangThai(msg); });
+        connect(widgetMuonTra, &WidgetMuonTraSach::duLieuThayDoi, this, &CuaSoChinh::triggerAutoSave);
+        connect(widgetMuonTra, &WidgetMuonTraSach::duLieuThayDoi, bangDieuKhien, &BangDieuKhien::capNhatRealtimeTuWidget);
+        
+        // CROSS-WIDGET REALTIME UPDATES
+        connect(widgetMuonTra, &WidgetMuonTraSach::duLieuThayDoi, this, [this](){
+            // Refresh Reader List (e.g. Borrow Count column)
+            if (widgetDocGia) widgetDocGia->taiLaiDanhSach();
+            // Refresh Book List (e.g. Quantity on shelf)
+            if (widgetSach) widgetSach->taiLaiDanhSach();
+        });
     }
     boChuyenManHinh->setCurrentWidget(widgetMuonTra);
     widgetMuonTra->lamMoi();
@@ -517,58 +652,60 @@ void CuaSoChinh::hienThiMuonTraSach() {
     chiSoManHinhHienTai = 3;
     capNhatThanhTrangThai("Đang xem: Mượn trả sách");
 }
+void CuaSoChinh::onAutoBackup() {
+    qDebug() << "[AUTO-BACKUP] Triggered by timer...";
+    std::string err = AutoBackup();
+    if (err.empty()) {
+        capNhatThanhTrangThai("✅ Đã sao lưu tự động (30p)", 3000);
+        qDebug() << "[AUTO-BACKUP] Success.";
+    } else {
+        qWarning() << "[AUTO-BACKUP] Failed:" << QString::fromStdString(err);
+    }
+}
+
+void CuaSoChinh::hienThiQuanLyNguoiDung() {
+    if (!widgetNguoiDung) {
+        qDebug() << "Lazy-loading WidgetQuanLyNguoiDung";
+        widgetNguoiDung = new WidgetQuanLyNguoiDung();
+        ClipboardHelper::setupGlobalCopyPaste(widgetNguoiDung);
+        boChuyenManHinh->addWidget(widgetNguoiDung);
+    }
+    boChuyenManHinh->setCurrentWidget(widgetNguoiDung);
+    widgetNguoiDung->taiLaiDanhSach();
+    
+    // Fix: Block signals to prevent recursion, OR just set correct row 4
+    danhSachMenu->blockSignals(true);
+    danhSachMenu->setCurrentRow(4); 
+    danhSachMenu->blockSignals(false);
+    
+    chiSoManHinhHienTai = 4;
+    capNhatThanhTrangThai("Đang xem: Quản lý nhân sự");
+}
 
 void CuaSoChinh::hienThiGioiThieu() {
-    QMessageBox::about(this, "Giới Thiệu",
-        "<h2>HỆ THỐNG QUẢN LÝ THƯ VIỆN</h2>"
-        "<p><b>Phiên bản:</b> 2.0.0</p>"
-        "<p><b>Ngày phát hành:</b> Tháng 12, 2025</p>"
-        "<hr>"
-        "<p><b>Tính năng chính:</b></p>"
-        "<ul>"
-        "<li>✅ Quản lý đầu sách và bản sao</li>"
-        "<li>✅ Quản lý độc giả (AVL Tree)</li>"
-        "<li>✅ Mượn trả sách tự động</li>"
-        "<li>✅ Thống kê và báo cáo</li>"
-        "<li>✅ Top 10 sách/độc giả</li>"
-        "<li>✅ Cảnh báo quá hạn</li>"
-        "<li>✅ Sao lưu dữ liệu</li>"
-        "<li>✅ In ấn thẻ/tem/báo cáo</li>"
-        "</ul>"
-        "<hr>"
-        "<p><b>Công nghệ:</b> Qt 6.10.1, C++17</p>"
-        "<p><b>Cấu trúc dữ liệu:</b> AVL Tree, Linked List, Array</p>"
-        "<p>© 2025 - Hệ thống Quản lý Thư viện</p>"
-    );
+    ManHinhGioiThieu dialog(this);
+    dialog.exec();
+    
+    // Khôi phục highlight menu về tab hiện tại (vì Giới thiệu chỉ là dialog, không phải màn hình chính)
     danhSachMenu->setCurrentRow(chiSoManHinhHienTai);
 }
 
 void CuaSoChinh::hienThiIn() {
-    extern PTRDG rootDocGia;
-    extern PTRDS dsDauSach[];
-    extern int soLuongDauSach;
+    PTRDG docGia = nullptr;
     
-    HopThoaiInAn *dialog = new HopThoaiInAn(this);
-    
-    // Thiết lập dữ liệu hiện tại
     // Nếu đang ở màn hình Mượn Trả, truyền độc giả đang chọn
     if (widgetMuonTra && chiSoManHinhHienTai == 3) {
-        // Lấy độc giả hiện tại từ widget Mượn Trả
-        PTRDG docGiaHienTai = widgetMuonTra->property("docGiaHienTai").value<PTRDG>();
-        if (docGiaHienTai) {
-            dialog->setDocGiaHienTai(docGiaHienTai);
-        }
+        docGia = widgetMuonTra->property("docGiaHienTai").value<PTRDG>();
     }
     
-    // Truyền danh sách đầu sách
-    dialog->setDanhSachDauSach(dsDauSach, soLuongDauSach);
-    
+    // Launch Unified Print Dialog
+    ManHinhQuanLyIn *dialog = new ManHinhQuanLyIn(docGia, {}, this);
     dialog->exec();
     delete dialog;
     
     // Khôi phục menu position
     danhSachMenu->setCurrentRow(chiSoManHinhHienTai);
-    capNhatThanhTrangThai("Đã đóng dialog in ấn");
+    capNhatThanhTrangThai("Đã đóng trình quản lý in ấn");
 }
 
 void CuaSoChinh::hienThiThongKe() {
@@ -611,60 +748,157 @@ void CuaSoChinh::toggleSidebar() {
     
     int targetWidth = sidebarDangMoRong ? sidebarWidthMax : sidebarWidthMin;
     
-    // Set fixed width trước rồi animate
-    khungMenuBen->setMinimumWidth(khungMenuBen->width());
-    khungMenuBen->setMaximumWidth(khungMenuBen->width());
-    
-    // Animate width một cách mượt mà
+    // Config Animation
     QPropertyAnimation *widthAnim = new QPropertyAnimation(khungMenuBen, "maximumWidth");
-    widthAnim->setDuration(200);
+    widthAnim->setDuration(300); // Slower for premium feel (Web-like)
     widthAnim->setStartValue(khungMenuBen->width());
     widthAnim->setEndValue(targetWidth);
-    widthAnim->setEasingCurve(QEasingCurve::InOutCubic);
     
-    // Update minimum width đồng thời
-    connect(widthAnim, &QPropertyAnimation::valueChanged, [this](const QVariant &value) {
-        khungMenuBen->setMinimumWidth(value.toInt());
-    });
+    // "InOutQuad" provides a much smoother acceleration/deceleration curve
+    widthAnim->setEasingCurve(QEasingCurve::InOutQuad); 
     
-    // Xử lý UI sau khi animation xong
-    connect(widthAnim, &QPropertyAnimation::finished, [this, targetWidth]() {
-        khungMenuBen->setMinimumWidth(targetWidth);
-        khungMenuBen->setMaximumWidth(targetWidth);
-    });
-    
-    widthAnim->start(QAbstractAnimation::DeleteWhenStopped);
-    
-    // Update UI ngay lập tức (không đợi animation)
+    // UI Elements
     QLabel *logoLabel = khungMenuBen->findChild<QLabel*>("LogoLabel");
     QLabel *titleLabel = khungMenuBen->findChild<QLabel*>("TitleLabel");
     
     QStringList menuTexts = {
-        "▣  Trang Chủ",
-        "▤  Quản Lý Sách",
-        "◉  Quản Lý Độc Giả",
-        "⇄  Mượn Trả Sách",
-        "ⓘ  Giới Thiệu"
+        "▣  " + LanguageManager::instance().getText("MENU_DASHBOARD"),
+        "▤  " + LanguageManager::instance().getText("MENU_BOOKS"),
+        "◉  " + LanguageManager::instance().getText("MENU_READERS"),
+        "⇄  " + LanguageManager::instance().getText("MENU_LOANS"),
+        "𐄷  " + LanguageManager::instance().getText("MENU_USERS"),
+        "⚙  " + LanguageManager::instance().getText("MENU_SETTINGS"),
+        "ⓘ  " + LanguageManager::instance().getText("MENU_ABOUT")
     };
+
+    // LOGIC: Sequence matters for smoothness
     
     if (sidebarDangMoRong) {
-        nutToggleSidebar->setText("☰");
-        if (logoLabel) logoLabel->show();
-        if (titleLabel) titleLabel->show();
+        // EXPANDING:
+        // 1. Start expanding width immediately
+        // 2. Show text only AFTER animation (or halfway) to avoid text clipping/overflow ugliness
         
-        // Hiện full text
-        for (int i = 0; i < danhSachMenu->count() && i < menuTexts.size(); ++i) {
-            danhSachMenu->item(i)->setText(menuTexts[i]);
-        }
+        nutToggleSidebar->setText("☰"); // Change icon immediately
+        
+        connect(widthAnim, &QPropertyAnimation::finished, [this, logoLabel, titleLabel, menuTexts]() {
+            // Show full details AFTER expansion finishes
+             if (logoLabel) logoLabel->show();
+             if (titleLabel) titleLabel->show();
+             if (btnLang) btnLang->show(); // SHOW Language Button
+             
+             for (int i = 0; i < danhSachMenu->count() && i < menuTexts.size(); ++i) {
+                danhSachMenu->item(i)->setText(menuTexts[i]);
+             }
+             
+             // Enforce exact width to prevent layout glitches
+             khungMenuBen->setMinimumWidth(sidebarWidthMax);
+        });
+
+        // Restore Full Padding Stylesheet
+        int menuPadding = ResponsiveHelper::getScaledSpacing(15, ResponsiveHelper::detectScreenSize());
+        int menuFontSize = ResponsiveHelper::getScaledFontSize(14, ResponsiveHelper::detectScreenSize());
+        danhSachMenu->setStyleSheet(QString(
+            "QListWidget#MenuList {"
+            "    background: #1E1E2D;"
+            "    border: none;"
+            "    outline: none;"
+            "    border-right: 1px solid rgba(255, 255, 255, 0.05);"
+            "}"
+            "QListWidget#MenuList::item {"
+            "    padding: 12px 15px;"
+            "    margin: 4px 12px;" 
+            "    color: #9CA3AF;"
+            "    border: none;"
+            "    border-radius: 10px;"
+            "    font-size: %2px;"
+            "    font-weight: 500;"
+            "}"
+            "QListWidget#MenuList::item:hover {"
+            "    background-color: rgba(255, 255, 255, 0.05);"
+            "    color: #E0E0E0;"
+            "}"
+            "QListWidget#MenuList::item:selected {"
+            "    background-color: rgba(54, 153, 255, 0.15);"
+            "    color: #3699FF;"
+            "    font-weight: 700;"
+            "}"
+        ).arg(menuPadding).arg(menuFontSize));
+        
     } else {
-        nutToggleSidebar->setText("»");
+        // COLLAPSING:
+        // 1. Hide text IMMEDIATELY (so it doesn't wrap/glitch during shrink)
+        // 2. Start shrinking width
+        
+        // Hide complex elements immediately to avoid overlap during shrink
         if (logoLabel) logoLabel->hide();
         if (titleLabel) titleLabel->hide();
+        if (btnLang) btnLang->hide(); // HIDE Language Button to prevent overlap
         
-        // Chỉ hiện icon
-        for (int i = 0; i < danhSachMenu->count() && i < menuTexts.size(); ++i) {
-            danhSachMenu->item(i)->setText(menuTexts[i].left(2));
+        nutToggleSidebar->setText("☰");
+        
+        for (int i = 0; i < danhSachMenu->count(); ++i) {
+             // Keep only the icon, clear the text
+             // We can't clear text easily without removing item content
+             // So we just set empty text
+             danhSachMenu->item(i)->setText("");
         }
+
+        // Apply Compact Stylesheet (Less padding/margin to fit Icon)
+        int menuFontSize = ResponsiveHelper::getScaledFontSize(14, ResponsiveHelper::detectScreenSize());
+        danhSachMenu->setStyleSheet(QString(
+            "QListWidget#MenuList {"
+            "    background: #1E1E2D;"
+            "    border: none;"
+            "    outline: none;"
+            "    border-right: 1px solid rgba(255, 255, 255, 0.05);"
+            "}"
+            "QListWidget#MenuList::item {"
+            "    padding: 12px 0px;"     /* Zero side padding */
+            "    margin: 4px 4px;"       /* Minimal margin */
+            "    color: #9CA3AF;"
+            "    border: none;"
+            "    border-radius: 10px;"
+            "    font-size: %1px;"
+            "    font-weight: 500;"
+            "}"
+             "QListWidget#MenuList::item:hover {"
+            "    background-color: rgba(255, 255, 255, 0.05);"
+            "}"
+            "QListWidget#MenuList::item:selected {"
+            "    background-color: rgba(54, 153, 255, 0.15);"
+            "    color: #3699FF;"
+            "}"
+        ).arg(menuFontSize));
+        
+    }
+    
+    // Sync minimum width during animation to avoid jitter
+    connect(widthAnim, &QPropertyAnimation::valueChanged, [this](const QVariant &value) {
+        khungMenuBen->setMinimumWidth(value.toInt());
+    });
+    
+    widthAnim->start(QAbstractAnimation::DeleteWhenStopped);
+}
+
+void CuaSoChinh::capNhatNgonNgu() {
+    // 1. Update Window Title
+    setWindowTitle(LanguageManager::instance().getText("APP_TITLE"));
+    if (nhanTieuDe) nhanTieuDe->setText(LanguageManager::instance().getText("APP_TITLE"));
+
+    // 2. Update Side Menu
+    if (danhSachMenu && danhSachMenu->count() >= 7) {
+        danhSachMenu->item(0)->setText("  " + LanguageManager::instance().getText("MENU_DASHBOARD"));
+        danhSachMenu->item(1)->setText("  " + LanguageManager::instance().getText("MENU_BOOKS"));
+        danhSachMenu->item(2)->setText("  " + LanguageManager::instance().getText("MENU_READERS"));
+        danhSachMenu->item(3)->setText("  " + LanguageManager::instance().getText("MENU_LOAN"));
+        danhSachMenu->item(4)->setText("  " + LanguageManager::instance().getText("MENU_USERS"));
+        danhSachMenu->item(5)->setText("  " + LanguageManager::instance().getText("MENU_SETTINGS"));
+        // Item 6 (About) - leave as is or add to key
+    }
+
+    // 3. Update Dashboard if visible
+    if (bangDieuKhien) {
+        bangDieuKhien->capNhatNgonNgu();
     }
 }
 
@@ -723,6 +957,10 @@ void CuaSoChinh::closeEvent(QCloseEvent *sukien) {
             autoSaveManager->forceSave();
         }
         
+        // Backup database before exit
+        capNhatThanhTrangThai("Đang sao lưu Database...");
+        AutoBackup();
+        
         // Lưu trạng thái cửa sổ (kích thước, vị trí, maximize)
         ResponsiveHelper::saveWindowGeometry(this);
         
@@ -767,25 +1005,7 @@ void CuaSoChinh::thieLapAutoSave() {
 }
 
 void CuaSoChinh::luuTatCaDuLieu() {
-    try {
-        // Lưu dữ liệu sách
-        extern PTRDS dsDauSach[];
-        extern int soLuongDauSach;
-        GhiDanhSachDauSach(FilePathManager::getDauSachPathStd().c_str(), dsDauSach, soLuongDauSach);
-        GhiDanhMucSach(FilePathManager::getDanhMucSachPathStd().c_str(), dsDauSach, soLuongDauSach);
-        
-        // Lưu dữ liệu độc giả
-        extern PTRDG rootDocGia;
-        saveDocGia(rootDocGia);
-        
-        // Reset flag thay đổi
-        extern bool duLieuDaThayDoi;
-        duLieuDaThayDoi = false;
-        
-        qDebug() << "[AUTO-SAVE] Đã lưu thành công tất cả dữ liệu";
-    } catch (const std::exception& e) {
-        qWarning() << "[AUTO-SAVE] Lỗi khi lưu:" << e.what();
-    }
+    qDebug() << "[AUTO-SAVE] Dữ liệu đã được đồng bộ với DB. Không cần thao tác lưu file thủ công.";
 }
 
 void CuaSoChinh::triggerAutoSave() {

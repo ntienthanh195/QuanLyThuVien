@@ -21,6 +21,7 @@
 #include <QFuture>
 #include <QFutureWatcher>
 #include <vector>
+#include "utils/FocusGuard.h"
 
 // ============ WORKFLOW STATE MACHINE ============
 enum WorkflowState {
@@ -66,6 +67,7 @@ public:
     
     void refreshData();
     void resetWorkflow(); // Reset về state 0
+    void handleGlobalScan(const QString& barcode); // Xử lý quét toàn cục
 
 signals:
     void backToHome();
@@ -89,6 +91,7 @@ private slots:
     // Trả sách workflow (State 3)
     void onChonSachTraChanged();
     void onXacNhanTraClicked();
+    void onScanTraSach(); // New slot for continuous return scanning
     
     // Báo mất workflow (State 4)
     void onXacNhanBaoMatClicked();
@@ -140,6 +143,7 @@ private:
     QComboBox *filterStatusCombo;    // Filter: All/Overdue/Normal
     QPushButton *btnXacNhanTra;
     QPushButton *btnHuyTra;
+    QLineEdit *editScanTraSach;      // Add hidden scanner input for State 3
     
     // STATE 4: Báo mất
     QWidget *widgetBaoMat;
@@ -164,9 +168,13 @@ private:
     QVector<ThongTinSachDangMuon_DTO> cacSachDangMuon; // Cache sách đang mượn
     PTRDS sachTimThay;               // Sách tìm được (state 2)
     ThongTinSachDangMuon_DTO sachDuocChon; // Sách được chọn để trả/báo mất
+    bool m_autoConfirm; // Flag to trigger zero-click borrow
     // Async search watchers
     QFutureWatcher<std::vector<KetQuaTimKiem>> *bookSearchWatcher;
     QFutureWatcher<std::vector<PTRDMS>> *banSaoWatcher;
+    
+    // Focus Guard
+    FocusGuard *m_focusGuard;
     
     // ========== METHODS ==========
     void setupUI();
@@ -205,6 +213,9 @@ private:
     QString validateBorrowRequest() const; // Returns error message or empty if valid
     void applyLoanFilters(); // Apply status filter to loan table
     void performBookSearch(); // Debounced search
+    
+    // Helper to find reader by book (Global Return)
+    PTRDG findReaderByBook(const std::string& maSach);
 };
 
 #endif // WIDGET_MUON_TRA_SACH_H

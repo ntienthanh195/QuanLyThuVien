@@ -12,9 +12,20 @@
 
 extern PTRDG rootDocGia;
 
+#include "utils/LanguageManager.h"
+
 ManHinhSuaDocGia::ManHinhSuaDocGia(const QString& readerCode, QWidget *parent)
-    : QDialog(parent), maDocGia(readerCode), docGiaHienTai(nullptr) {
-    setWindowTitle("Chỉnh Sửa Độc Giả 👤");
+    : QDialog(parent), maDocGia(readerCode), docGiaHienTai(nullptr)
+    , nhapMaThe(nullptr)
+    , nhapHo(nullptr)
+    , nhapTen(nullptr)
+    , chonGioiTinh(nullptr)
+    , chonTrangThai(nullptr)
+    , nhanSoSachDangMuon(nullptr)
+    , nutLuu(nullptr)
+    , nutHuy(nullptr)
+{
+    setWindowTitle(LanguageManager::instance().getText("TITLE_EDIT_READER") + " 👤");
     setMinimumWidth(500);
     setModal(true);
 
@@ -36,12 +47,12 @@ void ManHinhSuaDocGia::thietLapGiaoDien() {
     mainLayout->setContentsMargins(20, 20, 20, 20);
 
     // Title
-    QLabel* titleLabel = new QLabel("👤 Chỉnh Sửa Thông Tin Độc Giả");
+    QLabel* titleLabel = new QLabel(LanguageManager::instance().getText("DIALOG_EDIT_READER_TITLE"));
     titleLabel->setStyleSheet("font-size: 18px; font-weight: bold; color: #2c3e50; margin-bottom: 10px;");
     mainLayout->addWidget(titleLabel);
 
     // Form group
-    QGroupBox* formGroup = new QGroupBox("Thông Tin Độc Giả", this);
+    QGroupBox* formGroup = new QGroupBox(LanguageManager::instance().getText("GROUP_READER_INFO"), this);
     formGroup->setObjectName("formGroup");
     QFormLayout* formLayout = new QFormLayout(formGroup);
     formLayout->setSpacing(12);
@@ -51,44 +62,44 @@ void ManHinhSuaDocGia::thietLapGiaoDien() {
     nhapMaThe = new QLineEdit();
     nhapMaThe->setReadOnly(true);
     nhapMaThe->setStyleSheet("background-color: #ecf0f1; color: #7f8c8d; font-weight: bold;");
-    formLayout->addRow("Mã Thẻ:", nhapMaThe);
+    formLayout->addRow(LanguageManager::instance().getText("TABLE_HEADER_CODE") + ":", nhapMaThe);
 
-    QLabel* noteLabel = new QLabel("⚠️ Mã thẻ không thể chỉnh sửa");
+    QLabel* noteLabel = new QLabel(LanguageManager::instance().getText("MSG_CODE_READONLY"));
     noteLabel->setStyleSheet("color: #95a5a6; font-size: 11px; font-style: italic;");
     formLayout->addRow("", noteLabel);
 
     // Last name
     nhapHo = new QLineEdit();
-    nhapHo->setPlaceholderText("Nhập họ đệm...");
+    nhapHo->setPlaceholderText(LanguageManager::instance().getText("LBL_LASTNAME") + "...");
     nhapHo->setObjectName("inputField");
     connect(nhapHo, &QLineEdit::textChanged, this, &ManHinhSuaDocGia::kiemTraDuLieu);
-    formLayout->addRow("Họ Đệm: *", nhapHo);
+    formLayout->addRow(LanguageManager::instance().getText("LBL_LASTNAME") + ": *", nhapHo);
 
     // First name
     nhapTen = new QLineEdit();
-    nhapTen->setPlaceholderText("Nhập tên...");
+    nhapTen->setPlaceholderText(LanguageManager::instance().getText("LBL_FIRSTNAME") + "...");
     nhapTen->setObjectName("inputField");
     connect(nhapTen, &QLineEdit::textChanged, this, &ManHinhSuaDocGia::kiemTraDuLieu);
-    formLayout->addRow("Tên: *", nhapTen);
+    formLayout->addRow(LanguageManager::instance().getText("LBL_FIRSTNAME") + ": *", nhapTen);
 
     // Gender
     chonGioiTinh = new QComboBox();
     chonGioiTinh->setObjectName("inputField");
-    chonGioiTinh->addItem("👨 Nam", 0);
-    chonGioiTinh->addItem("👩 Nữ", 1);
-    formLayout->addRow("Giới Tính:", chonGioiTinh);
+    chonGioiTinh->addItem(LanguageManager::instance().getText("GENDER_MALE"), 0);
+    chonGioiTinh->addItem(LanguageManager::instance().getText("GENDER_FEMALE"), 1);
+    formLayout->addRow(LanguageManager::instance().getText("LBL_GENDER") + ":", chonGioiTinh);
 
     // Status
     chonTrangThai = new QComboBox();
     chonTrangThai->setObjectName("inputField");
-    chonTrangThai->addItem("✅ Hoạt động", 0);
-    chonTrangThai->addItem("🔒 Khóa", 1);
-    formLayout->addRow("Trạng Thái:", chonTrangThai);
+    chonTrangThai->addItem(LanguageManager::instance().getText("STATUS_ACTIVE"), 0);
+    chonTrangThai->addItem(LanguageManager::instance().getText("STATUS_LOCKED"), 1);
+    formLayout->addRow(LanguageManager::instance().getText("LBL_STATUS") + ":", chonTrangThai);
 
     mainLayout->addWidget(formGroup);
 
     // Statistics group
-    QGroupBox* statsGroup = new QGroupBox("Thống Kê");
+    QGroupBox* statsGroup = new QGroupBox(LanguageManager::instance().getText("GROUP_STATS"));
     statsGroup->setObjectName("statsGroup");
     QVBoxLayout* statsLayout = new QVBoxLayout(statsGroup);
     statsLayout->setContentsMargins(15, 15, 15, 15);
@@ -104,14 +115,14 @@ void ManHinhSuaDocGia::thietLapGiaoDien() {
     );
     statsLayout->addWidget(nhanSoSachDangMuon);
 
-    QLabel* statsNote = new QLabel("💡 Không thể khóa độc giả đang mượn sách");
+    QLabel* statsNote = new QLabel(LanguageManager::instance().getText("MSG_NOTE_CANNOT_LOCK"));
     statsNote->setStyleSheet("color: #7f8c8d; font-size: 11px; font-style: italic;");
     statsLayout->addWidget(statsNote);
 
     mainLayout->addWidget(statsGroup);
 
     // Info note
-    QLabel* infoLabel = new QLabel("💡 Các trường đánh dấu (*) là bắt buộc");
+    QLabel* infoLabel = new QLabel(LanguageManager::instance().getText("LBL_REQUIRED_FIELDS_NOTE"));
     infoLabel->setStyleSheet("color: #7f8c8d; font-size: 12px; padding: 10px; background-color: #ecf0f1; border-radius: 5px;");
     mainLayout->addWidget(infoLabel);
 
@@ -121,12 +132,12 @@ void ManHinhSuaDocGia::thietLapGiaoDien() {
     QHBoxLayout* buttonLayout = new QHBoxLayout();
     buttonLayout->setSpacing(10);
 
-    nutLuu = new QPushButton("✅ Lưu Thay Đổi");
+    nutLuu = new QPushButton(LanguageManager::instance().getText("BTN_SAVE_CHANGES"));
     nutLuu->setObjectName("primaryButton");
     nutLuu->setMinimumHeight(40);
     connect(nutLuu, &QPushButton::clicked, this, &ManHinhSuaDocGia::khiNhanLuu);
 
-    nutHuy = new QPushButton("❌ Hủy");
+    nutHuy = new QPushButton(LanguageManager::instance().getText("BTN_CANCEL_DIALOG"));
     nutHuy->setObjectName("nutHuy");
     nutHuy->setMinimumHeight(40);
     connect(nutHuy, &QPushButton::clicked, this, &QDialog::reject);
@@ -238,8 +249,8 @@ void ManHinhSuaDocGia::apDungPhongCachHienDai() {
 
 void ManHinhSuaDocGia::taiDuLieuDocGia() {
     if (!docGiaHienTai) {
-        QMessageBox::critical(this, "Lỗi ❌", 
-            "Không tìm thấy thông tin độc giả!");
+        QMessageBox::critical(this, LanguageManager::instance().getText("TITLE_ERROR"), 
+            LanguageManager::instance().getText("MSG_READER_NOT_FOUND"));
         reject();
         return;
     }
@@ -254,13 +265,13 @@ void ManHinhSuaDocGia::taiDuLieuDocGia() {
     // Update book count label
     int borrowedCount = docGiaHienTai->data.soSachDangMuon;
     nhanSoSachDangMuon->setText(
-        QString("📚 Số sách đang mượn: <b>%1</b>").arg(borrowedCount)
+        LanguageManager::instance().getText("LBL_BORROWED_COUNT").arg(borrowedCount)
     );
 
     // Disable status change if reader has borrowed books
     if (borrowedCount > 0) {
         chonTrangThai->setEnabled(false);
-        chonTrangThai->setToolTip("Không thể thay đổi trạng thái khi độc giả đang mượn sách");
+         chonTrangThai->setToolTip(LanguageManager::instance().getText("MSG_CANNOT_LOCK_BORROWING").arg(borrowedCount));
     }
 
     kiemTraDuLieu();
@@ -292,8 +303,8 @@ void ManHinhSuaDocGia::kiemTraDuLieu() {
 
 void ManHinhSuaDocGia::khiNhanLuu() {
     if (!docGiaHienTai) {
-        QMessageBox::critical(this, "Lỗi ❌", 
-            "Không tìm thấy thông tin độc giả!");
+        QMessageBox::critical(this, LanguageManager::instance().getText("TITLE_ERROR"), 
+            LanguageManager::instance().getText("MSG_READER_NOT_FOUND"));
         return;
     }
 
@@ -305,32 +316,32 @@ void ManHinhSuaDocGia::khiNhanLuu() {
 
     // Validate họ đệm
     if (lastName.isEmpty()) {
-        QMessageBox::warning(this, "Thiếu Thông Tin ⚠️",
-            "Vui lòng nhập họ đệm!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"),
+            LanguageManager::instance().getText("MSG_MISSING_LASTNAME"));
         nhapHo->setFocus();
         return;
     }
     
     std::string loiHo = KiemTraTenNguoi(lastName.toStdString(), "Họ đệm");
     if (!loiHo.empty()) {
-        QMessageBox::warning(this, "Lỗi Họ Đệm ⚠️",
-            QString::fromStdString(loiHo) + "\n\n💡 Họ đệm chỉ được chứa chữ cái và khoảng trắng, tối đa 50 ký tự.");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_ERROR_NAME"),
+            QString::fromStdString(loiHo) + LanguageManager::instance().getText("MSG_ERROR_NAME_FORMAT_HINT"));
         nhapHo->setFocus();
         return;
     }
 
     // Validate tên
     if (firstName.isEmpty()) {
-        QMessageBox::warning(this, "Thiếu Thông Tin ⚠️",
-            "Vui lòng nhập tên!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"),
+            LanguageManager::instance().getText("MSG_MISSING_FIRSTNAME"));
         nhapTen->setFocus();
         return;
     }
     
     std::string loiTen = KiemTraTenNguoi(firstName.toStdString(), "Tên");
     if (!loiTen.empty()) {
-        QMessageBox::warning(this, "Lỗi Tên ⚠️",
-            QString::fromStdString(loiTen) + "\n\n💡 Tên chỉ được chứa chữ cái và khoảng trắng, tối đa 50 ký tự.");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_ERROR_FIRSTNAME"),
+            QString::fromStdString(loiTen) + LanguageManager::instance().getText("MSG_ERROR_FIRSTNAME_FORMAT_HINT"));
         nhapTen->setFocus();
         return;
     }
@@ -340,9 +351,8 @@ void ManHinhSuaDocGia::khiNhanLuu() {
     int targetStatus = statusValue == 0 ? 1 : 0; // Convert from combo index to actual status
     
     if (targetStatus == 0 && borrowedCount > 0) {
-        QMessageBox::warning(this, "Không Thể Khóa ⚠️",
-            QString("Không thể khóa độc giả đang mượn %1 cuốn sách!\n"
-                   "Vui lòng đợi độc giả trả hết sách trước.").arg(borrowedCount));
+        QMessageBox::warning(this, LanguageManager::instance().getText("MSG_WARNING_LOCK"),
+            LanguageManager::instance().getText("MSG_CANNOT_LOCK_BORROWING").arg(borrowedCount));
         return;
     }
 
@@ -357,27 +367,32 @@ void ManHinhSuaDocGia::khiNhanLuu() {
         hieuChinhDocGia(rootDocGia, updatedData);
         emit docGiaDaCapNhat();
         
-        QString genderStr = genderValue == 0 ? "Nam" : "Nữ";
-        QString statusStr = targetStatus == 1 ? "Hoạt động" : "Khóa";
+        QString genderStr = genderValue == 0 ? LanguageManager::instance().getText("GENDER_MALE") : LanguageManager::instance().getText("GENDER_FEMALE");
+        QString statusStr = targetStatus == 1 ? LanguageManager::instance().getText("STATUS_ACTIVE") : LanguageManager::instance().getText("STATUS_LOCKED");
         
-        QMessageBox::information(this, "Thành Công 🎉",
-            QString("✅ Đã cập nhật thông tin độc giả thành công!\n\n"
-                   "🎫 Mã thẻ: %1\n"
-                   "👤 Họ tên: %2 %3\n"
-                   "⚧ Giới tính: %4\n"
-                   "📊 Trạng thái: %5")
+        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"),
+            QString("✅ %1\n\n"
+                   "🎫 %2: %3\n"
+                   "👤 %4: %5 %6\n"
+                   "⚧ %7: %8\n"
+                   "📊 %9: %10")
+                .arg(LanguageManager::instance().getText("MSG_SUCCESS_UPDATE"))
+                .arg(LanguageManager::instance().getText("TABLE_HEADER_CODE"))
                 .arg(docGiaHienTai->data.MaThe)
+                .arg(LanguageManager::instance().getText("LBL_LASTNAME") + " " + LanguageManager::instance().getText("LBL_FIRSTNAME"))
                 .arg(lastName)
                 .arg(firstName)
+                .arg(LanguageManager::instance().getText("LBL_GENDER"))
                 .arg(genderStr)
+                .arg(LanguageManager::instance().getText("LBL_STATUS"))
                 .arg(statusStr));
         
         accept();
     } catch (const std::exception& e) {
-        QMessageBox::critical(this, "Lỗi Hệ Thống ❌",
-            QString("Đã xảy ra lỗi khi cập nhật độc giả:\n%1").arg(e.what()));
+        QMessageBox::critical(this, LanguageManager::instance().getText("TITLE_ERROR_SYSTEM"),
+            LanguageManager::instance().getText("MSG_ERROR_UPDATE_FAILED").arg(e.what()));
     } catch (...) {
-        QMessageBox::critical(this, "Lỗi Không Xác Định ❌",
-            "Đã xảy ra lỗi không xác định khi cập nhật độc giả!");
+        QMessageBox::critical(this, LanguageManager::instance().getText("TITLE_ERROR_UNKNOWN"),
+            LanguageManager::instance().getText("MSG_ERROR_UNKNOWN_ACTION"));
     }
 }

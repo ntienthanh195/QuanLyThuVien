@@ -20,7 +20,10 @@
 #include <QDebug>
 #include <QScrollArea>
 #include <QFrame>
+#include <QFrame>
 #include <QShortcut>
+#include <QFile>
+#include <QPixmap>
 
 extern PTRDG rootDocGia;
 extern PTRDS dsDauSach[MAX_DAUSACH];
@@ -140,9 +143,9 @@ WidgetMuonTraSach::WidgetMuonTraSach(QWidget *parent)
     searchTimer->setSingleShot(true);
     searchTimer->setInterval(300); // 300ms debounce
     
-        // Initialize async watchers
-        bookSearchWatcher = new QFutureWatcher<std::vector<KetQuaTimKiem>>(this);
-        banSaoWatcher = new QFutureWatcher<std::vector<PTRDMS>>(this);
+    // Initialize async watchers
+    bookSearchWatcher = new QFutureWatcher<std::vector<KetQuaTimKiem>>(this);
+    banSaoWatcher = new QFutureWatcher<std::vector<PTRDMS>>(this);
         connect(bookSearchWatcher, &QFutureWatcher<std::vector<KetQuaTimKiem>>::finished,
             this, &WidgetMuonTraSach::onBookSearchFinished);
         connect(banSaoWatcher, &QFutureWatcher<std::vector<PTRDMS>>::finished,
@@ -151,6 +154,11 @@ WidgetMuonTraSach::WidgetMuonTraSach(QWidget *parent)
         setupUI();
         setupConnections();
         setupKeyboardShortcuts();
+        
+        // Init FocusGuard
+        m_focusGuard = new FocusGuard(this);
+        m_autoConfirm = false;
+        
         chuyenSangState(STATE_NHAP_MA_THE);
 }
 
@@ -213,7 +221,12 @@ void WidgetMuonTraSach::setupStateNhapMaThe() {
     cardLayout->setContentsMargins(40, 40, 40, 40);
     
     // Icon 64px
-    QLabel *iconLabel = new QLabel("👤");
+    QLabel *iconLabel = new QLabel();
+    if (QFile::exists(":/icons/user.png")) {
+        iconLabel->setPixmap(QPixmap(":/icons/user.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    } else {
+        // Fallback or empty
+    }
     // Set size via font rather than inline stylesheet
     QFont iconFont = iconLabel->font();
     iconFont.setPointSize(64);
@@ -232,7 +245,7 @@ void WidgetMuonTraSach::setupStateNhapMaThe() {
     titleLabel->setFont(titleFont);
     
     // Subtitle
-    lblHuongDan = new QLabel("Vui lòng nhập mã thẻ độc giả để truy cập");
+    lblHuongDan = new QLabel("Vui lòng nhập mã thẻ học viên để truy cập");
     lblHuongDan->setProperty("class", "SubText");
     lblHuongDan->setAlignment(Qt::AlignCenter);
     
@@ -293,8 +306,12 @@ void WidgetMuonTraSach::setupStateThongTinDocGia() {
     leftLayout->setContentsMargins(25, 30, 25, 30);
     
     // Avatar + Tên
-    QLabel *avatarLabel = new QLabel("👤");
-    avatarLabel->setStyleSheet("font-size: 80px; background: transparent; color: #3699FF;");
+    // Avatar + Tên
+    QLabel *avatarLabel = new QLabel();
+    if (QFile::exists(":/icons/reader.png")) {
+        avatarLabel->setPixmap(QPixmap(":/icons/reader.png").scaled(80, 80, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    }
+    avatarLabel->setStyleSheet("background: transparent;");
     avatarLabel->setAlignment(Qt::AlignCenter);
     leftLayout->addWidget(avatarLabel);
     
@@ -314,7 +331,7 @@ void WidgetMuonTraSach::setupStateThongTinDocGia() {
     leftLayout->addStretch();
     
     // Logout Button - Use btnQuayLai (declared in header)
-    btnQuayLai = new QPushButton("🚪 Đăng Xuất");
+    btnQuayLai = new QPushButton("Đăng Xuất");
     btnQuayLai->setProperty("class", "Danger");
     btnQuayLai->setMinimumHeight(45);
     leftLayout->addWidget(btnQuayLai);
@@ -328,7 +345,7 @@ void WidgetMuonTraSach::setupStateThongTinDocGia() {
     rightLayout->setContentsMargins(30, 30, 30, 30);
     
     // Title
-    QLabel *workspaceTitle = new QLabel("📚 Sách Đang Mượn");
+    QLabel *workspaceTitle = new QLabel("Sách Đang Mượn");
     workspaceTitle->setProperty("class", "PageTitle");
     rightLayout->addWidget(workspaceTitle);
     
@@ -365,17 +382,17 @@ void WidgetMuonTraSach::setupStateThongTinDocGia() {
     QHBoxLayout *actionLayout = new QHBoxLayout();
     actionLayout->setSpacing(15);
     
-    btnMuonSachMoi = new QPushButton("📖 Mượn Sách");
+    btnMuonSachMoi = new QPushButton("Mượn Sách");
     btnMuonSachMoi->setProperty("class", "Primary");
     btnMuonSachMoi->setMinimumHeight(55);
     btnMuonSachMoi->setMinimumWidth(180);
     
-    btnTraSach = new QPushButton("✅ Trả Sách");
+    btnTraSach = new QPushButton("Trả Sách");
     btnTraSach->setProperty("class", "Success");
     btnTraSach->setMinimumHeight(55);
     btnTraSach->setMinimumWidth(180);
     
-    btnBaoMat = new QPushButton("⚠ Báo Mất");
+    btnBaoMat = new QPushButton("Báo Mất");
     btnBaoMat->setProperty("class", "Danger");
     btnBaoMat->setMinimumHeight(55);
     btnBaoMat->setMinimumWidth(180);
@@ -398,7 +415,7 @@ void WidgetMuonTraSach::setupStateMuonSach() {
     QVBoxLayout *layout = new QVBoxLayout(widgetMuonSach);
     layout->setSpacing(20);
     
-    QLabel *titleMuon = new QLabel("+ MƯỢN SÁCH MỚI", widgetMuonSach);
+    QLabel *titleMuon = new QLabel("MƯỢN SÁCH MỚI", widgetMuonSach);
     QFont font = titleMuon->font();
     font.setPointSize(15);
     font.setBold(true);
@@ -407,7 +424,7 @@ void WidgetMuonTraSach::setupStateMuonSach() {
     layout->addWidget(titleMuon);
     
     // Tìm sách
-    QGroupBox *groupSearch = new QGroupBox("◈ Tìm Sách", widgetMuonSach);
+    QGroupBox *groupSearch = new QGroupBox("Tìm Sách", widgetMuonSach);
     QVBoxLayout *searchLayout = new QVBoxLayout(groupSearch);
     
     QHBoxLayout *searchBar = new QHBoxLayout();
@@ -417,7 +434,7 @@ void WidgetMuonTraSach::setupStateMuonSach() {
     editTimSach->setToolTip("Tìm sách theo ISBN hoặc tên (Ctrl+F để focus)");
     searchBar->addWidget(editTimSach);
     
-    btnTimSach = new QPushButton("◈ Tìm", groupSearch);
+    btnTimSach = new QPushButton("Tìm", groupSearch);
     btnTimSach->setProperty("class", "btn-primary");
     btnTimSach->setMinimumHeight(42);
     btnTimSach->setMinimumWidth(100);
@@ -433,7 +450,7 @@ void WidgetMuonTraSach::setupStateMuonSach() {
     layout->addWidget(groupSearch);
     
     // Chọn bản sao
-    QGroupBox *groupSelect = new QGroupBox("▫ Chọn Bản Sao", widgetMuonSach);
+    QGroupBox *groupSelect = new QGroupBox("Chọn Bản Sao", widgetMuonSach);
     QFormLayout *selectLayout = new QFormLayout(groupSelect);
     
     comboBanSao = new QComboBox(groupSelect);
@@ -448,13 +465,13 @@ void WidgetMuonTraSach::setupStateMuonSach() {
     
     // Buttons
     QHBoxLayout *btnLayout = new QHBoxLayout();
-    btnXacNhanMuon = new QPushButton("✓ Xác Nhận Mượn", widgetMuonSach);
+    btnXacNhanMuon = new QPushButton("Xác Nhận Mượn", widgetMuonSach);
     btnXacNhanMuon->setProperty("class", "btn-success");
     btnXacNhanMuon->setMinimumHeight(44);
     btnXacNhanMuon->setEnabled(false);
     btnLayout->addWidget(btnXacNhanMuon);
     
-    btnHuyMuon = new QPushButton("← Hủy", widgetMuonSach);
+    btnHuyMuon = new QPushButton("Hủy", widgetMuonSach);
     btnHuyMuon->setProperty("class", "btn-secondary");
     btnHuyMuon->setMinimumHeight(45);
     btnLayout->addWidget(btnHuyMuon);
@@ -470,7 +487,7 @@ void WidgetMuonTraSach::setupStateTraSach() {
     QVBoxLayout *layout = new QVBoxLayout(widgetTraSach);
     layout->setSpacing(20);
     
-    QLabel *titleTra = new QLabel("✓ TRẢ SÁCH", widgetTraSach);
+    QLabel *titleTra = new QLabel("TRẢ SÁCH", widgetTraSach);
     QFont font = titleTra->font();
     font.setPointSize(15);
     font.setBold(true);
@@ -481,6 +498,21 @@ void WidgetMuonTraSach::setupStateTraSach() {
     lblChonSachTra = new QLabel("Chọn sách muốn trả từ danh sách bên dưới:", widgetTraSach);
     lblChonSachTra->setStyleSheet("color: #6B7280; padding: 4px 0;");
     layout->addWidget(lblChonSachTra);
+    
+    // Continuous Scan Input for Return
+    QHBoxLayout *scanLayout = new QHBoxLayout();
+    QLabel *lblScan = new QLabel("Quét mã sách để trả ngay:", widgetTraSach);
+    lblScan->setStyleSheet("font-weight: bold; color: #2563EB;");
+    
+    editScanTraSach = new QLineEdit(widgetTraSach);
+    editScanTraSach->setPlaceholderText("Quét mã vạch sách tại đây...");
+    editScanTraSach->setMinimumHeight(40);
+    // Focus policy is important
+    editScanTraSach->setFocusPolicy(Qt::StrongFocus);
+    
+    scanLayout->addWidget(lblScan);
+    scanLayout->addWidget(editScanTraSach);
+    layout->addLayout(scanLayout);
     
     // Filter controls
     QHBoxLayout *filterLayout = new QHBoxLayout();
@@ -518,12 +550,12 @@ void WidgetMuonTraSach::setupStateTraSach() {
     
     // Buttons
     QHBoxLayout *btnLayout = new QHBoxLayout();
-    btnXacNhanTra = new QPushButton("✓ Xác Nhận Trả", widgetTraSach);
+    btnXacNhanTra = new QPushButton("Xác Nhận Trả", widgetTraSach);
     btnXacNhanTra->setProperty("class", "btn-success");
     btnXacNhanTra->setMinimumHeight(44);
     btnLayout->addWidget(btnXacNhanTra);
     
-    btnHuyTra = new QPushButton("← Hủy", widgetTraSach);
+    btnHuyTra = new QPushButton("Hủy", widgetTraSach);
     btnHuyTra->setProperty("class", "btn-secondary");
     btnHuyTra->setMinimumHeight(45);
     btnLayout->addWidget(btnHuyTra);
@@ -538,7 +570,7 @@ void WidgetMuonTraSach::setupStateBaoMat() {
     QVBoxLayout *layout = new QVBoxLayout(widgetBaoMat);
     layout->setSpacing(20);
     
-    QLabel *titleBaoMat = new QLabel("▲ BÁO MẤT SÁCH", widgetBaoMat);
+    QLabel *titleBaoMat = new QLabel("BÁO MẤT SÁCH", widgetBaoMat);
     QFont font = titleBaoMat->font();
     font.setPointSize(15);
     font.setBold(true);
@@ -548,7 +580,7 @@ void WidgetMuonTraSach::setupStateBaoMat() {
     
     // Warning
     lblCanhBaoBaoMat = new QLabel(
-        "▲ <b>CẢNH BÁO:</b> Khi báo mất sách, độc giả sẽ phải bồi thường.<br>"
+        "<b>CẢNH BÁO:</b> Khi báo mất sách, học viên sẽ phải bồi thường.<br>"
         "Trạng thái sách sẽ được cập nhật thành <b>Đã mất</b>.",
         widgetBaoMat
     );
@@ -569,12 +601,12 @@ void WidgetMuonTraSach::setupStateBaoMat() {
     
     // Buttons
     QHBoxLayout *btnLayout = new QHBoxLayout();
-    btnXacNhanBaoMat = new QPushButton("✓ Xác Nhận Báo Mất", widgetBaoMat);
+    btnXacNhanBaoMat = new QPushButton("Xác Nhận Báo Mất", widgetBaoMat);
     btnXacNhanBaoMat->setProperty("class", "btn-danger");
     btnXacNhanBaoMat->setMinimumHeight(44);
     btnLayout->addWidget(btnXacNhanBaoMat);
     
-    btnHuyBaoMat = new QPushButton("← Hủy", widgetBaoMat);
+    btnHuyBaoMat = new QPushButton("Hủy", widgetBaoMat);
     btnHuyBaoMat->setProperty("class", "btn-secondary");
     btnHuyBaoMat->setMinimumHeight(45);
     btnLayout->addWidget(btnHuyBaoMat);
@@ -610,6 +642,7 @@ void WidgetMuonTraSach::setupConnections() {
     connect(btnHuyMuon, &QPushButton::clicked, [this]() { chuyenSangState(STATE_HIEN_THONG_TIN); });
     
     // State 3
+    connect(editScanTraSach, &QLineEdit::returnPressed, this, &WidgetMuonTraSach::onScanTraSach);
     connect(tableTraSach, &QTableView::clicked, this, &WidgetMuonTraSach::onChonSachTraChanged);
     connect(btnXacNhanTra, &QPushButton::clicked, this, &WidgetMuonTraSach::onXacNhanTraClicked);
     connect(btnHuyTra, &QPushButton::clicked, [this]() { chuyenSangState(STATE_HIEN_THONG_TIN); });
@@ -704,6 +737,7 @@ void WidgetMuonTraSach::chuyenSangState(WorkflowState newState) {
 void WidgetMuonTraSach::xuLyNhapMaThe() {
     editMaThe->clear();
     editMaThe->setFocus();
+    m_focusGuard->setTarget(editMaThe); // Guard Focus
     statusLabel->clear();
     docGiaHienTai = nullptr;
     qDebug() << "State: NHAP_MA_THE";
@@ -723,6 +757,7 @@ void WidgetMuonTraSach::xuLyHienThongTin() {
     btnTraSach->setEnabled(cacSachDangMuon.size() > 0);
     btnBaoMat->setEnabled(cacSachDangMuon.size() > 0);
     
+    m_focusGuard->setTarget(nullptr); // No mandatory focus here (user chooses action)
     qDebug() << "State: HIEN_THONG_TIN";
 }
 
@@ -733,7 +768,9 @@ void WidgetMuonTraSach::xuLyMuonSach() {
     lblKetQuaTimSach->clear();
     lblViTri->clear();
     btnXacNhanMuon->setEnabled(false);
+    btnXacNhanMuon->setEnabled(false);
     sachTimThay = nullptr;
+    m_focusGuard->setTarget(editTimSach); // Guard Focus for continuous scanning
     qDebug() << "State: MUON_SACH";
 }
 
@@ -741,6 +778,11 @@ void WidgetMuonTraSach::xuLyTraSach() {
     modelTraSach->setLoans(cacSachDangMuon);
     lblChonSachTra->setText(QString("Chọn sách muốn trả (Tổng: %1 sách):").arg(cacSachDangMuon.size()));
     tableTraSach->selectRow(0);
+    tableTraSach->selectRow(0);
+    // TODO: Add barcode field for return status? For now standard
+    editScanTraSach->clear();
+    editScanTraSach->setFocus();
+    m_focusGuard->setTarget(editScanTraSach); 
     qDebug() << "State: TRA_SACH";
 }
 
@@ -766,7 +808,7 @@ void WidgetMuonTraSach::onTimDocGiaClicked() {
     QString maTheStr = editMaThe->text().trimmed();
     
     if (maTheStr.isEmpty()) {
-        hienThiThongBao("⚠️ Vui lòng nhập mã thẻ độc giả!", true);
+        hienThiThongBao("⚠️ Vui lòng nhập mã thẻ học viên!", true);
         return;
     }
     
@@ -786,8 +828,46 @@ void WidgetMuonTraSach::onTimDocGiaClicked() {
     }
 }
 
+// Helper algorithm to find reader who has the book
+PTRDG WidgetMuonTraSach::findReaderByBook(const std::string& maSach) {
+    if (!rootDocGia) return nullptr;
+    
+    PTRDG result = nullptr;
+    // Recursive traversal
+    std::function<void(PTRDG)> traverse = [&](PTRDG p) {
+        if (!p || result) return; // Stop if found
+        
+        // Check this reader's loans
+        MUONTRA mt = p->data.dsmt;
+        while (mt) {
+            // Check active loans only (TrangThai == 0: Dang Muon) or Lost (2)
+            if (mt->data.TrangThai == 0) {
+                 // Check maSach (need to check BanSao)
+                 if (mt->data.banSaoSach && mt->data.banSaoSach->maSach.length() > 0) {
+                     QString currentMa = QString::fromStdString(mt->data.banSaoSach->maSach);
+                     if (currentMa.compare(QString::fromStdString(maSach), Qt::CaseInsensitive) == 0) {
+                         result = p;
+                         return;
+                     }
+                 }
+            }
+            mt = mt->next;
+        }
+        
+        traverse(p->left);
+        traverse(p->right);
+    };
+    
+    traverse(rootDocGia);
+    return result;
+}
+
 void WidgetMuonTraSach::onMaTheEnterPressed() {
-    onTimDocGiaClicked();
+    QString input = editMaThe->text().trimmed();
+    if (input.isEmpty()) return;
+    
+    // Unified scanning logic
+    handleGlobalScan(input);
 }
 
 void WidgetMuonTraSach::onResetWorkflow() {
@@ -800,7 +880,7 @@ void WidgetMuonTraSach::onMuonSachMoiClicked() {
     // Check giới hạn 3 sách
     if (docGiaHienTai->data.soSachDangMuon >= 3) {
         QMessageBox::warning(this, "Giới Hạn Mượn Sách",
-            "⚠️ Độc giả đã mượn đủ 3 sách.\nVui lòng trả sách trước khi mượn tiếp!");
+            "⚠️ Học viên đã mượn đủ 3 sách.\nVui lòng trả sách trước khi mượn tiếp!");
         return;
     }
     
@@ -817,7 +897,7 @@ void WidgetMuonTraSach::onMuonSachMoiClicked() {
 void WidgetMuonTraSach::onTraSachClicked() {
     if (!docGiaHienTai || cacSachDangMuon.isEmpty()) {
         QMessageBox::warning(this, "Không Có Sách",
-            "⚠️ Độc giả không có sách nào đang mượn!");
+            "⚠️ Học viên không có sách nào đang mượn!");
         return;
     }
     
@@ -827,7 +907,7 @@ void WidgetMuonTraSach::onTraSachClicked() {
 void WidgetMuonTraSach::onBaoMatClicked() {
     if (!docGiaHienTai || cacSachDangMuon.isEmpty()) {
         QMessageBox::warning(this, "Không Có Sách",
-            "⚠️ Độc giả không có sách nào đang mượn!");
+            "⚠️ Học viên không có sách nào đang mượn!");
         return;
     }
     
@@ -836,12 +916,51 @@ void WidgetMuonTraSach::onBaoMatClicked() {
 
 void WidgetMuonTraSach::onTimSachMuonClicked() {
     QString tuKhoa = editTimSach->text().trimmed();
-    
+
     if (tuKhoa.isEmpty()) {
         lblKetQuaTimSach->setText("⚠️ Vui lòng nhập từ khóa tìm kiếm!");
         lblKetQuaTimSach->setStyleSheet("color: #DC2626;");
         return;
     }
+    
+    // Check Special Command "HOAN_TAT" or "F12"
+    if (tuKhoa.toUpper() == "HOAN_TAT" || tuKhoa.toUpper() == "CMD_HOAN_TAT") {
+        // Trigger Finish Workflow (Print Receipt)
+        // Assume finishing borrow session
+        // Print Receipt (Silent)
+        if (docGiaHienTai && !cacSachDangMuon.isEmpty()) {
+             // In tat ca sach vua muon? 
+             // Logic: In phieu muon cho cac sach co ngay muon = hom nay
+             // For simplicity, print current list
+             QList<QString> bookList;
+             for (const auto& s : cacSachDangMuon) bookList.append(QString::fromStdString(s.tenSach));
+             
+             // In Phieu Tong Hop
+             // Loop print for now (supporting Receipt Printer)
+             int count = 0;
+             for (const auto& s : cacSachDangMuon) {
+                 // Check if borrowed today? For now print all in session list
+                 if (s.ngayMuon == NgayThang::LayNgayHienTai()) {
+                     PrintHelper::inPhieuMuonTuDong(docGiaHienTai, QString::fromStdString(s.maSach), QString::fromStdString(s.tenSach), QString::fromStdString(s.ngayMuon), this);
+                     count++;
+                 }
+             }
+             
+             if (count > 0) {
+                 hienThiThongBao(QString("🖨️ Đã gửi lệnh in %1 phiếu mượn...").arg(count), false);
+             } else {
+                 hienThiThongBao("⚠️ Không có sách nào mượn hôm nay để in.", true);
+             }
+             
+             // Reset to State 1
+             capNhatDanhSachSachDangMuon(); // refresh
+             chuyenSangState(STATE_HIEN_THONG_TIN);
+        }
+        return;
+    }
+    
+    // Set auto confirm flag (since Enter was pressed)
+    m_autoConfirm = true;
     
     // Run book search asynchronously to avoid blocking UI
     try {
@@ -882,27 +1001,53 @@ void WidgetMuonTraSach::onXacNhanMuonClicked() {
         return;
     }
     
-    QString isbn = QString::fromStdString(sachTimThay->ISBN);
+    QString codeToBorrow = QString::fromStdString(sachTimThay->ISBN);
+    
+    // Prefer specific copy if selected
+    if (comboBanSao->currentIndex() >= 0) {
+        codeToBorrow = comboBanSao->currentData().toString();
+    }
     
     // ✅ Gọi backend function MuonSach()
-    std::string result = MuonSach(docGiaHienTai, isbn.toStdString(), dsDauSach, soLuongDauSach);
+    std::string result = MuonSach(docGiaHienTai, codeToBorrow.toStdString(), dsDauSach, soLuongDauSach);
     
     if (result.empty()) {
-        QMessageBox::information(this, "Thành Công ✅",
-            QString("Đã mượn sách:\n%1\n\nĐộc giả đang mượn: %2/3 sách\n"
-                    "Hạn trả: 7 ngày kể từ hôm nay")
-            .arg(QString::fromStdString(sachTimThay->tenSach))
-            .arg(docGiaHienTai->data.soSachDangMuon));
-        
-        // Refresh và quay lại state 1
-        // Notify auto-save / persistence and update UI
+        // Refresh 
         try { emit duLieuThayDoi(); } catch(...) {}
         capNhatDanhSachSachDangMuon();
-        hienThiThongBao("✓ Đã mượn sách thành công", false);
-        chuyenSangState(STATE_HIEN_THONG_TIN);
+        
+        // AUTO PRINT RECEIPT
+        PrintHelper::inPhieuMuonTuDong(docGiaHienTai, codeToBorrow, QString::fromStdString(sachTimThay->tenSach), NgayThang::LayNgayHienTai(), this);
+        
+        // NOTIFY & RESET (CONTINUOUS FLOW)
+        hienThiThongBao("✓ Đã mượn: " + QString::fromStdString(sachTimThay->tenSach) + 
+                        QString(" (%1/3)").arg(docGiaHienTai->data.soSachDangMuon), false);
+        QApplication::beep();
+
+        // Check limit
+        if (docGiaHienTai->data.soSachDangMuon >= 3) {
+            QMessageBox::information(this, "Đã Đủ Sách", 
+                "Học viên đã mượn đủ 3 sách!\nQuay lại màn hình thông tin.");
+            chuyenSangState(STATE_HIEN_THONG_TIN);
+            return;
+        }
+
+        // RESET UI FOR NEXT SCAN
+        editTimSach->clear();
+        comboBanSao->clear();
+        lblKetQuaTimSach->clear(); // Clear search result info
+        lblViTri->clear();
+        btnXacNhanMuon->setEnabled(false);
+        sachTimThay = nullptr; // Reset current book pointer
+        
+        // FOCUS BACK TO SEARCH
+        editTimSach->setFocus();
+        if (m_focusGuard) m_focusGuard->setTarget(editTimSach);
+        
     } else {
         hienThiThongBao(QString::fromStdString(result), true);
         QMessageBox::critical(this, "Lỗi ❌", QString::fromStdString(result));
+        // On error, we might want to stay to let user retry or cancel
     }
 }
 
@@ -930,9 +1075,12 @@ void WidgetMuonTraSach::onXacNhanTraClicked() {
     
     if (result.empty()) {
         QMessageBox::information(this, "Thành Công",
-            QString("Đã trả sách:\n%1\n\nĐộc giả còn: %2 sách đang mượn")
+            QString("Đã trả sách:\n%1\n\nHọc viên còn: %2 sách đang mượn")
             .arg(QString::fromStdString(sachTra.tenSach))
             .arg(docGiaHienTai->data.soSachDangMuon));
+        
+        // Auto Print Return Receipt
+        PrintHelper::inPhieuTraTuDong(docGiaHienTai, QString::fromStdString(sachTra.maSach), QString::fromStdString(sachTra.tenSach), NgayThang::LayNgayHienTai(), this);
         
         // Refresh và quay lại state 1
         try { emit duLieuThayDoi(); } catch(...) {}
@@ -940,6 +1088,63 @@ void WidgetMuonTraSach::onXacNhanTraClicked() {
         chuyenSangState(STATE_HIEN_THONG_TIN);
     } else {
         QMessageBox::critical(this, "Lỗi ❌", QString::fromStdString(result));
+    }
+}
+
+
+void WidgetMuonTraSach::onScanTraSach() {
+    QString barcode = editScanTraSach->text().trimmed();
+    if (barcode.isEmpty()) return;
+    
+    // Find book in 'cacSachDangMuon'
+    bool found = false;
+    int foundIndex = -1;
+    
+    for (int i = 0; i < cacSachDangMuon.size(); ++i) {
+        // Unified Case-Insensitive Match
+        QString currentMa = QString::fromStdString(cacSachDangMuon[i].maSach);
+        if (currentMa.compare(barcode, Qt::CaseInsensitive) == 0) {
+            foundIndex = i;
+            found = true;
+            break;
+        }
+    }
+    
+    if (!found) {
+        hienThiThongBao("⚠️ Sách không có trong danh sách mượn của độc giả này!", true);
+        QApplication::beep(); 
+        editScanTraSach->selectAll();
+        return;
+    }
+    
+    tableTraSach->selectRow(foundIndex);
+    
+    ThongTinSachDangMuon_DTO sachTra = cacSachDangMuon[foundIndex];
+    std::string result = TraSach(docGiaHienTai, sachTra.maSach, dsDauSach, soLuongDauSach);
+    
+    if (result.empty()) {
+        hienThiThongBao(QString("✓ Đã trả: %1").arg(QString::fromStdString(sachTra.tenSach)), false);
+        QApplication::beep();
+        
+        PrintHelper::inPhieuTraTuDong(docGiaHienTai, QString::fromStdString(sachTra.maSach), QString::fromStdString(sachTra.tenSach), NgayThang::LayNgayHienTai(), this);
+        
+        try { emit duLieuThayDoi(); } catch(...) {}
+        capNhatDanhSachSachDangMuon();
+        
+        modelTraSach->setLoans(cacSachDangMuon);
+        lblChonSachTra->setText(QString("Còn %1 sách đang mượn:").arg(cacSachDangMuon.size()));
+        
+        editScanTraSach->clear();
+        editScanTraSach->setFocus();
+        
+        if (cacSachDangMuon.isEmpty()) {
+            QMessageBox::information(this, "Hoàn Tất", "Học viên đã trả hết sách!");
+            chuyenSangState(STATE_HIEN_THONG_TIN);
+        }
+        
+    } else {
+        hienThiThongBao("❌ Lỗi trả sách: " + QString::fromStdString(result), true);
+        QApplication::beep();
     }
 }
 
@@ -956,7 +1161,7 @@ void WidgetMuonTraSach::onXacNhanBaoMatClicked() {
         "Xác Nhận Báo Mất",
         QString("⚠️ Bạn có chắc chắn muốn báo mất sách:\n\n"
                 "%1\n\n"
-                "Độc giả sẽ phải bồi thường cho sách này!")
+                "Học viên sẽ phải bồi thường cho sách này!")
         .arg(QString::fromStdString(sachMat.tenSach)),
         QMessageBox::Yes | QMessageBox::No
     );
@@ -1078,44 +1283,6 @@ void WidgetMuonTraSach::timSachCoTheMuon(const QString& tuKhoa) {
         "Số bản sao sẵn: <b>%2</b>").arg(QString::fromStdString(sachTimThay->tenSach)).arg(soLuongSan));
     lblKetQuaTimSach->setStyleSheet("color: #10B981;");
     if (soLuongSan == 0) {
-        lblKetQuaTimSach->setText(lblKetQuaTimSach->text() + "<br>⚠️ Không có bản sao nào sẵn sàng!");
-        comboBanSao->clear();
-        btnXacNhanMuon->setEnabled(false);
-        return;
-    }
-    loadBanSaoKhaDung(sachTimThay);
-}
-
-void WidgetMuonTraSach::loadBanSaoKhaDung(PTRDS dauSach) {
-    comboBanSao->clear();
-    
-    if (!dauSach) return;
-    // Prefer using DBBatcher to collect available copies (allows future batching)
-    try {
-        btnTimSach->setEnabled(false);
-        lblKetQuaTimSach->setText("⏳ Đang tải bản sao...");
-        QFuture<std::vector<PTRDMS>> future = QtConcurrent::run(&DBBatcher::layBanSaoTheoISBN, std::string(dauSach->ISBN));
-        banSaoWatcher->setFuture(future);
-    } catch (...) {
-        // Fallback: traverse linked list (synchronous)
-        PTRDMS p = dauSach->dms;
-        int count = 0;
-        while (p) {
-            if (p->trangThai == CHO_MUON_DUOC) {
-                QString display = QString("%1 (%2)")
-                    .arg(QString::fromStdString(p->maSach))
-                    .arg(QString::fromStdString(p->viTri));
-                comboBanSao->addItem(display, QString::fromStdString(p->maSach));
-                count++;
-            }
-            p = p->next;
-        }
-        if (count > 0) {
-            comboBanSao->setCurrentIndex(0);
-            onChonBanSaoChanged(0);
-        }
-        btnTimSach->setEnabled(true);
-    }
 }
 
 // ============================================
@@ -1188,6 +1355,13 @@ void WidgetMuonTraSach::onBookSearchFinished() {
 void WidgetMuonTraSach::onBanSaoFinished() {
     btnTimSach->setEnabled(true);
     if (!banSaoWatcher) return;
+    
+    // SAFETY GUARD: If user switched state (e.g. Global Return), drop this result
+    if (currentState != STATE_MUON_SACH) {
+        m_autoConfirm = false;
+        return;
+    }
+    
     std::vector<PTRDMS> copies = banSaoWatcher->future().result();
     comboBanSao->clear();
     int count = 0;
@@ -1201,12 +1375,40 @@ void WidgetMuonTraSach::onBanSaoFinished() {
         }
     }
     if (count > 0) {
-        comboBanSao->setCurrentIndex(0);
-        onChonBanSaoChanged(0);
+        // Auto-select the scanned book if matches specific copy code
+        int selectedIndex = 0;
+        QString scanCode = editTimSach->text().trimmed();
+        for(int i=0; i<comboBanSao->count(); i++) {
+            if (comboBanSao->itemData(i).toString().compare(scanCode, Qt::CaseInsensitive) == 0) {
+                selectedIndex = i;
+                break;
+            }
+        }
+        comboBanSao->setCurrentIndex(selectedIndex);
+        onChonBanSaoChanged(selectedIndex);
+        
+        // ZERO CLICK LOGIC
+        if (m_autoConfirm) {
+            // Check warnings before auto-confirming?
+            // validateBorrowRequest handles it.
+            hienThiThongBao("⚡ Auto-Submit: Đang mượn sách...", false);
+            // Small delay or direct call? Direct call is faster.
+            onXacNhanMuonClicked();
+            
+            // Refocus for next scan (onXacNhanMuonClicked might change state, we need to ensure we stay or handle it)
+            // But checking output: onXacNhanMuonClicked calls chuyenSangState(STATE_HIEN_THONG_TIN) on success.
+            // Requirement: "Quét Sách (Liên tục)". So we should STAY in state STATE_MUON_SACH.
+            // I need to modify onXacNhanMuonClicked to NOT change state if Auto Mode?
+            // Or just change state back?
+            
+            // Let's modify onXacNhanMuonClicked to be smarter (see next refactor)
+        }
+        
     } else {
         lblKetQuaTimSach->setText(lblKetQuaTimSach->text() + "<br>⚠️ Không có bản sao nào sẵn sàng!");
         btnXacNhanMuon->setEnabled(false);
     }
+    m_autoConfirm = false; // Reset flag
 }
 
 void WidgetMuonTraSach::hienThiThongBao(const QString &message, bool isError) {
@@ -1238,6 +1440,91 @@ void WidgetMuonTraSach::resetWorkflow() {
     cacSachDangMuon.clear();
     modelSachDangMuon->clear();
     chuyenSangState(STATE_NHAP_MA_THE);
+}
+
+void WidgetMuonTraSach::handleGlobalScan(const QString& barcode) {
+    QString code = barcode.trimmed();
+    if (code.isEmpty()) return;
+    
+    qDebug() << "Global Scan Received:" << code;
+    
+    // 1. Try as Reader ID (Numeric)
+    bool isNumeric;
+    int maThe = code.toInt(&isNumeric);
+    if (isNumeric) {
+        // Assume it's a reader card
+        if (layThongTinDocGia(maThe)) {
+            chuyenSangState(STATE_HIEN_THONG_TIN);
+            hienThiThongBao("✅ Đã nhận diện độc giả: " + QString::fromStdString(docGiaHienTai->data.Ho + " " + docGiaHienTai->data.Ten));
+            QApplication::beep();
+            return;
+        }
+    }
+    
+    // 2. Try as Book Code
+    
+    // Scenario A: Reader is already login
+    if (docGiaHienTai) {
+        // Check if book is currently borrowed by this reader (for Return)
+        bool isBorrowed = false;
+        for (const auto& loan : cacSachDangMuon) {
+            // Case-Insensitive Check
+            if (QString::fromStdString(loan.maSach).compare(code, Qt::CaseInsensitive) == 0) {
+                isBorrowed = true;
+                break;
+            }
+        }
+        
+        if (isBorrowed) {
+            // Auto Trigger Return
+            if (currentState != STATE_TRA_SACH) {
+                chuyenSangState(STATE_TRA_SACH);
+            }
+            editScanTraSach->setText(code);
+            onScanTraSach(); // Trigger Logic
+            return;
+        } else {
+            // Auto Trigger Borrow
+            if (currentState != STATE_MUON_SACH) {
+                chuyenSangState(STATE_MUON_SACH);
+            }
+            editTimSach->setText(code); // Put code into search
+            // Force auto confirm flow
+            m_autoConfirm = true;
+            onTimSachMuonClicked(); // Trigger Search
+            return;
+        }
+    } 
+    
+    // Scenario B: No reader login
+    // Check if book is borrowed by SOMEONE ELSE (Global Return)
+    PTRDG borrower = findReaderByBook(code.toStdString());
+    if (borrower) {
+        // Login as that borrower and go to Return
+        docGiaHienTai = borrower;
+        chuyenSangState(STATE_HIEN_THONG_TIN);
+        chuyenSangState(STATE_TRA_SACH);
+        
+        hienThiThongBao("⚡ Phát hiện sách của: " + QString::fromStdString(borrower->data.Ho + " " + borrower->data.Ten), false);
+        
+        // Trigger Return
+        editScanTraSach->setText(code);
+        onScanTraSach();
+        return;
+    }
+    
+    // Scenario C: Book is free / Unknown / Error
+    std::stringstream ss; 
+    // Check if it is a valid book code?
+    PTRDMS validBook = timDanhMucTheoMaSach(code.toStdString(), dsDauSach, soLuongDauSach, ss, true);
+    
+    if (validBook) {
+        hienThiThongBao("📖 Sách có trong thư viện. Quét thẻ độc giả để mượn!", false);
+        // Maybe visual cue?
+    } else {
+        hienThiThongBao("⚠️ Mã vạch không hợp lệ hoặc không có trong hệ thống!", true);
+    }
+    QApplication::beep();
 }
 
 // ============================================
@@ -1278,19 +1565,19 @@ QString WidgetMuonTraSach::validateBorrowRequest() const {
     
     // Check reader is active
     if (docGiaHienTai->data.TrangThai != 1) {
-        return "⚠ Độc giả đã bị khóa, không thể mượn sách";
+        return "⚠ Học viên đã bị khóa, không thể mượn sách";
     }
     
     // Check borrowing limit
     if (!canReaderBorrowMore()) {
-        return QString("⚠ Độc giả đã mượn tối đa %1/3 sách")
+        return QString("⚠ Học viên đã mượn tối đa %1/3 sách")
                .arg(docGiaHienTai->data.soSachDangMuon);
     }
     
     // Check if has overdue books
     for (const auto& loan : cacSachDangMuon) {
         if (loan.soNgayGiu > 7) {
-            return "⚠ Độc giả có sách quá hạn, cần trả sách trước khi mượn thêm";
+            return "⚠ Học viên có sách quá hạn, cần trả sách trước khi mượn thêm";
         }
     }
     
@@ -1326,10 +1613,34 @@ void WidgetMuonTraSach::applyLoanFilters() {
     
     modelTraSach->setLoans(filtered);
     
-    // Update status
-    hienThiThongBao(QString("Hiển thị %1/%2 sách đang mượn")
-                    .arg(filtered.size())
-                    .arg(cacSachDangMuon.size()), false);
+void WidgetMuonTraSach::capNhatNgonNgu() {
+    try {
+        if (btnXacNhanMuon) btnXacNhanMuon->setText(" " + LanguageManager::instance().getText("BTN_BORROW_SHORT"));
+        if (btnXacNhanTra) btnXacNhanTra->setText(" " + LanguageManager::instance().getText("BTN_RETURN_SHORT"));
+        if (btnBaoMat) btnBaoMat->setText(" " + LanguageManager::instance().getText("BTN_LOST_SHORT"));
+        
+        // Update Table Headers safely
+        if (tableSachDangMuon) {
+            QAbstractItemModel* model = tableSachDangMuon->model();
+            if (model) {
+                model->setHeaderData(0, Qt::Horizontal, LanguageManager::instance().getText("TABLE_HEADER_BOOK_ID"));
+                model->setHeaderData(1, Qt::Horizontal, LanguageManager::instance().getText("TABLE_HEADER_TITLE"));
+                model->setHeaderData(2, Qt::Horizontal, LanguageManager::instance().getText("TABLE_HEADER_DATE_BORROW"));
+            }
+        }
+        
+        if (tableTraSach) {
+             QAbstractItemModel* model = tableTraSach->model();
+             if (model) {
+                 model->setHeaderData(0, Qt::Horizontal, LanguageManager::instance().getText("TABLE_HEADER_BOOK_ID"));
+                 model->setHeaderData(1, Qt::Horizontal, LanguageManager::instance().getText("TABLE_HEADER_TITLE"));
+                 model->setHeaderData(2, Qt::Horizontal, LanguageManager::instance().getText("TABLE_HEADER_DATE_BORROW"));
+                 model->setHeaderData(3, Qt::Horizontal, LanguageManager::instance().getText("TABLE_HEADER_STATUS"));
+             }
+        }
+    } catch (...) {
+        qWarning() << "WidgetMuonTraSach::capNhatNgonNgu exception";
+    }
 }
 
 void WidgetMuonTraSach::performBookSearch() {

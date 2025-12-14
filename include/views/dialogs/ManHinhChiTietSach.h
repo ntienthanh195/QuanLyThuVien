@@ -23,7 +23,11 @@ private slots:
     void khiNhanThanhLy();
     void khiNhanXoaBanSao();
     void khiNhanLamMoi();
+    void khiNhanThemBanSao(); // Added Slot
+    void khiNhanSuaSach(); // Added Slot
+
     void khiNhanDong();
+    void khiNhanInTem(); // In tem mã vạch
     void khiChonBanSao(const QModelIndex &index);
 
 private:
@@ -34,6 +38,9 @@ private:
     QPushButton *nutThanhLy;
     QPushButton *nutXoaBanSao;
     QPushButton *nutLamMoi;
+    QPushButton *nutThemBanSao; // Added Add Copy Button
+    QPushButton *nutSuaSach; // Added Edit Button
+    QPushButton *nutInTem; // Nút in tem
     QPushButton *nutDong;
     QLabel *nhanTongQuat;
     QLabel *nhanTrangThai;

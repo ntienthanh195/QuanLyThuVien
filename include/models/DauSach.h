@@ -32,6 +32,9 @@ struct DauSach {
     PTRDMS dms = NULL;          // con tro toi dau danh sach lien ket cac ban sao (DanhMucSach)
     int tongBanSao;             // Tong so luong ban sao hien co
     int soLuotMuon;             // them de de tim top 10 sach
+    
+    // Feature: Book Price (VNĐ)
+    long long giaTien = 0;
 };
 
 typedef DauSach* PTRDS;         // Con tro toi mot DauSach

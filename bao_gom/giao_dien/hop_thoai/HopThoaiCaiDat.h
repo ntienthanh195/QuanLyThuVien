@@ -1,0 +1,60 @@
+#ifndef HOPTHOAICAIDAT_H
+#define HOPTHOAICAIDAT_H
+
+#include <QDialog>
+#include <QTabWidget>
+#include <QLineEdit>
+#include <QSpinBox>
+#include <QPushButton>
+#include <QCheckBox>
+#include <QComboBox>
+#include <QLabel>
+#include <QPrinter>
+#include <QPrinterInfo>
+
+class HopThoaiCaiDat : public QDialog {
+    Q_OBJECT
+
+public:
+    explicit HopThoaiCaiDat(QWidget *parent = nullptr);
+
+private slots:
+    void luuCauHinh();
+    void macDinh();
+    void capNhatNgonNgu();
+
+private:
+    void thietLapGiaoDien();
+    void loadData();
+
+    // UI Elements
+    QTabWidget *tabs; // Added for dynamic title update
+    
+    QLabel *lblTenThuVien;
+    QLabel *lblDiaChi;
+    QLineEdit *oTenThuVien;
+    QLineEdit *oDiaChi;
+    
+    QLabel *lblTienPhat;
+    QLabel *lblNgayMuon;
+    QLabel *lblLanGiaHan;
+    QLabel *lblSachMuon;
+    QSpinBox *oTienPhatMoiNgay;
+    QSpinBox *oSoNgayMuonToiDa;
+    QSpinBox *oSoLanGiaHanToiDa; 
+    QSpinBox *oSoSachMuonToiDa;
+    
+    // Printing Config
+    QLabel *lblCheDoIn;
+    QLabel *lblMayInReceipt;
+    QLabel *lblMayInReport;
+    QCheckBox *oInYenLang;
+    QComboBox *oMayInReceipt;
+    QComboBox *oMayInReport;
+    
+    QPushButton *nutLuu;
+    QPushButton *nutHuy;
+    QPushButton *nutMacDinh;
+};
+
+#endif // HOPTHOAICAIDAT_H

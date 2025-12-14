@@ -94,6 +94,9 @@ private:
     
     static PrintQueueManager* s_instance;
     QList<PTRDG> m_danhSach;
+    
+    // Internal helper
+    QString taoHTMLHangDoi();
 };
 
 #endif // PRINTQUEUEMANAGER_H

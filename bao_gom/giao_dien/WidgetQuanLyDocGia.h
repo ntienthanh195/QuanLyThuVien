@@ -55,13 +55,17 @@ private slots:
     void xuLyLocTrangThai(int chiSo);
     void xuLyLocGioiTinh(int chiSo);
     void xuLyChonDong(int dong, int cot);
-    void xuLyNhapDuLieuTu();
+    void xuLyNhapDuLieuTu(); // Restored
+    
+    // Multilingual Support
+    void capNhatNgonNgu();
 
 private:
     void thieLapGiaoDien();
-    void thieLapBangDocGia();
+    void setupConnections();
     void thieLapTimKiem();
     void thieLapNutChucNang();
+    void thieLapBangDocGia(); // Added missing declaration
     void hienThiDanhSachDocGia();
     void hienThiThongTinChiTiet(PTRDG docGia);
     

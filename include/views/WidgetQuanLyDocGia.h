@@ -72,6 +72,7 @@ private slots:
     void onToggleStatus();
     void onViewHistory();
     void onPrintCard();
+    void onPrintList();
     void onExportCSV();
     void onImportCSV();
     void onShowWarnings();

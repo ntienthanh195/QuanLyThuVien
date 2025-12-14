@@ -4,6 +4,7 @@
 #include <QDialog>
 #include <QLineEdit>
 #include <QSpinBox>
+#include <QDoubleSpinBox>
 #include <QComboBox>
 #include <QPushButton>
 #include <QLabel>
@@ -35,6 +36,7 @@ private:
     QComboBox *hopChonTheLoai;
     QSpinBox *soNamXuatBan;
     QSpinBox *soSoTrang;
+    QDoubleSpinBox *soGiaTien; // Added Price field
     QPushButton *nutLuu;
     QPushButton *nutHuy;
     QLabel *nhanTrangThai;

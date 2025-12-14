@@ -2,6 +2,7 @@
 #include "utils/ThongBao.h"
 #include "Constants.h"
 #include "utils/XuLyChuoi.h" 
+#include "utils/SettingsManager.h" // Added SettingsManager 
 #include <ctime>
 #include <iomanip>
 #include <sstream>
@@ -54,7 +55,11 @@ int tinhSoNgayQuaHan(std::string ngayMuon, std::ostream& out){
 
     double diff_seconds = difftime(now, tMuon);            // tinh chenh lech giay
     double diff_days = diff_seconds / (60 * 60 * 24);      // chuyen sang ngay
-    int soNgayQuaHan = static_cast<int>(diff_days) - SO_NGAY_MUON_TOI_DA;
+    
+    // Su dung SettingsManager thay vi hang so hardcode
+    int soNgayMuonMax = SettingsManager::instance().getInt("SO_NGAY_MUON_TOI_DA", 7);
+    int soNgayQuaHan = static_cast<int>(diff_days) - soNgayMuonMax;
+    
     return soNgayQuaHan > 0 ? soNgayQuaHan : 0;            // tra ve 0 neu chua qua han
 }
 

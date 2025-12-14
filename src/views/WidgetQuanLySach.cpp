@@ -24,12 +24,11 @@
 #include <QSpinBox>
 #include <QFileDialog>
 #include <QTextStream>
-#include <QPrinter>
-#include <QPrintDialog>
-#include <QTextDocument>
-#include <QPageLayout>
+
 #include <QDate>
 #include <QTabBar>
+#include <QDesktopServices>
+#include <QUrl>
 #include <vector>
 #include <QSettings>
 
@@ -103,9 +102,9 @@ QVariant BookTableModel::data(const QModelIndex &index, int role) const {
             case 7: {
                 if ((int)cachedStatusEnum.size() == bookCount) {
                     int st = cachedStatusEnum[absRow];
-                    if (st == CHO_MUON_DUOC) return "Có sẵn";
-                    else if (st == DANG_MUON) return "Đang mượn";
-                    else return "Đã thanh lý";
+                    if (st == CHO_MUON_DUOC) return LanguageManager::instance().getText("STATUS_AVAILABLE");
+                    else if (st == DANG_MUON) return LanguageManager::instance().getText("STATUS_BORROWED");
+                    else return LanguageManager::instance().getText("STATUS_LIQUIDATED");
                 }
                 // Fallback
                 int dangMuon = 0, coSan = 0;
@@ -115,9 +114,9 @@ QVariant BookTableModel::data(const QModelIndex &index, int role) const {
                     else if (dms->trangThai == CHO_MUON_DUOC) coSan++;
                     dms = dms->next;
                 }
-                if (coSan > 0) return "Có sẵn";
-                else if (dangMuon > 0) return "Đang mượn";
-                else return "Đã thanh lý";
+                if (coSan > 0) return LanguageManager::instance().getText("STATUS_AVAILABLE");
+                else if (dangMuon > 0) return LanguageManager::instance().getText("STATUS_BORROWED");
+                else return LanguageManager::instance().getText("STATUS_LIQUIDATED");
             }
         }
     } else if (role == Qt::UserRole && index.column() == 7) {
@@ -237,14 +236,14 @@ QVariant BookTableModel::headerData(int section, Qt::Orientation orientation, in
     
     if (orientation == Qt::Horizontal) {
         switch (section) {
-            case 0: return "ISBN";
-            case 1: return "TÊN SÁCH";
-            case 2: return "TÁC GIẢ";
-            case 3: return "THỂ LOẠI";
-            case 4: return "NĂM XB";
+            case 0: return LanguageManager::instance().getText("TABLE_HEADER_ISBN");
+            case 1: return LanguageManager::instance().getText("TABLE_HEADER_BOOK_NAME");
+            case 2: return LanguageManager::instance().getText("TABLE_HEADER_AUTHOR");
+            case 3: return "THỂ LOẠI"; // Keep hardcoded if no key, or add key. I'll keep it for now as "THỂ LOẠI".
+            case 4: return LanguageManager::instance().getText("TABLE_HEADER_YEAR");
             case 5: return "SỐ TRANG";
             case 6: return "SỐ LƯỢNG";
-            case 7: return "TRẠNG THÁI";
+            case 7: return LanguageManager::instance().getText("TABLE_HEADER_STATUS");
         }
     }
     return QVariant();
@@ -461,13 +460,44 @@ void BookTableModel::sort(int column, Qt::SortOrder order) {
 WidgetQuanLySach::WidgetQuanLySach(QWidget *parent)
     : QWidget(parent)
     , tabWidget(nullptr)
+    , tabQuanLy(nullptr)
+    , tableView(nullptr)
+    , bookModel(nullptr)
     , badgeDelegate(nullptr)
+    , searchEdit(nullptr)
+    , searchTypeCombo(nullptr)
     , filterTheLoaiCombo(nullptr)
     , filterTrangThaiCombo(nullptr)
-    , selectedBook(nullptr)
+    , btnSearch(nullptr)
+    , btnClearSearch(nullptr)
+    , btnAdd(nullptr)
+    , btnEdit(nullptr)
+    , btnDelete(nullptr)
+    , btnDetails(nullptr)
+    , btnAddCopy(nullptr)
+    , btnBack(nullptr)
+    , statusLabel(nullptr)
+    , toolbar(nullptr)
+    , searchTimer(nullptr)
+    , fsWatcher(nullptr)
+    , fsDebounceTimer(nullptr)
+    , btnPrevPage(nullptr)
+    , btnNextPage(nullptr)
+    , lblPageInfo(nullptr)
+    , cbPageSize(nullptr)
+    , shortcutSearch(nullptr)
+    , shortcutAdd(nullptr)
+    , shortcutEdit(nullptr)
+    , shortcutDelete(nullptr)
+    , shortcutRefresh(nullptr)
+    , tabTop10(nullptr)
     , tableTop10(nullptr)
     , modelTop10(nullptr)
+    , btnRefreshTop10(nullptr)
+    , tabThongKe(nullptr)
     , txtThongKe(nullptr)
+    , btnRefreshThongKe(nullptr)
+    , selectedBook(nullptr)
 {
     searchTimer = new QTimer(this);
     searchTimer->setSingleShot(true);
@@ -504,10 +534,10 @@ void WidgetQuanLySach::setupUI() {
     // Dòng 1: Tiêu đề to + Nút Thêm Sách (nổi bật)
     QHBoxLayout *topRow = new QHBoxLayout();
     
-    QLabel *titleLabel = new QLabel("📚 Quản Lý Sách", headerCard);
+    QLabel *titleLabel = new QLabel(LanguageManager::instance().getText("TITLE_MANAGER_BOOK"), headerCard);
     titleLabel->setProperty("class", "PageTitle"); // Master Plan: PageTitle class
     
-    btnAdd = new QPushButton("+ Thêm Sách Mới", headerCard);
+    btnAdd = new QPushButton(LanguageManager::instance().getText("BTN_ADD_NEW_BOOK"), headerCard);
     btnAdd->setProperty("class", "Primary"); // Nút xanh chủ đạo
     btnAdd->setCursor(Qt::PointingHandCursor);
     btnAdd->setMinimumHeight(40);
@@ -522,13 +552,13 @@ void WidgetQuanLySach::setupUI() {
     filterRow->setSpacing(10);
     
     searchTypeCombo = new QComboBox(headerCard);
-    searchTypeCombo->addItem("◈ Tìm kiếm", 0);
+    searchTypeCombo->addItem(LanguageManager::instance().getText("BTN_SEARCH_SYMBOL"), 0);
     searchTypeCombo->setMinimumHeight(40);
     searchTypeCombo->setMinimumWidth(120);
     filterRow->addWidget(searchTypeCombo);
     
     searchEdit = new QLineEdit(headerCard);
-    searchEdit->setPlaceholderText("Tìm kiếm theo ISBN, Tên sách, Tác giả...");
+    searchEdit->setPlaceholderText(LanguageManager::instance().getText("PLACEHOLDER_SEARCH_BOOK"));
     searchEdit->setMinimumHeight(40);
     filterRow->addWidget(searchEdit, 1); // Search bar giãn hết cỡ
     
@@ -538,20 +568,20 @@ void WidgetQuanLySach::setupUI() {
     filterRow->addWidget(filterTheLoaiCombo);
     
     filterTrangThaiCombo = new QComboBox(headerCard);
-    filterTrangThaiCombo->addItem("Tất cả trạng thái", -1);
-    filterTrangThaiCombo->addItem("● Có sẵn", CHO_MUON_DUOC);
-    filterTrangThaiCombo->addItem("● Đang mượn", DANG_MUON);
-    filterTrangThaiCombo->addItem("● Thanh lý", THANH_LY);
+    filterTrangThaiCombo->addItem(LanguageManager::instance().getText("OPTION_ALL_STATUS"), -1);
+    filterTrangThaiCombo->addItem(LanguageManager::instance().getText("OPTION_STATUS_AVAILABLE_SYMBOL"), CHO_MUON_DUOC);
+    filterTrangThaiCombo->addItem(LanguageManager::instance().getText("OPTION_STATUS_BORROWED"), DANG_MUON);
+    filterTrangThaiCombo->addItem(LanguageManager::instance().getText("OPTION_STATUS_LIQUIDATED_SYMBOL"), THANH_LY);
     filterTrangThaiCombo->setMinimumHeight(40);
     filterTrangThaiCombo->setMinimumWidth(150);
     filterRow->addWidget(filterTrangThaiCombo);
     
-    btnSearch = new QPushButton("Tìm kiếm", headerCard);
+    btnSearch = new QPushButton(LanguageManager::instance().getText("BTN_SEARCH_SYMBOL"), headerCard);
     btnSearch->setProperty("class", "Secondary");
     btnSearch->setMinimumHeight(40);
     filterRow->addWidget(btnSearch);
     
-    btnClearSearch = new QPushButton("× Xóa", headerCard);
+    btnClearSearch = new QPushButton(LanguageManager::instance().getText("BTN_DELETE_SYMBOL"), headerCard);
     btnClearSearch->setProperty("class", "Secondary");
     btnClearSearch->setMinimumHeight(40);
     filterRow->addWidget(btnClearSearch);
@@ -572,7 +602,7 @@ void WidgetQuanLySach::setupUI() {
     QAction *actImport = toolbar->addAction("◫ Import CSV");
     QAction *actExport = toolbar->addAction("◫ Export CSV");
     toolbar->addSeparator();
-    QAction *actPrint = toolbar->addAction("▣ In Danh Sách");
+    QAction *actPrint = toolbar->addAction(LanguageManager::instance().getText("BTN_PRINT_LIST_SYMBOL"));
     actPrint->setShortcut(QKeySequence::Print);
     tableLayout->addWidget(toolbar);
     
@@ -610,19 +640,19 @@ void WidgetQuanLySach::setupUI() {
     QHBoxLayout *footerLayout = new QHBoxLayout();
     footerLayout->setContentsMargins(20, 10, 20, 20);
     
-    statusLabel = new QLabel("Tổng số: 0 sách", tableCard);
+    statusLabel = new QLabel(LanguageManager::instance().getText("LBL_TOTAL_BOOKS_COUNT").arg(0), tableCard);
     statusLabel->setStyleSheet("color: #B5B5C3; font-style: italic; background: transparent;");
     
     btnEdit = new QPushButton("✎ Sửa", tableCard);
     btnEdit->setProperty("class", "Secondary");
     
-    btnDelete = new QPushButton("× Xóa", tableCard);
+    btnDelete = new QPushButton(LanguageManager::instance().getText("BTN_DELETE_SYMBOL"), tableCard);
     btnDelete->setProperty("class", "Danger");
     
     btnDetails = new QPushButton("◈ Chi Tiết", tableCard);
     btnDetails->setProperty("class", "Success");
     
-    btnAddCopy = new QPushButton("▣ Thêm Bản Sao", tableCard);
+    btnAddCopy = new QPushButton(LanguageManager::instance().getText("BTN_ADD_COPY_SYMBOL"), tableCard);
     btnAddCopy->setProperty("class", "Success");
     
     btnBack = new QPushButton("← Quay Lại", tableCard);
@@ -711,7 +741,7 @@ void WidgetQuanLySach::setupTabQuanLy() {
     
     toolbar->addSeparator();
     
-    QAction *actPrint = toolbar->addAction("▣ In Danh Sách");
+    QAction *actPrint = toolbar->addAction(LanguageManager::instance().getText("BTN_PRINT_LIST_SYMBOL"));
     actPrint->setShortcut(QKeySequence::Print);
     connect(actPrint, &QAction::triggered, this, &WidgetQuanLySach::onPrintList);
     
@@ -725,7 +755,7 @@ void WidgetQuanLySach::setupTabQuanLy() {
     searchLayout->addWidget(searchTypeCombo);
     
     searchEdit = new QLineEdit(tabQuanLy);
-    searchEdit->setPlaceholderText("Tìm theo ISBN, Tên Sách, Tác Giả...");
+    searchEdit->setPlaceholderText(LanguageManager::instance().getText("PLACEHOLDER_SEARCH_BOOK"));
     searchEdit->setMinimumWidth(300);
     searchLayout->addWidget(searchEdit, 1);
     
@@ -787,17 +817,17 @@ void WidgetQuanLySach::setupTabQuanLy() {
     
     // Buttons
     QHBoxLayout *buttonLayout = new QHBoxLayout();
-    btnAdd = new QPushButton("+ Thêm Sách", tabQuanLy);
+    btnAdd = new QPushButton("Thêm Sách", tabQuanLy);
     btnAdd->setProperty("class", "btn-primary");
-    btnEdit = new QPushButton("✎ Sửa", tabQuanLy);
+    btnEdit = new QPushButton("Sửa", tabQuanLy);
     btnEdit->setProperty("class", "btn-secondary");
-    btnDelete = new QPushButton("× Xóa", tabQuanLy);
+    btnDelete = new QPushButton("Xóa", tabQuanLy);
     btnDelete->setProperty("class", "btn-danger");
-    btnDetails = new QPushButton("◈ Chi Tiết", tabQuanLy);
+    btnDetails = new QPushButton("Chi Tiết", tabQuanLy);
     btnDetails->setProperty("class", "btn-secondary");
-    btnAddCopy = new QPushButton("▣ Thêm Bản Sao", tabQuanLy);
+    btnAddCopy = new QPushButton("Thêm Bản Sao", tabQuanLy);
     btnAddCopy->setProperty("class", "btn-success");
-    btnBack = new QPushButton("← Quay Lại", tabQuanLy);
+    btnBack = new QPushButton("Quay Lại", tabQuanLy);
     btnBack->setProperty("class", "btn-secondary");
     
     buttonLayout->addWidget(btnAdd);
@@ -810,7 +840,7 @@ void WidgetQuanLySach::setupTabQuanLy() {
     
     layout->addLayout(buttonLayout);
     
-    tabWidget->addTab(tabQuanLy, "◫ Danh Sách Sách");
+    tabWidget->addTab(tabQuanLy, LanguageManager::instance().getText("TAB_BOOK_LIST_SYMBOL"));
 }
 
 void WidgetQuanLySach::setupTabTop10() {
@@ -819,7 +849,7 @@ void WidgetQuanLySach::setupTabTop10() {
     layout->setSpacing(12);
     layout->setContentsMargins(12, 12, 12, 12);
     
-    QLabel *title = new QLabel("★ TOP 10 SÁCH ĐƯỢC MƯỢN NHIỀU NHẤT", tabTop10);
+    QLabel *title = new QLabel(LanguageManager::instance().getText("TITLE_TOP_10_BORROWED"), tabTop10);
     QFont font = title->font();
     font.setPointSize(14);
     font.setBold(true);
@@ -827,7 +857,7 @@ void WidgetQuanLySach::setupTabTop10() {
     title->setStyleSheet("color: #2D3748; padding: 8px;");
     layout->addWidget(title);
     
-    btnRefreshTop10 = new QPushButton("⟳ Làm mới", tabTop10);
+    btnRefreshTop10 = new QPushButton("Làm mới", tabTop10);
     btnRefreshTop10->setProperty("class", "btn-primary");
     btnRefreshTop10->setMaximumWidth(150);
     layout->addWidget(btnRefreshTop10);
@@ -841,7 +871,7 @@ void WidgetQuanLySach::setupTabTop10() {
     
     layout->addStretch();
     
-    tabWidget->addTab(tabTop10, "★ Top 10");
+    tabWidget->addTab(tabTop10, "Top 10");
 }
 
 void WidgetQuanLySach::setupTabThongKe() {
@@ -850,7 +880,7 @@ void WidgetQuanLySach::setupTabThongKe() {
     layout->setSpacing(12);
     layout->setContentsMargins(12, 12, 12, 12);
     
-    QLabel *title = new QLabel("◫ THỐNG KÊ SÁCH THEO THỂ LOẠI", tabThongKe);
+    QLabel *title = new QLabel(LanguageManager::instance().getText("TITLE_STATS_BY_CATEGORY"), tabThongKe);
     QFont font = title->font();
     font.setPointSize(14);
     font.setBold(true);
@@ -858,7 +888,7 @@ void WidgetQuanLySach::setupTabThongKe() {
     title->setStyleSheet("color: #2D3748; padding: 8px;");
     layout->addWidget(title);
     
-    btnRefreshThongKe = new QPushButton("⟳ Làm mới", tabThongKe);
+    btnRefreshThongKe = new QPushButton("Làm mới", tabThongKe);
     btnRefreshThongKe->setProperty("class", "btn-primary");
     btnRefreshThongKe->setMaximumWidth(150);
     layout->addWidget(btnRefreshThongKe);
@@ -868,7 +898,7 @@ void WidgetQuanLySach::setupTabThongKe() {
     txtThongKe->setMinimumHeight(400);
     layout->addWidget(txtThongKe);
     
-    tabWidget->addTab(tabThongKe, "◫ Thống Kê");
+    tabWidget->addTab(tabThongKe, LanguageManager::instance().getText("TAB_STATS_SYMBOL"));
 }
 
 void WidgetQuanLySach::setupConnections() {
@@ -955,12 +985,12 @@ void WidgetQuanLySach::setupConnections() {
 
 void WidgetQuanLySach::onRefreshTop10() {
     // TODO: Implement Top 10 logic using backend
-    showMessage("Chức năng Top 10 đang được phát triển");
+    showMessage(LanguageManager::instance().getText("MSG_FEATURE_DEVELOPING"));
 }
 
 void WidgetQuanLySach::onRefreshThongKe() {
     // TODO: Implement statistics logic using backend
-    showMessage("Chức năng Thống kê đang được phát triển");
+    showMessage(LanguageManager::instance().getText("MSG_FEATURE_DEVELOPING"));
 }
 
 void WidgetQuanLySach::refreshData() {
@@ -1046,7 +1076,7 @@ void WidgetQuanLySach::onSearchClicked() {
     
     // Validate data
     if (soLuongDauSach < 0 || soLuongDauSach > MAX_DAUSACH) {
-        showMessage("❌ Dữ liệu không hợp lệ!", true);
+        showMessage("Dữ liệu không hợp lệ!", true);
         return;
     }
     
@@ -1062,7 +1092,7 @@ void WidgetQuanLySach::onSearchClicked() {
             count = timKiemLogic(dsDauSach, soLuongDauSach, keyword.toStdString(), results);
             
             if (count < 0 || count > MAX_DAUSACH) {
-                showMessage("❌ Kết quả tìm kiếm không hợp lệ!", true);
+                showMessage(LanguageManager::instance().getText("MSG_ERROR_SEARCH_INVALID_RESULT"), true);
                 return;
             }
             
@@ -1072,17 +1102,17 @@ void WidgetQuanLySach::onSearchClicked() {
                 }
             }
         } catch (...) {
-            showMessage("❌ Lỗi khi tìm kiếm!", true);
+            showMessage(LanguageManager::instance().getText("MSG_ERROR_SEARCH"), true);
             return;
         }
-        showMessage(QString("🔍 Tìm thấy %1 kết quả").arg(count));
+        showMessage(LanguageManager::instance().getText("MSG_FOUND_RESULTS").arg(count));
         
     } else if (searchType == 1) {
         // Search by year
         bool ok;
         int year = keyword.toInt(&ok);
         if (!ok || year < 1000 || year > 9999) {
-            showMessage("⚠️ Vui lòng nhập năm hợp lệ (VD: 2020)!", true);
+            showMessage(LanguageManager::instance().getText("MSG_ENTER_VALID_YEAR"), true);
             return;
         }
         
@@ -1090,16 +1120,16 @@ void WidgetQuanLySach::onSearchClicked() {
             count = TimSachTheoNamXuatBan(dsDauSach, soLuongDauSach, year, searchBooks);
             if (count < 0 || count > MAX_DAUSACH) count = 0;
         } catch (...) {
-            showMessage("❌ Lỗi khi tìm kiếm theo năm!", true);
+            showMessage(LanguageManager::instance().getText("MSG_ERROR_SEARCH_YEAR"), true);
             return;
         }
-        showMessage(QString("📅 Tìm thấy %1 sách xuất bản năm %2").arg(count).arg(year));
+        showMessage(LanguageManager::instance().getText("MSG_FOUND_BOOKS_YEAR").arg(count).arg(year));
         
     } else if (searchType == 2) {
         // Search by year range
         QStringList years = keyword.split("-");
         if (years.size() != 2) {
-            showMessage("⚠️ Vui lòng nhập khoảng năm (VD: 2015-2020)!", true);
+            showMessage(LanguageManager::instance().getText("MSG_ENTER_YEAR_RANGE"), true);
             return;
         }
         
@@ -1108,7 +1138,7 @@ void WidgetQuanLySach::onSearchClicked() {
         int yearEnd = years[1].trimmed().toInt(&ok2);
         
         if (!ok1 || !ok2 || yearStart > yearEnd) {
-            showMessage("⚠️ Khoảng năm không hợp lệ!", true);
+            showMessage(LanguageManager::instance().getText("MSG_INVALID_YEAR_RANGE"), true);
             return;
         }
         
@@ -1116,15 +1146,15 @@ void WidgetQuanLySach::onSearchClicked() {
             count = TimSachTheoKhoangNam(dsDauSach, soLuongDauSach, yearStart, yearEnd, searchBooks);
             if (count < 0 || count > MAX_DAUSACH) count = 0;
         } catch (...) {
-            showMessage("❌ Lỗi khi tìm kiếm theo khoảng năm!", true);
+            showMessage(LanguageManager::instance().getText("MSG_ERROR_SEARCH_YEAR_RANGE"), true);
             return;
         }
-        showMessage(QString("📆 Tìm thấy %1 sách từ %2 đến %3").arg(count).arg(yearStart).arg(yearEnd));
+        showMessage(LanguageManager::instance().getText("MSG_FOUND_BOOKS_YEAR_RANGE").arg(count).arg(yearStart).arg(yearEnd));
         
     } else if (searchType == 3) {
         // Search by author
         if (keyword.isEmpty()) {
-            showMessage("⚠️ Vui lòng nhập tên tác giả!", true);
+            showMessage(LanguageManager::instance().getText("MSG_ENTER_AUTHOR"), true);
             return;
         }
         
@@ -1132,19 +1162,21 @@ void WidgetQuanLySach::onSearchClicked() {
             count = TimSachTheoTacGia(dsDauSach, soLuongDauSach, keyword.toStdString(), searchBooks);
             if (count < 0 || count > MAX_DAUSACH) count = 0;
         } catch (...) {
-            showMessage("❌ Lỗi khi tìm kiếm theo tác giả!", true);
+            showMessage(LanguageManager::instance().getText("MSG_ERROR_SEARCH_AUTHOR"), true);
             return;
         }
-        showMessage(QString("✍️ Tìm thấy %1 sách của tác giả '%2'").arg(count).arg(keyword));
+        showMessage(LanguageManager::instance().getText("MSG_FOUND_BOOKS_AUTHOR").arg(count).arg(keyword));
         
     } else if (searchType == 4) {
         // Filter by status
         QStringList options;
-        options << "0 - Có thể mượn" << "1 - Đang được mượn" << "2 - Thanh lý";
+        options << LanguageManager::instance().getText("OPTION_STATUS_BORROWABLE") 
+                << LanguageManager::instance().getText("OPTION_STATUS_BORROWED") 
+                << LanguageManager::instance().getText("OPTION_STATUS_LIQUIDATED");
         
         bool ok;
-        QString item = QInputDialog::getItem(this, "Lọc theo trạng thái",
-                                            "Chọn trạng thái:", options, 0, false, &ok);
+        QString item = QInputDialog::getItem(this, LanguageManager::instance().getText("TITLE_FILTER_STATUS"),
+                                            LanguageManager::instance().getText("LBL_CHOOSE_STATUS"), options, 0, false, &ok);
         if (!ok) return;
         
         int status = item.left(1).toInt();
@@ -1153,10 +1185,10 @@ void WidgetQuanLySach::onSearchClicked() {
             count = LocSachTheoTrangThai(dsDauSach, soLuongDauSach, static_cast<TrangThaiSach>(status), searchBooks);
             if (count < 0 || count > MAX_DAUSACH) count = 0;
         } catch (...) {
-            showMessage("❌ Lỗi khi lọc theo trạng thái!", true);
+            showMessage(LanguageManager::instance().getText("MSG_ERROR_FILTER_STATUS"), true);
             return;
         }
-        showMessage(QString("📊 Tìm thấy %1 đầu sách có bản sao '%2'").arg(count).arg(item.mid(4)));
+        showMessage(LanguageManager::instance().getText("MSG_FOUND_BOOKS_STATUS").arg(count).arg(item.mid(4)));
     }
     
     bookModel->setSearchResults(searchBooks, count);
@@ -1168,7 +1200,7 @@ void WidgetQuanLySach::onClearSearchClicked() {
     bookModel->refreshData();
     selectedBook = nullptr;
     updateButtonStates();
-    showMessage(QString("Hiển thị tất cả %1 đầu sách").arg(LaySoLuongDauSach()));
+    showMessage(LanguageManager::instance().getText("MSG_SHOW_ALL_BOOKS").arg(LaySoLuongDauSach()));
 }
 
 void WidgetQuanLySach::onAddBookClicked() {
@@ -1186,9 +1218,9 @@ void WidgetQuanLySach::onDeleteBookClicked() {
     // Check if can delete
     if (!KiemTraCoTheXoaDauSach(selectedBook)) {
         ConfirmationDialog::confirm(this,
-            "Không thể xóa",
-            "Không thể xóa đầu sách này vì còn bản sao đang được mượn hoặc chờ mượn!",
-            QString("ISBN: %1\nTên sách: %2\n\nVui lòng đợi tất cả bản sao được trả lại trước khi xóa.")
+            LanguageManager::instance().getText("TITLE_CANNOT_DELETE"),
+            LanguageManager::instance().getText("MSG_CANNOT_DELETE_BORROWED"),
+            QString("ISBN: %1\n" + LanguageManager::instance().getText("LBL_BOOK_NAME") + ": %2\n\n" + LanguageManager::instance().getText("MSG_CANNOT_DELETE_WAIT"))
                 .arg(QString::fromStdString(selectedBook->ISBN))
                 .arg(QString::fromStdString(selectedBook->tenSach)),
             ConfirmationDialog::Type::Warning);
@@ -1226,12 +1258,12 @@ void WidgetQuanLySach::onDeleteBookClicked() {
     
     if (confirmed) {
         // Show loading
-        statusLabel->setText("⏳ Đang xóa...");
+        statusLabel->setText(" Đang xóa...");
         statusLabel->setStyleSheet("color: #F59E0B; font-weight: 600;");
         
         std::string result = XoaDauSachTheoISBN(selectedBook->ISBN);
         if (result.empty()) {
-            showMessage("✅ Xóa đầu sách thành công!");
+            showMessage(" Xóa đầu sách thành công!");
             AnimationHelper::fadeIn(statusLabel, 300);
             refreshData();
         } else {
@@ -1463,27 +1495,153 @@ void WidgetQuanLySach::onExportCSV() {
     
     file.close();
     
-    QMessageBox::information(this, "Thành công ✅",
+    QMessageBox::information(this, "Thành công",
         QString("Đã export %1 đầu sách ra file:\n%2")
         .arg(soLuongDauSach).arg(fileName));
 }
 
 void WidgetQuanLySach::onImportCSV() {
-    QMessageBox::StandardButton reply = QMessageBox::question(this,
-        "Xác nhận Import",
-        "⚠️ Import sẽ THÊM sách mới từ CSV.\n"
-        "Sách trùng ISBN sẽ bị bỏ qua.\n\n"
-        "Format CSV:\n"
-        "ISBN,Tên Sách,Tác Giả,Thể Loại,Năm XB,Số Trang\n\n"
-        "Bạn có muốn tiếp tục?",
-        QMessageBox::Yes | QMessageBox::No);
-    
-    if (reply != QMessageBox::Yes) return;
-    
+    // Ask user which source to import from: CSV (native) or Excel (.xlsx via tools script)
+    QMessageBox msg(this);
+    msg.setWindowTitle("Chọn nguồn Import");
+    msg.setText("Bạn muốn import từ file CSV (nội bộ) hay Excel (.xlsx) (cần script tools/import_from_excel.py)?");
+    QPushButton *btnCsv = msg.addButton("CSV (nội bộ)", QMessageBox::AcceptRole);
+    QPushButton *btnXlsx = msg.addButton("Excel (.xlsx)", QMessageBox::AcceptRole);
+    msg.addButton(QMessageBox::Cancel);
+    msg.exec();
+
+    if (msg.clickedButton() == nullptr) return;
+
+    if (msg.clickedButton() == btnCsv) {
+        // proceed with existing CSV flow
+        QMessageBox::StandardButton reply = QMessageBox::question(this,
+            "Xác nhận Import",
+            "Import sẽ THÊM sách mới từ CSV.\n"
+            "Sách trùng ISBN sẽ bị bỏ qua.\n\n"
+            "Format CSV:\n"
+            "ISBN,Tên Sách,Tác Giả,Thể Loại,Năm XB,Số Trang\n\n"
+            "Bạn có muốn tiếp tục?",
+            QMessageBox::Yes | QMessageBox::No);
+        if (reply != QMessageBox::Yes) return;
+        QString fileName = QFileDialog::getOpenFileName(this,
+            "Import danh sách sách", 
+            "",
+            "CSV Files (*.csv);;All Files (*)");
+        if (fileName.isEmpty()) return;
+        QFile file(fileName);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QMessageBox::critical(this, "Lỗi", "Không thể mở file để đọc!");
+            return;
+        }
+        QTextStream in(&file);
+        in.setEncoding(QStringConverter::Utf8);
+        // Skip header
+        if (!in.atEnd()) in.readLine();
+
+        int imported = 0;
+        int skipped = 0;
+        QString errors;
+        while (!in.atEnd()) {
+            QString line = in.readLine();
+            QStringList fields = line.split(",");
+            if (fields.size() < 6) { skipped++; continue; }
+            std::string isbn = fields[0].trimmed().toStdString();
+            std::string tenSach = fields[1].trimmed().remove("\"").toStdString();
+            std::string tacGia = fields[2].trimmed().remove("\"").toStdString();
+            std::string theLoai = fields[3].trimmed().remove("\"").toStdString();
+            int namXB = fields[4].trimmed().toInt();
+            int soTrang = fields[5].trimmed().toInt();
+            if (TimDauSachTheoISBN(dsDauSach, soLuongDauSach, isbn)) { skipped++; continue; }
+            bool result = themDauSach(dsDauSach, soLuongDauSach, isbn, tenSach, soTrang, theLoai, namXB, tacGia);
+            if (result) imported++; else { skipped++; errors += QString::fromStdString(isbn) + ": Failed to add\n"; }
+        }
+        file.close();
+        refreshData();
+        QString message = QString("Đã import %1 đầu sách mới\n").arg(imported);
+        if (skipped > 0) message += QString(" Đã bỏ qua %1 dòng (trùng/lỗi)").arg(skipped);
+        if (!errors.isEmpty()) message += "\n\nLỗi:\n" + errors.left(500);
+        QMessageBox::information(this, "Kết quả Import", message);
+        return;
+    }
+
+    // If Excel chosen, ask for xlsx
     QString fileName = QFileDialog::getOpenFileName(this,
-        "Import danh sách sách", 
-        "",
-        "CSV Files (*.csv);;All Files (*)");
+        "Chọn file Excel để nhập", QDir::currentPath(), "Excel Files (*.xlsx);;All Files (*)");
+    if (fileName.isEmpty()) return;
+
+    // Find import script in multiple locations
+    QString repoRoot = QDir(FilePathManager::getRootPath()).absolutePath();
+    QStringList candidates;
+    candidates << QDir(repoRoot).filePath("tools/import_from_excel.py");
+    candidates << QDir(QCoreApplication::applicationDirPath()).filePath("tools/import_from_excel.py");
+    candidates << QDir(QCoreApplication::applicationDirPath()).filePath("..\\tools/import_from_excel.py");
+    candidates << QDir(QDir::currentPath()).filePath("tools/import_from_excel.py");
+    candidates << QDir(repoRoot).filePath("../tools/import_from_excel.py");
+    QString scriptToRun;
+    for (const QString &cand : candidates) { if (QFile::exists(cand)) { scriptToRun = cand; break; } }
+    if (scriptToRun.isEmpty()) {
+        QMessageBox::warning(this, tr("Không tìm thấy script"), tr("Không thể tìm thấy file tools/import_from_excel.py trong thư mục dự án hoặc thư mục của ứng dụng. Hãy đảm bảo file tồn tại tại 'tools/import_from_excel.py'."));
+        return;
+    }
+
+    // Prefer repo venv python
+    QString pythonExe;
+    QString venvPython = QDir(repoRoot).filePath(".venv\\Scripts\\python.exe");
+    if (QFile::exists(venvPython)) pythonExe = venvPython;
+    else {
+        QString appVenv = QDir(QCoreApplication::applicationDirPath()).filePath(".venv\\Scripts\\python.exe");
+        if (QFile::exists(appVenv)) pythonExe = appVenv; else pythonExe = "python";
+    }
+
+    // Run preview (python script) -> then show preview and let user apply
+    QProcess proc;
+    QStringList args;
+    args << scriptToRun << "--file" << fileName << "--preview" << "--out" << "tools";
+    proc.start(pythonExe, args);
+    bool started = proc.waitForStarted(10000);
+    if (!started) {
+        QMessageBox::critical(this, tr("Lỗi"), tr("Không thể khởi chạy python. Hãy đảm bảo Python có trong PATH hoặc .venv được cài dependencies."));
+        return;
+    }
+    proc.waitForFinished(-1);
+    QString stdoutStr = QString::fromUtf8(proc.readAllStandardOutput());
+    QString stderrStr = QString::fromUtf8(proc.readAllStandardError());
+
+    // Build preview dialog
+    QDialog dlg(this);
+    dlg.setWindowTitle(tr("Kết quả Import (Preview)"));
+    dlg.setModal(true);
+    QVBoxLayout *lay = new QVBoxLayout(&dlg);
+    QLabel *lbl = new QLabel(tr("Kết quả preview từ script import:")); lay->addWidget(lbl);
+    QTextEdit *out = new QTextEdit(); out->setReadOnly(true);
+    out->setPlainText(stdoutStr + (stderrStr.isEmpty() ? QString() : QString("\n--- ERRORS ---\n") + stderrStr));
+    out->setMinimumSize(700, 380); lay->addWidget(out);
+    QHBoxLayout *btnLay = new QHBoxLayout(); btnLay->addStretch();
+    QPushButton *btnApply = new QPushButton(tr("Áp dụng (ghi file import)"));
+    QPushButton *btnOpenPreviews = new QPushButton(tr("Mở file preview"));
+    QPushButton *btnClose = new QPushButton(tr("Đóng"));
+    btnLay->addWidget(btnOpenPreviews); btnLay->addWidget(btnApply); btnLay->addWidget(btnClose); lay->addLayout(btnLay);
+    connect(btnClose, &QPushButton::clicked, &dlg, &QDialog::reject);
+    connect(btnOpenPreviews, &QPushButton::clicked, this, [this]() {
+        QString folder = QDir(FilePathManager::getRootPath()).filePath("tools");
+        QDesktopServices::openUrl(QUrl::fromLocalFile(folder));
+    });
+    connect(btnApply, &QPushButton::clicked, this, [this, &dlg, pythonExe, scriptToRun, fileName]() {
+        QProcess p2;
+        QStringList a2; a2 << scriptToRun << "--file" << fileName << "--apply" << "--mode" << "merge";
+        p2.start(pythonExe, a2);
+        if (!p2.waitForStarted(10000)) { QMessageBox::critical(this, tr("Lỗi"), tr("Không thể khởi chạy python để áp dụng import.")); return; }
+        p2.waitForFinished(-1);
+        QString out2 = QString::fromUtf8(p2.readAllStandardOutput());
+        QString err2 = QString::fromUtf8(p2.readAllStandardError());
+        QString msg = "Import applied.\n" + out2 + (err2.isEmpty()?QString():QString("\n--- ERR ---\n") + err2);
+        QMessageBox::information(this, tr("Kết quả Áp dụng"), msg.left(2000));
+        dlg.accept();
+    });
+    dlg.exec();
+    // after apply/close, refresh
+    refreshData();
+    return;
     
     if (fileName.isEmpty()) return;
     
@@ -1552,78 +1710,21 @@ void WidgetQuanLySach::onImportCSV() {
 }
 
 void WidgetQuanLySach::onPrintList() {
-    QPrinter printer(QPrinter::HighResolution);
-    printer.setPageOrientation(QPageLayout::Landscape);
-    
-    QPrintDialog printDialog(&printer, this);
-    if (printDialog.exec() != QDialog::Accepted) {
-        return;
-    }
-    
-    // Build HTML for printing
-    QString html = "<html><head><style>"
-                   "body { font-family: Arial, sans-serif; }"
-                   "h1 { text-align: center; color: #2c3e50; }"
-                   "table { width: 100%; border-collapse: collapse; margin-top: 20px; }"
-                   "th { background-color: #3498db; color: white; padding: 8px; text-align: left; }"
-                   "td { border: 1px solid #ddd; padding: 8px; }"
-                   "tr:nth-child(even) { background-color: #f2f2f2; }"
-                   "</style></head><body>";
-    
-    html += "<h1>📚 DANH SÁCH ĐẦU SÁCH</h1>";
-    html += QString("<p style='text-align: center; color: #7f8c8d;'>Tổng số: %1 đầu sách</p>")
-            .arg(LaySoLuongDauSach());
-    
-    html += "<table>";
-    html += "<tr>"
-            "<th>STT</th>"
-            "<th>ISBN</th>"
-            "<th>Tên Sách</th>"
-            "<th>Tác Giả</th>"
-            "<th>Thể Loại</th>"
-            "<th>Năm XB</th>"
-            "<th>Số Trang</th>"
-            "<th>Bản Sao</th>"
-            "</tr>";
-    
     extern PTRDS dsDauSach[MAX_DAUSACH];
     extern int soLuongDauSach;
     
-    for (int i = 0; i < soLuongDauSach; i++) {
-        PTRDS book = dsDauSach[i];
-        if (!book) continue;
-        
-        html += QString("<tr>"
-                       "<td>%1</td>"
-                       "<td>%2</td>"
-                       "<td>%3</td>"
-                       "<td>%4</td>"
-                       "<td>%5</td>"
-                       "<td>%6</td>"
-                       "<td>%7</td>"
-                       "<td>%8</td>"
-                       "</tr>")
-                .arg(i + 1)
-                .arg(QString::fromStdString(book->ISBN))
-                .arg(QString::fromStdString(book->tenSach))
-                .arg(QString::fromStdString(book->tacGia))
-                .arg(QString::fromStdString(book->theLoai))
-                .arg(book->namXuatBan)
-                .arg(book->soTrang)
-                .arg(book->tongBanSao);
+    if (soLuongDauSach <= 0) {
+        showMessage("Danh sách sách trống!");
+        return;
     }
+
+    // Use centralized PrintHelper
+    // This utilizes the standard print dialog/preview and global config
+    PrintHelper::inDanhMucSach(dsDauSach, soLuongDauSach, this);
     
-    html += "</table>";
-    html += QString("<p style='text-align: right; color: #95a5a6; margin-top: 20px;'>"
-                   "In ngày: %1</p>")
-            .arg(QDate::currentDate().toString("dd/MM/yyyy"));
-    html += "</body></html>";
-    
-    QTextDocument document;
-    document.setHtml(html);
-    document.print(&printer);
-    
-    showMessage("✅ Đã in danh sách sách!");
+    // showMessage is handled by PrintHelper or just confirmation
+    // but PrintHelper doesn't return success status easily for toast, 
+    // however the user sees the dialog so it is fine.
 }
 
 // ==================== NEW METHODS ====================
@@ -1691,7 +1792,7 @@ void WidgetQuanLySach::setupKeyboardShortcuts() {
 void WidgetQuanLySach::onBulkDelete() {
     QModelIndexList selected = tableView->selectionModel()->selectedRows();
     if (selected.isEmpty()) {
-        showMessage("⚠️ Vui lòng chọn ít nhất một sách để xóa", true);
+        showMessage("Vui lòng chọn ít nhất một sách để xóa", true);
         return;
     }
     
@@ -1735,7 +1836,7 @@ void WidgetQuanLySach::onBulkDelete() {
             }
         }
         
-        showMessage(QString("✅ Xóa thành công: %1 | ❌ Thất bại: %2")
+        showMessage(QString("Xóa thành công: %1 | Thất bại: %2")
                    .arg(successCount).arg(failCount));
         refreshData();
     }

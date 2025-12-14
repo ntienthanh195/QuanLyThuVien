@@ -47,7 +47,7 @@ private:
 
     QSqlDatabase m_db;
     QString m_path;
-    bool m_autoBackup = true;
+    bool m_autoBackup = false; // Disabled by default, use periodic backup instead
 };
 
 #endif // DATABASEMANAGER_H

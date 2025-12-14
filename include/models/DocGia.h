@@ -11,6 +11,10 @@ struct MuonTra{
     string NgayMuon;
     string NgayTra;
     int TrangThai;//0: dang muon, 1: da tra, 2: lam mat sach
+    // Feature 4: Financial & Extension
+    int soLanGiaHan = 0;
+    bool daThanhToan = false;
+    long long tienPhat = 0;
     // Cache the ma_sach value at the time of transaction to avoid dangling pointer derefs
     string maSachCached;
 };
@@ -21,6 +25,7 @@ struct NodeMT{
 typedef NodeMT* MUONTRA;
 
 //PTRDGdoc gia
+//PTRDGdoc gia
 struct TheDocGia{
     int MaThe;
     string Ho;
@@ -28,6 +33,10 @@ struct TheDocGia{
     bool Phai;//0 nam 1 nu
     int TrangThai = 1;//0 = khoa, 1=hoat dong
     
+    // Feature 5 Details
+    string NgayLapThe; 
+    string NgayHetHan;
+
     // CẢI TIẾN: Thêm trường đếm sách để kiểm tra giới hạn O(1)
     int soSachDangMuon = 0; 
     
@@ -53,6 +62,12 @@ struct ThongTinSachDangMuon_DTO {
     string tenSach;     // <== Thêm trường này
     string ngayMuon;
     int soNgayGiu;    // <== Thêm trường này
+    int trangThai;    // 0: Borrowing, 1: Returned (Unpaid if listed)
+    
+    // Feature 4 Extras
+    long long tienPhat = 0;
+    bool daThanhToan = false;
+    int soLanGiaHan = 0; // Feature Renewal
 };
 
 struct TopSachDTO {
@@ -66,7 +81,11 @@ struct DocGiaQuaHanDTO {
 // Prototype AVL
 PTRDG RotateLeft(PTRDG root);
 PTRDG RotateRight(PTRDG root);
-void InsertDocGia(PTRDG& root, PTRDG node);
+PTRDG RotateRight(PTRDG root);
+void InsertDocGia(PTRDG& root, PTRDG node, bool syncDB = true);
+
+// DATABASE LOADING
+void NapDocGiaTuDB_Fixed(PTRDG &root, PTRDS dsDauSach[], int soLuongDS);
 
 // Prototype Chức năng chính (a)
 PTRDG taoDocGia(std::string ho, std::string ten, bool phai, int trangthai, PTRDG root);
@@ -88,20 +107,20 @@ void InDocGiaTheoTenHo(PTRDG root); // In ra danh sách sắp xếp theo Tên+H�
 void GiaiPhongCay(PTRDG& root);
 void giaiPhongDsmt(MUONTRA& dsmt);
 
-// Prototype Quản lý Mượn Trả (f) (g)
-std::string MuonSach(PTRDG docGia, const std::string& isbn, PTRDS dsDauSach[], int soLuongDauSach);
-std::string TraSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[], int soLuongDauSach);
-std::string BaoMatSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[], int soLuongDauSach);
-void themMuonTra(PTRDG docgia, PTRDMS banSaoSach);//khi muon sach
-void themMuonTra(PTRDG docgia, const MuonTra &mt);//khi load file
-PTRDMS TimBanSaoCoTheMuon(PTRDS dauSach);
-PTRDMS TimBanSaoTheoMa(PTRDS dauSach, const std::string& maSach);
-int DemBanSaoCoTheMuon(PTRDS dauSach);
+// Prototype File I/O - Legacy helpers can stay in ThaoTacFile
+// MuonTra functions are now in models/MuonTra.h
+#include "models/MuonTra.h"
+
+// Feature 4: Financial & Extension functions
+
+long long TinhTongNo(PTRDG docGia);
+
 // Prototype (h)
-int LayDSSachDangMuon(PTRDG docGia, ThongTinSachDangMuon_DTO ketQua[], int maxKetQua, PTRDS dsDauSach[], int soLuongDauSach);
+// LayDSSachDangMuon moved to MuonTra.h
 
 // Prototype Danh sách độc giả mượn quá hạn (i)
-int TinhSoNgayQuaHanLonNhat(PTRDG docgia);
+// TinhSoNgayQuaHanLonNhat moved to MuonTra.h
+
 int LayDSDocGiaQuaHan(PTRDG root, DocGiaQuaHanDTO arr[], int maxKetQua);
 int LayTopSach(PTRDS dsDauSach[], int soLuongDS, TopSachDTO arr[]);
 
@@ -132,6 +151,10 @@ struct ThongKeDocGia {
     int docGiaDangMuonSach;      // doc gia dang muon sach
     int tongSoSachDangMuon;      // tong so sach dang muon
     int docGiaCoSachQuaHan;      // doc gia co sach qua han
+    
+    // Feature 5 Stats
+    int docGiaHetHan;
+    int docGiaSapHetHan;
 };
 
 ThongKeDocGia LayThongKeDocGia(PTRDG root, PTRDS dsDauSach[], int soLuongDauSach);

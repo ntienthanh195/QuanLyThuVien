@@ -1,7 +1,41 @@
 #include "views/dialogs/ManHinhChiTietSach.h"
 #include "models/QuanLySach.h"
+#include "utils/ToastNotification.h"
+#include "utils/LanguageManager.h"
+#include <QInputDialog>
+#include <QLineEdit>
 // Forward declaration of DBBatcher API used here to avoid include path issues
-// (declaration matches include/utils/DBBatcher.h implemented elsewhere).
+// (declaration matches include/utils/DBBatcher.h)
+namespace DBBatcher { std::vector<PTRDMS> layBanSaoTheoISBN(const std::string &isbn); }
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+
+void ManHinhChiTietSach::khiNhanThemBanSao() {
+    if (!sachDuocChon) return;
+
+    bool ok;
+    int soLuong = QInputDialog::getInt(this, LanguageManager::instance().getText("DIALOG_ADD_COPY_TITLE"),
+                                     LanguageManager::instance().getText("DIALOG_ADD_COPY_MSG"), 1, 1, 100, 1, &ok);
+    if (!ok) return;
+
+    QString viTri = QInputDialog::getText(this, LanguageManager::instance().getText("DIALOG_LOCATION_TITLE"),
+                                        LanguageManager::instance().getText("DIALOG_LOCATION_MSG"), QLineEdit::Normal, "", &ok);
+    if (!ok) return;
+
+    try {
+        std::string viTriStr = viTri.toStdString();
+        std::string result = ThemBanSaoMoi(sachDuocChon->ISBN, soLuong, viTriStr);
+
+        if (result.empty()) {
+            ToastNotification::show(LanguageManager::instance().getText("MSG_ADD_COPY_SUCCESS"), ToastNotification::SUCCESS);
+            taiThongTinSach(); // Refresh data
+        } else {
+            ToastNotification::show(QString::fromStdString(result), ToastNotification::ERROR);
+        }
+    } catch (const std::exception& e) {
+        ToastNotification::show(QString("Lỗi: %1").arg(e.what()), ToastNotification::ERROR);
+    }
+}
 namespace DBBatcher { std::vector<PTRDMS> layBanSaoTheoISBN(const std::string &isbn); }
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -11,7 +45,11 @@ namespace DBBatcher { std::vector<PTRDMS> layBanSaoTheoISBN(const std::string &i
 #include <QScrollBar>
 #include <QAbstractTableModel>
 #include <QModelIndex>
+#include <QModelIndex>
 #include <algorithm>
+#include <QInputDialog>
+#include "utils/PrintHelper.h"
+#include "../../bao_gom/giao_dien/hop_thoai/HopThoaiSuaSach.h" // Relative path fallback
 
 // Model for Bản sao table
 class BanSaoTableModel : public QAbstractTableModel {
@@ -40,10 +78,10 @@ public:
                 case 0: return QString::fromStdString(copy->maSach);
                 case 1: {
                     switch (copy->trangThai) {
-                        case CHO_MUON_DUOC: return QStringLiteral("Có thể mượn");
-                        case DANG_MUON: return QStringLiteral("Đang được mượn");
-                        case THANH_LY: return QStringLiteral("Đã thanh lý");
-                        default: return QStringLiteral("Không rõ");
+                        case CHO_MUON_DUOC: return LanguageManager::instance().getText("LBL_STATUS_AVAILABLE");
+                        case DANG_MUON: return LanguageManager::instance().getText("LBL_STATUS_Borrowed");
+                        case THANH_LY: return LanguageManager::instance().getText("LBL_STATUS_LIQUIDATED");
+                        default: return LanguageManager::instance().getText("LBL_STATUS_UNKNOWN");
                     }
                 }
                 case 2: {
@@ -80,10 +118,10 @@ public:
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override {
         if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
             switch (section) {
-            case 0: return QStringLiteral("Mã Sách");
-            case 1: return QStringLiteral("Trạng Thái");
-            case 2: return QStringLiteral("Vị Trí");
-            case 3: return QStringLiteral("Thao Tác");
+            case 0: return LanguageManager::instance().getText("TABLE_HEADER_BOOK_CODE"); // Reusing general key if exists, or LBL_BOOK_CODE
+            case 1: return LanguageManager::instance().getText("TABLE_HEADER_STATUS");
+            case 2: return LanguageManager::instance().getText("TABLE_HEADER_LOCATION"); // Need to check if this key exists or use LBL
+            case 3: return LanguageManager::instance().getText("TABLE_HEADER_ACTION");
             }
         }
         return QAbstractTableModel::headerData(section, orientation, role);
@@ -100,7 +138,7 @@ ManHinhChiTietSach::ManHinhChiTietSach(PTRDS book, QWidget *parent)
     , sachDuocChon(book)
     , dongBanSaoDuocChon(-1)
 {
-    setWindowTitle("Chi Tiết Sách");
+    setWindowTitle(LanguageManager::instance().getText("TITLE_BOOK_DETAILS"));
     setMinimumSize(750, 550);
     thietLapGiaoDien();
     thietLapKetNoi();
@@ -114,39 +152,43 @@ ManHinhChiTietSach::~ManHinhChiTietSach() {
 
 void ManHinhChiTietSach::thietLapGiaoDien() {
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
-    mainLayout->setSpacing(15);
-    mainLayout->setContentsMargins(20, 20, 20, 20);
+    mainLayout->setSpacing(8); // Compact spacing
+    mainLayout->setContentsMargins(10, 10, 10, 10); // Compact margins
     
     // Title
-    QLabel *titleLabel = new QLabel("CHI TIẾT ĐẦU SÁCH", this);
+    QLabel *titleLabel = new QLabel(LanguageManager::instance().getText("HEADER_BOOK_DETAILS"), this);
     QFont titleFont;
-    titleFont.setPointSize(14);
+    titleFont.setPointSize(14); // Reduced size
     titleFont.setBold(true);
     titleLabel->setFont(titleFont);
     titleLabel->setAlignment(Qt::AlignCenter);
-    titleLabel->setStyleSheet("color: #2c3e50; margin-bottom: 5px;");
+    titleLabel->setStyleSheet("color: #FFFFFF; marginBottom: 5px;");
     mainLayout->addWidget(titleLabel);
     
+    // Global background for Dialog
+    this->setStyleSheet("QDialog { background-color: #1e1e2d; color: #E0E0E0; }");
+    
     // Book info group
-    QGroupBox *infoGroup = new QGroupBox("Thông Tin Chung", this);
-    // Subtle styling: neutral border and light background
+    QGroupBox *infoGroup = new QGroupBox(LanguageManager::instance().getText("GROUP_GENERAL_INFO"), this);
+    // Dark Modern styling
     infoGroup->setStyleSheet(
         "QGroupBox {"
-        "   border: 1px solid #d1d5db;"
+        "   border: 1px solid #3E3E42;"
         "   border-radius: 6px;"
-        "   margin-top: 8px;"
-        "   padding-top: 12px;"
+        "   margin-top: 10px;"
+        "   padding-top: 15px;"
         "   font-weight: bold;"
-        "   background-color: #fbfdff;"
+        "   background-color: #252526;"
+        "   color: #E0E0E0;"
         "}"
         "QGroupBox::title {"
         "   subcontrol-origin: margin;"
         "   subcontrol-position: top left;"
-        "   left: 12px;"
-        "   top: -8px;"
-        "   padding: 0 6px;"
-        "   color: #111827;"
-        "   background-color: transparent;"
+        "   left: 10px;"
+        "   top: -10px;"
+        "   padding: 0 5px;"
+        "   color: #5BA3F5;" // Softer Blue
+        "   background-color: #1e1e2d;" // Match dialog bg
         "}"
     );
     
@@ -158,7 +200,7 @@ void ManHinhChiTietSach::thietLapGiaoDien() {
     mainLayout->addWidget(infoGroup);
     
     // Copies table group
-    QGroupBox *copiesGroup = new QGroupBox("Danh Sách Bản Sao", this);
+    QGroupBox *copiesGroup = new QGroupBox(LanguageManager::instance().getText("GROUP_COPIES_LIST"), this);
     copiesGroup->setStyleSheet(infoGroup->styleSheet());
     
     QVBoxLayout *copiesLayout = new QVBoxLayout(copiesGroup);
@@ -178,23 +220,28 @@ void ManHinhChiTietSach::thietLapGiaoDien() {
 
     bangBanSao->setStyleSheet(
         "QTableView {"
-        "   border: 1px solid #e5e7eb;"
+        "   background-color: #1b1b29;"
+        "   color: #ffffff;"
+        "   border: 1px solid #323248;"
         "   border-radius: 6px;"
-        "   gridline-color: #f3f4f6;"
+        "   gridline-color: #2b2b40;"
         "   font-size: 10pt;"
+        "   selection-background-color: #3699ff;"
+        "   selection-color: #ffffff;"
         "}"
         "QTableView::item {"
         "   padding: 8px;"
         "}"
         "QTableView::item:selected {"
-        "   background-color: #e6f0fb;"
-        "   color: #0f172a;"
+        "   background-color: #3699ff;"
+        "   color: #ffffff;"
         "}"
         "QHeaderView::section {"
-        "   background-color: #f8fafc;"
-        "   color: #111827;"
-        "   padding: 8px;"
+        "   background-color: #2b2b40;"
+        "   color: #b5b5c3;"
+        "   padding: 10px;"
         "   border: none;"
+        "   border-bottom: 2px solid #323248;"
         "   font-weight: 600;"
         "}"
     );
@@ -211,73 +258,124 @@ void ManHinhChiTietSach::thietLapGiaoDien() {
     // Buttons
     QHBoxLayout *buttonLayout = new QHBoxLayout();
     
-    nutThanhLy = new QPushButton("Thanh Lý Bản Sao", this);
-    nutThanhLy->setEnabled(false);
+    nutThanhLy = new QPushButton(LanguageManager::instance().getText("BTN_LIQUIDATE"), this);
     nutThanhLy->setMinimumHeight(40);
+    nutThanhLy->setCursor(Qt::PointingHandCursor);
     nutThanhLy->setStyleSheet(
         "QPushButton {"
-        "   background-color: #e67e22;"
-        "   color: white;"
+        "   background-color: #C42B1C;" // Destructive Red
+        "   color: #ffffff;"
         "   border: none;"
-        "   border-radius: 5px;"
-        "   font-size: 10pt;"
-        "   font-weight: bold;"
-        "   padding: 8px 15px;"
+        "   border-radius: 4px;"
+        "   font-size: 13px;"
+        "   font-weight: 600;"
+        "   padding: 6px 16px;"
         "}"
-        "QPushButton:hover {"
-        "   background-color: #d68910;"
-        "}"
-        "QPushButton:disabled {"
-        "   background-color: #95a5a6;"
-        "}"
+        "QPushButton:hover { background-color: #e69500; }"
+        "QPushButton:disabled { background-color: #2b2b40; color: #565674; }"
     );
     
-    nutLamMoi = new QPushButton("Làm Mới", this);
+    // START EDIT: ADD EDIT BUTTON
+    nutSuaSach = new QPushButton(LanguageManager::instance().getText("BTN_EDIT"), this);
+    nutSuaSach->setMinimumHeight(40);
+    nutSuaSach->setCursor(Qt::PointingHandCursor);
+    nutSuaSach->setStyleSheet(
+        "QPushButton {"
+        "   background-color: #5D9CEC;" // Blue
+        "   color: #ffffff;"
+        "   border: none;"
+        "   border-radius: 4px;"
+        "   font-size: 13px;"
+        "   font-weight: 600;"
+        "   padding: 6px 16px;"
+        "}"
+        "QPushButton:hover { background-color: #4A89DC; }"
+    );
+    // END EDIT
+    
+    nutThemBanSao = new QPushButton(LanguageManager::instance().getText("BTN_ADD_COPY"), this);
+    nutThemBanSao->setMinimumHeight(40);
+    nutThemBanSao->setCursor(Qt::PointingHandCursor);
+    nutThemBanSao->setStyleSheet(
+        "QPushButton {"
+        "   background-color: #28a745;" // Green
+        "   color: #ffffff;"
+        "   border: none;"
+        "   border-radius: 4px;"
+        "   font-size: 13px;"
+        "   font-weight: 600;"
+        "   padding: 6px 16px;"
+        "}"
+        "QPushButton:hover { background-color: #218838; }"
+    );
+    
+    nutLamMoi = new QPushButton(LanguageManager::instance().getText("BTN_REFRESH"), this);
     nutLamMoi->setMinimumHeight(40);
+    nutLamMoi->setCursor(Qt::PointingHandCursor);
     nutLamMoi->setStyleSheet(
         "QPushButton {"
-        "   background-color: #3498db;"
-        "   color: white;"
-        "   border: none;"
-        "   border-radius: 5px;"
-        "   font-size: 10pt;"
-        "   font-weight: bold;"
-        "   padding: 8px 15px;"
+        "   background-color: #2D2D30;" // Secondary Dark
+        "   color: #E0E0E0;"
+        "   border: 1px solid #3E3E42;"
+        "   border-radius: 4px;"
+        "   font-size: 13px;"
+        "   font-weight: 600;"
+        "   padding: 6px 16px;"
         "}"
-        "QPushButton:hover {"
-        "   background-color: #2980b9;"
-        "}"
+        "QPushButton:hover { background-color: #106ebe; }"
     );
     
-    nutDong = new QPushButton("Đóng", this);
+    nutDong = new QPushButton(LanguageManager::instance().getText("BTN_CLOSE"), this);
     nutDong->setMinimumHeight(40);
+    nutDong->setCursor(Qt::PointingHandCursor);
     nutDong->setStyleSheet(
         "QPushButton {"
-        "   background-color: #7f8c8d;"
-        "   color: white;"
-        "   border: none;"
-        "   border-radius: 5px;"
+        "   background-color: #2b2b40;"
+        "   color: #ffffff;"
+        "   border: 1px solid #323248;"
+        "   border-radius: 6px;"
         "   font-size: 10pt;"
-        "   font-weight: bold;"
-        "   padding: 8px 15px;"
+        "   font-weight: 600;"
+        "   padding: 0 15px;"
         "}"
-        "QPushButton:hover {"
-        "   background-color: #5d6d7e;"
-        "}"
+        "QPushButton:hover { background-color: #323248; border-color: #565674; }"
     );
     
     buttonLayout->addWidget(nutThanhLy);
+    buttonLayout->addWidget(nutThemBanSao); // Added Add Copy button
+    buttonLayout->addWidget(nutSuaSach); // Add Edit button to layout
+    
     // New: delete copy button (permanent removal)
-    nutXoaBanSao = new QPushButton("Xóa Bản Sao", this);
+    nutXoaBanSao = new QPushButton(LanguageManager::instance().getText("BTN_DELETE_COPY"), this);
     nutXoaBanSao->setEnabled(false);
     nutXoaBanSao->setMinimumHeight(40);
     nutXoaBanSao->setStyleSheet(
-        "QPushButton { background-color: #ef4444; color: white; border: none; border-radius: 5px; font-weight: bold; padding: 8px 15px;}"
-        "QPushButton:disabled { background-color: #95a5a6; }"
+        "QPushButton { background-color: #C42B1C; color: #ffffff; border: none; border-radius: 4px; font-weight: 600; padding: 6px 16px; font-size: 13px; }"
+        "QPushButton:hover { background-color: #A80000; }"
+        "QPushButton:disabled { background-color: #2b2b40; color: #565674; }"
     );
     buttonLayout->addWidget(nutXoaBanSao);
     buttonLayout->addWidget(nutLamMoi);
-    buttonLayout->addWidget(nutLamMoi);
+
+    // Nút in tem mã vạch
+    nutInTem = new QPushButton(LanguageManager::instance().getText("BTN_PRINT_BARCODE"), this);
+    nutInTem->setMinimumHeight(40);
+    nutInTem->setCursor(Qt::PointingHandCursor);
+    nutInTem->setStyleSheet(
+        "QPushButton {"
+        "   background-color: #2D2D30;" // Secondary Dark
+        "   color: #E0E0E0;"
+        "   border: 1px solid #3E3E42;"
+        "   border-radius: 6px;"
+        "   font-size: 10pt;"
+        "   font-weight: 600;"
+        "   padding: 0 15px;"
+        "}"
+        "QPushButton:hover { background-color: #7337ee; }"
+        "QPushButton:disabled { background-color: #2b2b40; color: #565674; }"
+    );
+    buttonLayout->addWidget(nutInTem);
+
     buttonLayout->addStretch();
     buttonLayout->addWidget(nutDong);
     mainLayout->addLayout(buttonLayout);
@@ -287,7 +385,11 @@ void ManHinhChiTietSach::thietLapKetNoi() {
     connect(nutThanhLy, &QPushButton::clicked, this, &ManHinhChiTietSach::khiNhanThanhLy);
     connect(nutXoaBanSao, &QPushButton::clicked, this, &ManHinhChiTietSach::khiNhanXoaBanSao);
     connect(nutLamMoi, &QPushButton::clicked, this, &ManHinhChiTietSach::khiNhanLamMoi);
+    connect(nutInTem, &QPushButton::clicked, this, &ManHinhChiTietSach::khiNhanInTem);
     connect(nutDong, &QPushButton::clicked, this, &ManHinhChiTietSach::khiNhanDong);
+    connect(nutSuaSach, &QPushButton::clicked, this, &ManHinhChiTietSach::khiNhanSuaSach); // Connect Edit
+    connect(nutThemBanSao, &QPushButton::clicked, this, &ManHinhChiTietSach::khiNhanThemBanSao);
+    
     // connect selection change from view
     if (bangBanSao->selectionModel()) {
         connect(bangBanSao->selectionModel(), &QItemSelectionModel::currentChanged,
@@ -299,19 +401,32 @@ void ManHinhChiTietSach::taiThongTinSach() {
     if (!sachDuocChon) return;
     
     QString info = QString(
-        "📖 <b>Tên sách:</b> %1<br>"
-        "✍️ <b>Tác giả:</b> %2<br>"
-        "📚 <b>ISBN:</b> %3<br>"
-        "📂 <b>Thể loại:</b> %4<br>"
-        "📅 <b>Năm xuất bản:</b> %5<br>"
-        "📄 <b>Số trang:</b> %6"
+        "<b>%1:</b> %2<br>"
+        "<b>%3:</b> %4<br>"
+        "<b>%5:</b> %6<br>"
+        "<b>%7:</b> %8<br>"
+        "<b>%9:</b> %10<br>"
+        "<b>%11:</b> %12"
     )
+    .arg(LanguageManager::instance().getText("LBL_TITLE"))
     .arg(QString::fromStdString(sachDuocChon->tenSach))
+    .arg(LanguageManager::instance().getText("LBL_AUTHOR"))
     .arg(QString::fromStdString(sachDuocChon->tacGia))
+    .arg(LanguageManager::instance().getText("LBL_ISBN"))
     .arg(QString::fromStdString(sachDuocChon->ISBN))
+    .arg(LanguageManager::instance().getText("LBL_CATEGORY"))
     .arg(QString::fromStdString(sachDuocChon->theLoai))
+    .arg(LanguageManager::instance().getText("LBL_PUBLISH_YEAR"))
     .arg(sachDuocChon->namXuatBan)
+    .arg(LanguageManager::instance().getText("LBL_PAGE_COUNT"))
     .arg(sachDuocChon->soTrang);
+    
+    // Feature: Display Price
+    QLocale locale(QLocale::Vietnamese, QLocale::Vietnam);
+    QString giaTienStr = locale.toCurrencyString((double)sachDuocChon->giaTien, "VNĐ");
+    info += QString("<br><b>%1:</b> <span style='color: #78C2AD; font-weight: bold;'>%2</span>")
+        .arg(LanguageManager::instance().getText("LBL_PRICE"))
+        .arg(giaTienStr);
     
     nhanTongQuat->setText(info);
 }
@@ -344,36 +459,46 @@ void ManHinhChiTietSach::capNhatTongQuat() {
     
     ThongTinDauSach info = LayThongTinDauSach(sachDuocChon->ISBN);
     
+    // Use HTML table for better layout control and avoid overlapping
+    // Use HTML table for better layout control and avoid overlapping
     QString summary = QString(
-        "📊 <b>Tổng bản sao:</b> %1 | "
-        "✅ <b>Có thể mượn:</b> %2 | "
-        "📖 <b>Đang mượn:</b> %3 | "
-        "🗑️ <b>Đã thanh lý:</b> %4"
+        "<table style='width: 100%; border-collapse: collapse;'>"
+        "<tr>"
+        "<td style='padding: 5px; color: #b5b5c3;'><b>%1:</b></td><td style='padding: 5px; color: #ffffff;'>%2</td>"
+        "<td style='padding: 5px; color: #b5b5c3;'><b>%3:</b></td><td style='padding: 5px; color: #27ae60;'>%4</td>"
+        "</tr>"
+        "<tr>"
+        "<td style='padding: 5px; color: #b5b5c3;'><b>%5:</b></td><td style='padding: 5px; color: #3498db;'>%6</td>"
+        "<td style='padding: 5px; color: #b5b5c3;'><b>%7:</b></td><td style='padding: 5px; color: #95a5a6;'>%8</td>"
+        "</tr>"
+        "</table>"
     )
+    .arg(LanguageManager::instance().getText("LBL_TOTAL_COPIES"))
     .arg(info.tongBanSao)
+    .arg(LanguageManager::instance().getText("LBL_AVAILABLE_COPIES"))
     .arg(info.choMuonDuoc)
+    .arg(LanguageManager::instance().getText("LBL_BORROWED_COPIES")) // Need key
     .arg(info.dangMuon)
+    .arg(LanguageManager::instance().getText("LBL_LIQUIDATED_COPIES")) // Need key
     .arg(info.thanhLy);
     
     nhanTrangThai->setText(summary);
-    nhanTrangThai->setStyleSheet("color: #2c3e50; font-weight: bold; padding: 8px; background-color: #ecf0f1; border-radius: 5px;");
+    // Remove fixed height/padding in stylesheet to let HTML handle it, but keep container style
+    nhanTrangThai->setStyleSheet("background-color: #2b2b40; border: 1px solid #323248; border-radius: 6px;");
 }
 
 QString ManHinhChiTietSach::layBieuTuongTrangThai(TrangThaiSach status) {
-    switch (status) {
-        case CHO_MUON_DUOC: return "✅";
-        case DANG_MUON: return "📖";
-        case THANH_LY: return "🗑️";
-        default: return "❓";
-    }
+    // Removed emojis
+    Q_UNUSED(status);
+    return "";
 }
 
 QString ManHinhChiTietSach::layVanBanTrangThai(TrangThaiSach status) {
     switch (status) {
-        case CHO_MUON_DUOC: return "Có thể mượn";
-        case DANG_MUON: return "Đang được mượn";
-        case THANH_LY: return "Đã thanh lý";
-        default: return "Không rõ";
+        case CHO_MUON_DUOC: return LanguageManager::instance().getText("LBL_STATUS_AVAILABLE");
+        case DANG_MUON: return LanguageManager::instance().getText("LBL_STATUS_Borrowed");
+        case THANH_LY: return LanguageManager::instance().getText("LBL_STATUS_LIQUIDATED");
+        default: return LanguageManager::instance().getText("LBL_STATUS_UNKNOWN");
     }
 }
 
@@ -418,14 +543,14 @@ void ManHinhChiTietSach::khiChonBanSao(const QModelIndex &index) {
 
 void ManHinhChiTietSach::khiNhanXoaBanSao() {
     if (maBanSaoDuocChon.empty()) {
-        hienThiThongBao("Vui lòng chọn bản sao cần xóa!", true);
+        hienThiThongBao(LanguageManager::instance().getText("MSG_SELECT_COPY_DELETE"), true);
         return;
     }
 
     QMessageBox::StandardButton reply = QMessageBox::warning(
         this,
-        "Xác nhận xóa bản sao",
-        QString("Bạn có chắc muốn xóa bản sao:\n%1?\n\n⚠️ Hành động này sẽ xóa vĩnh viễn bản sao khỏi hệ thống!")
+        LanguageManager::instance().getText("MSG_CONFIRM_DELETE_COPY_TITLE"),
+        LanguageManager::instance().getText("MSG_CONFIRM_DELETE_COPY_BODY")
             .arg(QString::fromStdString(maBanSaoDuocChon)),
         QMessageBox::Yes | QMessageBox::No
     );
@@ -433,7 +558,7 @@ void ManHinhChiTietSach::khiNhanXoaBanSao() {
     if (reply == QMessageBox::Yes) {
         std::string result = XoaBanSaoTheoMa(maBanSaoDuocChon);
         if (result.empty()) {
-            hienThiThongBao("Đã xóa bản sao thành công!");
+            hienThiThongBao(LanguageManager::instance().getText("MSG_DELETE_COPY_SUCCESS"));
             taiDanhSachBanSao();
             capNhatTongQuat();
             emit sachDaCapNhat();
@@ -449,15 +574,14 @@ void ManHinhChiTietSach::khiNhanXoaBanSao() {
 
 void ManHinhChiTietSach::khiNhanThanhLy() {
     if (maBanSaoDuocChon.empty()) {
-        hienThiThongBao("Vui lòng chọn bản sao cần thanh lý!", true);
+        hienThiThongBao(LanguageManager::instance().getText("MSG_SELECT_COPY_LIQUIDATE"), true);
         return;
     }
     
     QMessageBox::StandardButton reply = QMessageBox::warning(
         this,
-        "Xác nhận thanh lý",
-        QString("Bạn có chắc muốn thanh lý bản sao:\n%1?\n\n"
-                "⚠️ Hành động này không thể hoàn tác!")
+        LanguageManager::instance().getText("MSG_CONFIRM_LIQUIDATE_TITLE"),
+        LanguageManager::instance().getText("MSG_CONFIRM_LIQUIDATE_BODY")
             .arg(QString::fromStdString(maBanSaoDuocChon)),
         QMessageBox::Yes | QMessageBox::No
     );
@@ -466,7 +590,7 @@ void ManHinhChiTietSach::khiNhanThanhLy() {
         std::string result = ThanhLyBanSaoTheoMa(maBanSaoDuocChon);
         
         if (result.empty()) {
-            hienThiThongBao("Đã thanh lý bản sao thành công!");
+            hienThiThongBao(LanguageManager::instance().getText("MSG_LIQUIDATE_SUCCESS"));
             taiDanhSachBanSao();
             capNhatTongQuat();
             emit sachDaCapNhat();
@@ -482,7 +606,31 @@ void ManHinhChiTietSach::khiNhanThanhLy() {
 void ManHinhChiTietSach::khiNhanLamMoi() {
     taiDanhSachBanSao();
     capNhatTongQuat();
-    hienThiThongBao("Đã làm mới dữ liệu!");
+    hienThiThongBao(LanguageManager::instance().getText("MSG_REFRESH_SUCCESS"));
+}
+
+void ManHinhChiTietSach::khiNhanSuaSach() {
+    if (!sachDuocChon) return;
+    
+    HopThoaiSuaSach *dialog = new HopThoaiSuaSach(QString::fromStdString(sachDuocChon->ISBN), this);
+    connect(dialog, &HopThoaiSuaSach::sachDaSua, this, [this]() {
+        taiThongTinSach();
+        capNhatTongQuat(); // Update general info too
+        emit sachDaCapNhat();
+    });
+    dialog->exec();
+    delete dialog;
+}
+
+void ManHinhChiTietSach::khiNhanInTem() {
+    if (!sachDuocChon) return;
+
+    bool ok;
+    int soLuong = QInputDialog::getInt(this, LanguageManager::instance().getText("BTN_PRINT_BARCODE"),
+                                       LanguageManager::instance().getText("MSG_ENTER_PRINT_QUANTITY"), 1, 1, 100, 1, &ok);
+    if (ok) {
+        PrintHelper::inNhieuTemSach(sachDuocChon, soLuong, this);
+    }
 }
 
 void ManHinhChiTietSach::khiNhanDong() {

@@ -4,6 +4,7 @@
 #include <QDialog>
 #include <QLineEdit>
 #include <QSpinBox>
+#include <QDoubleSpinBox>
 #include <QComboBox>
 #include <QPushButton>
 #include <QLabel>
@@ -57,6 +58,7 @@ private:
     QSpinBox *soSoTrang;
     QSpinBox *soSoBanSao;
     QLineEdit *oNhapViTri;
+    QDoubleSpinBox *soGiaTien; // Using DoubleSpinBox for currency (allows large numbers)
     
     // Buttons
     QPushButton *nutLuu;

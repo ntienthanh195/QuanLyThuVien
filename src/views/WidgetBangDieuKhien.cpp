@@ -15,6 +15,10 @@
 #include <QKeySequence>
 #include <functional>
 #include "utils/EventBus.h"
+#include "utils/EventBus.h"
+#include "utils/LanguageManager.h"
+#include <QFile>
+#include <QPixmap>
 
 // ==================== REFACTORED: Sử dụng Backend API ====================
 // Thay vì tự đếm, sử dụng các hàm có sẵn:
@@ -71,6 +75,38 @@ WidgetBangDieuKhien::WidgetBangDieuKhien(QWidget *parent)
     // Refresh when global data changes (e.g. background loader finished)
     connect(&EventBus::instance(), &EventBus::dataChanged, this, [this]() { this->capNhatThongKe(); });
 
+    // Localization
+    connect(&LanguageManager::instance(), &LanguageManager::languageChanged, this, &WidgetBangDieuKhien::capNhatNgonNgu);
+    capNhatNgonNgu(); // Initial set
+}
+
+void WidgetBangDieuKhien::capNhatNgonNgu() {
+    // Headers
+    if (lblHeaderCanhBao) lblHeaderCanhBao->setText(LanguageManager::instance().getText("HEADER_DASHBOARD_WARNING"));
+    if (lblHeaderSoLieu) lblHeaderSoLieu->setText(LanguageManager::instance().getText("HEADER_DASHBOARD_STATS"));
+    if (lblHeaderTacVu) lblHeaderTacVu->setText(LanguageManager::instance().getText("HEADER_DASHBOARD_QUICK"));
+    
+    // Stat Cards
+    if (lblTitleTongSach) lblTitleTongSach->setText(LanguageManager::instance().getText("CARD_TITLE_TOTAL_BOOKS"));
+    if (lblTitleDocGia) lblTitleDocGia->setText(LanguageManager::instance().getText("CARD_TITLE_TOTAL_READERS"));
+    if (lblTitleDangMuon) lblTitleDangMuon->setText(LanguageManager::instance().getText("CARD_TITLE_BORROWED"));
+    if (lblTitleLuotMuon) lblTitleLuotMuon->setText(LanguageManager::instance().getText("CARD_TITLE_VISITS"));
+    
+    // Warning Cards
+    if (lblTitleSachQuaHan) lblTitleSachQuaHan->setText(LanguageManager::instance().getText("CARD_TITLE_OVERDUE_BOOKS"));
+    if (lblTitleTheSapHet) lblTitleTheSapHet->setText(LanguageManager::instance().getText("CARD_TITLE_WARNING_CARDS"));
+    
+    if (btnXemSachQuaHan) btnXemSachQuaHan->setText(LanguageManager::instance().getText("BTN_VIEW_DETAILS"));
+    if (btnXemTheSapHet) btnXemTheSapHet->setText(LanguageManager::instance().getText("BTN_VIEW_DETAILS"));
+    
+    // Quick Actions
+    if (lblBtnThemSach) lblBtnThemSach->setText(LanguageManager::instance().getText("BTN_QUICK_ADD_BOOK"));
+    if (lblBtnDangKy) lblBtnDangKy->setText(LanguageManager::instance().getText("BTN_QUICK_ADD_READER"));
+    if (lblBtnTaoPhieu) lblBtnTaoPhieu->setText(LanguageManager::instance().getText("BTN_QUICK_CREATE_LOAN"));
+    if (lblBtnSaoLuu) lblBtnSaoLuu->setText(LanguageManager::instance().getText("BTN_QUICK_BACKUP"));
+    if (lblBtnThongTin) lblBtnThongTin->setText(LanguageManager::instance().getText("BTN_QUICK_SYSTEM_INFO"));
+    
+    // Re-trigger stats update to refresh dynamic strings
     capNhatThongKe();
 }
 
@@ -106,13 +142,14 @@ void WidgetBangDieuKhien::khoiTaoGiaoDien() {
 
 void WidgetBangDieuKhien::taoKhungCanhBao() {
     // Tiêu đề phần
-    QLabel *tieuDePhan = new QLabel("⚠️ Cảnh báo", this);
+    QLabel *tieuDePhan = new QLabel("Cảnh báo", this);
     QFont fontPhan;
     fontPhan.setPointSize(18);
     fontPhan.setBold(true);
     tieuDePhan->setFont(fontPhan);
     tieuDePhan->setProperty("class", "SectionTitle");
     layoutChinh->addWidget(tieuDePhan);
+    lblHeaderCanhBao = tieuDePhan;
     
     // Layout ngang cho 2 card cảnh báo
     QHBoxLayout *layoutCanhBao = new QHBoxLayout();
@@ -253,13 +290,14 @@ void WidgetBangDieuKhien::taoKhungCanhBao() {
 
 void WidgetBangDieuKhien::taoKhungThongKe() {
     // Tiêu đề phần
-    QLabel *tieuDePhan = new QLabel("📊 Số liệu chính", this);
+    QLabel *tieuDePhan = new QLabel("Số liệu chính", this);
     QFont fontPhan;
     fontPhan.setPointSize(18);
     fontPhan.setBold(true);
     tieuDePhan->setFont(fontPhan);
     tieuDePhan->setStyleSheet("color: #F1F5F9; margin-top: 16px; margin-bottom: 12px; background: transparent;");
     layoutChinh->addWidget(tieuDePhan);
+    lblHeaderSoLieu = tieuDePhan;
     
     // Grid layout cho 4 card thống kê (2x2)
     QGridLayout *gridThongKe = new QGridLayout();
@@ -267,20 +305,24 @@ void WidgetBangDieuKhien::taoKhungThongKe() {
     gridThongKe->setContentsMargins(0, 0, 0, 0);
     
     // Card 1: Tổng số sách
-    QWidget *cardTongSach = taoCardThongKe("■", "Tổng số sách", "12,480", "#3B82F6");
+    QWidget *cardTongSach = taoCardThongKe(":/icons/book.png", "Tổng số sách", "12,480", "#3B82F6");
     gridThongKe->addWidget(cardTongSach, 0, 0);
+    lblTitleTongSach = cardTongSach->findChild<QLabel*>("CardTitle");
     
-    // Card 2: Số độc giả
-    QWidget *cardDocGia = taoCardThongKe("●", "Số độc giả", "3,256", "#10B981");
+    // Card 2: Số học viên
+    QWidget *cardDocGia = taoCardThongKe(":/icons/reader.png", "Số học viên", "3,256", "#10B981");
     gridThongKe->addWidget(cardDocGia, 0, 1);
+    lblTitleDocGia = cardDocGia->findChild<QLabel*>("CardTitle");
     
     // Card 3: Sách đang mượn
-    QWidget *cardDangMuon = taoCardThongKe("◆", "Sách đang mượn", "789", "#F59E0B");
+    QWidget *cardDangMuon = taoCardThongKe(":/icons/loan.png", "Sách đang mượn", "789", "#F59E0B");
     gridThongKe->addWidget(cardDangMuon, 1, 0);
+    lblTitleDangMuon = cardDangMuon->findChild<QLabel*>("CardTitle");
     
     // Card 4: Lượt truy cập hôm nay
-    QWidget *cardLuotMuon = taoCardThongKe("▲", "Lượt truy cập hôm nay", "121", "#8B5CF6");
+    QWidget *cardLuotMuon = taoCardThongKe(":/icons/stats.png", "Lượt truy cập hôm nay", "121", "#8B5CF6");
     gridThongKe->addWidget(cardLuotMuon, 1, 1);
+    lblTitleLuotMuon = cardLuotMuon->findChild<QLabel*>("CardTitle");
     
     layoutChinh->addLayout(gridThongKe);
 }
@@ -294,36 +336,42 @@ void WidgetBangDieuKhien::taoKhungTacVuNhanh() {
     tieuDePhan->setFont(fontPhan);
     tieuDePhan->setStyleSheet("color: #F1F5F9; margin-top: 16px; margin-bottom: 12px; background: transparent;");
     layoutChinh->addWidget(tieuDePhan);
+    lblHeaderTacVu = tieuDePhan;
     
     // Layout lưới cho các nút
     QGridLayout *layoutTacVu = new QGridLayout();
     layoutTacVu->setSpacing(12);
     
     // Hàng 1: 3 nút chính
-    btnThemSachMoi = taoNutTacVuNhanh("Thêm Sách Mới", "+", "#3B82F6");
+    btnThemSachMoi = taoNutTacVuNhanh("Thêm Sách Mới", ":/icons/plus.png", "#3B82F6");
     connect(btnThemSachMoi, &QPushButton::clicked, this, &WidgetBangDieuKhien::yeuCauThemSachMoi);
+    lblBtnThemSach = btnThemSachMoi->findChild<QLabel*>("BtnLabel");
     
-    btnDangKyDocGia = taoNutTacVuNhanh("Đăng Ký Độc Giả", "●", "#3B82F6");
+    btnDangKyDocGia = taoNutTacVuNhanh("Đăng Ký Học Viên", ":/icons/reader.png", "#3B82F6");
     connect(btnDangKyDocGia, &QPushButton::clicked, this, &WidgetBangDieuKhien::yeuCauDangKyDocGia);
+    lblBtnDangKy = btnDangKyDocGia->findChild<QLabel*>("BtnLabel");
     
-    btnTaoPhieuMuon = taoNutTacVuNhanh("Tạo Phiếu Mượn", "■", "#3B82F6");
+    btnTaoPhieuMuon = taoNutTacVuNhanh("Tạo Phiếu Mượn", ":/icons/loan.png", "#3B82F6");
     connect(btnTaoPhieuMuon, &QPushButton::clicked, this, &WidgetBangDieuKhien::yeuCauTaoPhieuMuon);
+    lblBtnTaoPhieu = btnTaoPhieuMuon->findChild<QLabel*>("BtnLabel");
     
     // Hàng 2: 2 nút phụ
-    btnSaoLuu = taoNutTacVuNhanh("Sao Lưu Dữ Liệu", "▲", "#10B981");
+    btnSaoLuu = taoNutTacVuNhanh("Sao Lưu Dữ Liệu", ":/icons/save.png", "#10B981");
     connect(btnSaoLuu, &QPushButton::clicked, this, &WidgetBangDieuKhien::yeuCauSaoLuu);
+    lblBtnSaoLuu = btnSaoLuu->findChild<QLabel*>("BtnLabel");
     
-    btnThongTin = taoNutTacVuNhanh("Thông Tin Hệ Thống", "i", "#3B82F6");
+    btnThongTin = taoNutTacVuNhanh("Thông Tin Hệ Thống", ":/icons/info.png", "#3B82F6");
     connect(btnThongTin, &QPushButton::clicked, this, &WidgetBangDieuKhien::yeuCauXemThongTin);
+    lblBtnThongTin = btnThongTin->findChild<QLabel*>("BtnLabel");
     
     // Demo buttons - chỉ để development/debugging
     #ifdef QT_DEBUG
-    QPushButton *btnDemo = taoNutTacVuNhanh("Demo UI Phase 1", "*", "#8B5CF6");
+    QPushButton *btnDemo = taoNutTacVuNhanh("Demo UI Phase 1", ":/icons/demo.png", "#8B5CF6");
     connect(btnDemo, &QPushButton::clicked, this, [this]() {
         emit yeuCauMoDemo();
     });
     
-    QPushButton *btnDemoBang = taoNutTacVuNhanh("Demo Table", "#", "#8B5CF6");
+    QPushButton *btnDemoBang = taoNutTacVuNhanh("Demo Table", ":/icons/table.png", "#8B5CF6");
     connect(btnDemoBang, &QPushButton::clicked, this, [this]() {
         emit yeuCauMoDemoBang();
     });
@@ -406,6 +454,9 @@ QWidget* WidgetBangDieuKhien::taoCardCanhBao(const QString &tieuDe, const QStrin
     fontTieuDe.setBold(true);
     labelTieuDe->setFont(fontTieuDe);
     labelTieuDe->setStyleSheet(QString("color: %1; background: transparent;").arg(mauChu));
+    labelTieuDe->setObjectName("CardTitle");
+    if (tieuDe == "Sách Quá Hạn") lblTitleSachQuaHan = labelTieuDe;
+    else if (tieuDe == "Thẻ Cảnh Báo") lblTitleTheSapHet = labelTieuDe;
     
     // Mô tả
     QLabel *labelMoTa = new QLabel(moTa, card);
@@ -428,6 +479,13 @@ QWidget* WidgetBangDieuKhien::taoCardCanhBao(const QString &tieuDe, const QStrin
         "  background: #2563EB;"
         "}"
     );
+    // Lưu lại pointer tới label nút (không trực tiếp vì là nút created dynamically), 
+    // nhưng nút này được gắn vào btnXemSachQuaHan ở cấp trên rồi.
+    // Thực ra btnHanhDong được assign ra ngoài.
+    // Chúng ta cần cập nhật text của nút này.
+    // Mà nút này là btnXemSachQuaHan hoặc btnXemTheSapHet.
+    // Đã có member rồi: btnXemSachQuaHan, btnXemTheSapHet.
+    // Nên chỉ cần cập nhật trong capNhatNgonNgu thông qua các member này là được.
     (*btnHanhDong)->setCursor(Qt::PointingHandCursor);
     
     contentLayout->addWidget(labelTieuDe);
@@ -475,11 +533,13 @@ QWidget* WidgetBangDieuKhien::taoCardThongKe(const QString &icon, const QString 
     // Icon container bên trái
     QWidget *iconWidget = new QWidget(card);
     QString iconBg;
-    if (icon == "📚") {
+    
+    // Determine background color based on icon path context
+    if (icon.contains("book")) {
         iconBg = "rgba(59, 130, 246, 0.1)";
-    } else if (icon == "👥") {
+    } else if (icon.contains("reader")) {
         iconBg = "rgba(16, 185, 129, 0.1)";
-    } else if (icon == "📖") {
+    } else if (icon.contains("loan")) {
         iconBg = "rgba(245, 158, 11, 0.1)";
     } else {
         iconBg = "rgba(139, 92, 246, 0.1)";
@@ -497,10 +557,16 @@ QWidget* WidgetBangDieuKhien::taoCardThongKe(const QString &icon, const QString 
     QVBoxLayout *iconLayout = new QVBoxLayout(iconWidget);
     iconLayout->setContentsMargins(0, 0, 0, 0);
     
-    QLabel *iconLabel = new QLabel(icon, iconWidget);
-    QFont iconFont;
-    iconFont.setPointSize(24);
-    iconLabel->setFont(iconFont);
+    QLabel *iconLabel = new QLabel(iconWidget);
+    if (icon.startsWith(":/")) {
+        QPixmap pixmap(icon);
+        iconLabel->setPixmap(pixmap.scaled(32, 32, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    } else {
+        iconLabel->setText(icon);
+        QFont iconFont;
+        iconFont.setPointSize(24);
+        iconLabel->setFont(iconFont);
+    }
     iconLabel->setAlignment(Qt::AlignCenter);
     iconLabel->setStyleSheet("background: transparent; border: none;");
     iconLayout->addWidget(iconLabel);
@@ -516,6 +582,7 @@ QWidget* WidgetBangDieuKhien::taoCardThongKe(const QString &icon, const QString 
     fontTieuDe.setWeight(QFont::Medium);
     labelTieuDe->setFont(fontTieuDe);
     labelTieuDe->setStyleSheet("color: #A0A0B0; background: transparent;");
+    labelTieuDe->setObjectName("CardTitle");
     
     // Giá trị lớn
     QLabel *labelGiaTri = new QLabel(giaTri, card);
@@ -544,10 +611,22 @@ QPushButton* WidgetBangDieuKhien::taoNutTacVuNhanh(const QString &tieuDe, const 
     btnLayout->setContentsMargins(16, 14, 16, 14);
     
     // Icon với background tròn
-    QLabel *iconLabel = new QLabel(icon, btn);
-    QFont fontIcon;
-    fontIcon.setPointSize(18);
-    iconLabel->setFont(fontIcon);
+    QLabel *iconLabel = new QLabel(btn);
+    if (icon.startsWith(":/")) {
+        QPixmap pixmap(icon);
+        if (!pixmap.isNull()) {
+            iconLabel->setPixmap(pixmap.scaled(24, 24, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        } else {
+             // Fallback text if icon load fails or empty
+             iconLabel->setText("");
+        }
+    } else {
+        iconLabel->setText(icon);
+        QFont fontIcon;
+        fontIcon.setPointSize(18);
+        iconLabel->setFont(fontIcon);
+    }
+
     iconLabel->setStyleSheet(
         "QLabel {"
         "  background-color: rgba(255, 255, 255, 0.2);"
@@ -567,7 +646,9 @@ QPushButton* WidgetBangDieuKhien::taoNutTacVuNhanh(const QString &tieuDe, const 
     fontText.setPointSize(13);
     fontText.setBold(true);
     textLabel->setFont(fontText);
+    textLabel->setFont(fontText);
     textLabel->setStyleSheet("color: white; background: transparent;");
+    textLabel->setObjectName("BtnLabel");
     
     btnLayout->addWidget(iconLabel);
     btnLayout->addWidget(textLabel);
@@ -620,7 +701,7 @@ void WidgetBangDieuKhien::capNhatThongKe() {
     int soTheSapHet = demTheSapHetHan();
     
     if (labelSachQuaHan) {
-        labelSachQuaHan->setText(QString("%1 Sách Quá Hạn").arg(soSachQuaHan));
+        labelSachQuaHan->setText(LanguageManager::instance().getText("MSG_DASHBOARD_OVERDUE_COUNT").arg(soSachQuaHan));
     }
     
     if (labelMoTaSachQuaHan) {
@@ -629,7 +710,7 @@ void WidgetBangDieuKhien::capNhatThongKe() {
     }
     
     if (labelTheSapHetHan) {
-        labelTheSapHetHan->setText(QString("%1 Thẻ Cảnh Báo").arg(soTheSapHet));
+        labelTheSapHetHan->setText(LanguageManager::instance().getText("MSG_DASHBOARD_WARNING_COUNT").arg(soTheSapHet));
     }
     
     if (labelMoTaTheSapHet) {
@@ -768,10 +849,10 @@ QString WidgetBangDieuKhien::layThongTinSachQuaHanNhieuNhat() {
         int soNgay = danhSach[0].soNgayQuaHanMax;
         QString ten = QString::fromStdString(danhSach[0].docGia->data.Ho + " " + 
                                              danhSach[0].docGia->data.Ten);
-        return QString("Độc giả '%1' quá hạn %2 ngày.").arg(ten).arg(soNgay);
+        return LanguageManager::instance().getText("MSG_DASHBOARD_OVERDUE_DETAIL").arg(ten).arg(soNgay);
     }
     
-    return "Không có sách quá hạn.";
+    return LanguageManager::instance().getText("MSG_DASHBOARD_NO_OVERDUE");
 }
 
 // Lấy thông tin độc giả quá hạn
@@ -787,10 +868,10 @@ QString WidgetBangDieuKhien::layThongTinDocGiaQuaHan() {
         int soNgay = danhSach[0].soNgayQuaHanMax;
         QString ten = QString::fromStdString(danhSach[0].docGia->data.Ho + " " + 
                                              danhSach[0].docGia->data.Ten);
-        return QString("Độc giả '%1' quá hạn %2 ngày.").arg(ten).arg(soNgay);
+        return LanguageManager::instance().getText("MSG_DASHBOARD_OVERDUE_DETAIL").arg(ten).arg(soNgay);
     }
     
-    return "Không có độc giả quá hạn.";
+    return LanguageManager::instance().getText("MSG_DASHBOARD_NO_WARNING");
 }
 
 // ==================== NEW METHODS ====================
@@ -999,7 +1080,7 @@ void WidgetBangDieuKhien::taoKhungTop10() {
     iconDocGia->setAlignment(Qt::AlignCenter);
     iconDocGia->setStyleSheet("background: transparent; color: white;");
     
-    QLabel *labelTieuDeDocGia = new QLabel("Top 10 Độc Giả Hoạt Động");
+    QLabel *labelTieuDeDocGia = new QLabel("Top 10 Học Viên Hoạt Động");
     QFont fontTieuDe2;
     fontTieuDe2.setPointSize(16);
     fontTieuDe2.setBold(true);
@@ -1007,7 +1088,7 @@ void WidgetBangDieuKhien::taoKhungTop10() {
     labelTieuDeDocGia->setAlignment(Qt::AlignCenter);
     labelTieuDeDocGia->setStyleSheet("color: white; background: transparent;");
     
-    QLabel *labelMoTaDocGia = new QLabel("Xem độc giả mượn sách nhiều nhất");
+    QLabel *labelMoTaDocGia = new QLabel("Xem học viên mượn sách nhiều nhất");
     labelMoTaDocGia->setAlignment(Qt::AlignCenter);
     labelMoTaDocGia->setWordWrap(true);
     labelMoTaDocGia->setStyleSheet("color: #A7F3D0; font-size: 13px; background: transparent;");
@@ -1141,7 +1222,7 @@ void WidgetBangDieuKhien::setupShortcuts() {
         btnThemSachMoi->setToolTip("Thêm sách mới (Ctrl+N)");
     }
     if (btnDangKyDocGia) {
-        btnDangKyDocGia->setToolTip("Đăng ký độc giả (Ctrl+Shift+N)");
+        btnDangKyDocGia->setToolTip("Đăng ký học viên (Ctrl+Shift+N)");
     }
     if (btnTaoPhieuMuon) {
         btnTaoPhieuMuon->setToolTip("Tạo phiếu mượn (Ctrl+L)");

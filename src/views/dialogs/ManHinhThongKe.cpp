@@ -1,6 +1,7 @@
 #include "views/dialogs/ManHinhThongKe.h"
 #include "models/QuanLySach.h"
 #include "models/DocGia.h"
+#include "utils/LanguageManager.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGridLayout>
@@ -11,7 +12,7 @@
 
 ManHinhThongKe::ManHinhThongKe(PTRDS dsDauSach[], int soLuongDauSach, PTRDG rootDocGia, QWidget *parent)
     : QDialog(parent), danhSachDauSach(dsDauSach), soLuong(soLuongDauSach), cayDocGia(rootDocGia) {
-    setWindowTitle("Thống Kê Hệ Thống");
+    setWindowTitle(LanguageManager::instance().getText("DIALOG_STATS_TITLE"));
     setMinimumSize(800, 600);
     setModal(true);
     
@@ -26,7 +27,7 @@ void ManHinhThongKe::thietLapGiaoDien() {
     mainLayout->setContentsMargins(25, 25, 25, 25);
     
     // Title
-    QLabel* titleLabel = new QLabel("THỐNG KÊ HỆ THỐNG THƯ VIỆN");
+    QLabel* titleLabel = new QLabel(LanguageManager::instance().getText("TITLE_STATS_HEADER"));
     titleLabel->setStyleSheet(
         "font-size: 22px; "
         "font-weight: bold; "
@@ -39,8 +40,7 @@ void ManHinhThongKe::thietLapGiaoDien() {
     mainLayout->addWidget(titleLabel);
     
     // Info panel
-    QLabel* infoLabel = new QLabel(
-        "<b>Lưu ý:</b> Thống kê được cập nhật tự động từ dữ liệu hiện tại trong hệ thống");
+    QLabel* infoLabel = new QLabel(LanguageManager::instance().getText("MSG_STATS_NOTE_HTML"));
     infoLabel->setStyleSheet(
         "color: #7f8c8d; "
         "font-size: 11px; "
@@ -56,7 +56,7 @@ void ManHinhThongKe::thietLapGiaoDien() {
     columnsLayout->setSpacing(20);
     
     // === SÁCH COLUMN ===
-    QGroupBox* sachGroup = new QGroupBox("Thống Kê Sách");
+    QGroupBox* sachGroup = new QGroupBox(LanguageManager::instance().getText("GROUP_STATS_BOOKS"));
     sachGroup->setObjectName("statsGroup");
     QGridLayout* sachLayout = new QGridLayout(sachGroup);
     sachLayout->setSpacing(12);
@@ -65,7 +65,7 @@ void ManHinhThongKe::thietLapGiaoDien() {
     int row = 0;
     
     // Tổng đầu sách
-    QLabel* lblTongDauSach = new QLabel("📖 Tổng số đầu sách:");
+    QLabel* lblTongDauSach = new QLabel(LanguageManager::instance().getText("LBL_TOTAL_TITLES"));
     lblTongDauSach->setObjectName("labelMetric");
     nhanTongDauSach = new QLabel("0");
     nhanTongDauSach->setObjectName("valueMetric");
@@ -74,7 +74,7 @@ void ManHinhThongKe::thietLapGiaoDien() {
     row++;
     
     // Tổng bản sao
-    QLabel* lblTongBanSao = new QLabel("📚 Tổng số bản sao:");
+    QLabel* lblTongBanSao = new QLabel(LanguageManager::instance().getText("LBL_TOTAL_COPIES"));
     lblTongBanSao->setObjectName("labelMetric");
     nhanTongBanSao = new QLabel("0");
     nhanTongBanSao->setObjectName("valueMetric");
@@ -83,7 +83,7 @@ void ManHinhThongKe::thietLapGiaoDien() {
     row++;
     
     // Bản sao có thể mượn
-    QLabel* lblCoTheMuon = new QLabel("✅ Có thể mượn:");
+    QLabel* lblCoTheMuon = new QLabel(LanguageManager::instance().getText("LBL_AVAILABLE_COPIES"));
     lblCoTheMuon->setObjectName("labelMetric");
     nhanBanSaoCoTheMuon = new QLabel("0");
     nhanBanSaoCoTheMuon->setObjectName("valueGreen");
@@ -92,7 +92,7 @@ void ManHinhThongKe::thietLapGiaoDien() {
     row++;
     
     // Đang được mượn
-    QLabel* lblDangMuon = new QLabel("📤 Đang được mượn:");
+    QLabel* lblDangMuon = new QLabel(LanguageManager::instance().getText("LBL_BORROWED_COPIES"));
     lblDangMuon->setObjectName("labelMetric");
     nhanBanSaoDangMuon = new QLabel("0");
     nhanBanSaoDangMuon->setObjectName("valueBlue");
@@ -101,7 +101,7 @@ void ManHinhThongKe::thietLapGiaoDien() {
     row++;
     
     // Thanh lý
-    QLabel* lblThanhLy = new QLabel("🗑️ Đã thanh lý:");
+    QLabel* lblThanhLy = new QLabel(LanguageManager::instance().getText("LBL_LIQUIDATED_COPIES"));
     lblThanhLy->setObjectName("labelMetric");
     nhanBanSaoThanhLy = new QLabel("0");
     nhanBanSaoThanhLy->setObjectName("valueRed");
@@ -110,7 +110,7 @@ void ManHinhThongKe::thietLapGiaoDien() {
     row++;
     
     // Tỷ lệ cho mượn
-    QLabel* lblTyLe = new QLabel("📊 Tỷ lệ cho mượn:");
+    QLabel* lblTyLe = new QLabel(LanguageManager::instance().getText("LBL_BORROW_RATE"));
     lblTyLe->setObjectName("labelMetric");
     nhanTyLeChoMuon = new QLabel("0.00%");
     nhanTyLeChoMuon->setObjectName("valueMetric");
@@ -119,7 +119,7 @@ void ManHinhThongKe::thietLapGiaoDien() {
     row++;
     
     // Số thể loại
-    QLabel* lblTheLoai = new QLabel("🏷️ Số thể loại khác nhau:");
+    QLabel* lblTheLoai = new QLabel(LanguageManager::instance().getText("LBL_TOTAL_CATEGORIES"));
     lblTheLoai->setObjectName("labelMetric");
     nhanSoTheLoai = new QLabel("0");
     nhanSoTheLoai->setObjectName("valueMetric");
@@ -131,7 +131,7 @@ void ManHinhThongKe::thietLapGiaoDien() {
     columnsLayout->addWidget(sachGroup);
     
     // === ĐỘC GIẢ COLUMN ===
-    QGroupBox* docGiaGroup = new QGroupBox("Thống Kê Độc Giả");
+    QGroupBox* docGiaGroup = new QGroupBox(LanguageManager::instance().getText("GROUP_STATS_READERS"));
     docGiaGroup->setObjectName("statsGroup");
     QGridLayout* docGiaLayout = new QGridLayout(docGiaGroup);
     docGiaLayout->setSpacing(12);
@@ -140,7 +140,7 @@ void ManHinhThongKe::thietLapGiaoDien() {
     row = 0;
     
     // Tổng độc giả
-    QLabel* lblTongDocGia = new QLabel("👤 Tổng số độc giả:");
+    QLabel* lblTongDocGia = new QLabel(LanguageManager::instance().getText("LBL_TOTAL_READERS"));
     lblTongDocGia->setObjectName("labelMetric");
     nhanTongDocGia = new QLabel("0");
     nhanTongDocGia->setObjectName("valueMetric");
@@ -149,7 +149,7 @@ void ManHinhThongKe::thietLapGiaoDien() {
     row++;
     
     // Hoạt động
-    QLabel* lblHoatDong = new QLabel("✅ Đang hoạt động:");
+    QLabel* lblHoatDong = new QLabel(LanguageManager::instance().getText("LBL_ACTIVE_READERS"));
     lblHoatDong->setObjectName("labelMetric");
     nhanDocGiaHoatDong = new QLabel("0");
     nhanDocGiaHoatDong->setObjectName("valueGreen");
@@ -158,7 +158,7 @@ void ManHinhThongKe::thietLapGiaoDien() {
     row++;
     
     // Bị khóa
-    QLabel* lblBiKhoa = new QLabel("🔒 Bị khóa:");
+    QLabel* lblBiKhoa = new QLabel(LanguageManager::instance().getText("LBL_LOCKED_READERS"));
     lblBiKhoa->setObjectName("labelMetric");
     nhanDocGiaBiKhoa = new QLabel("0");
     nhanDocGiaBiKhoa->setObjectName("valueRed");
@@ -167,7 +167,7 @@ void ManHinhThongKe::thietLapGiaoDien() {
     row++;
     
     // Đang mượn sách
-    QLabel* lblDangMuonSach = new QLabel("📖 Đang mượn sách:");
+    QLabel* lblDangMuonSach = new QLabel(LanguageManager::instance().getText("LBL_READERS_BORROWING"));
     lblDangMuonSach->setObjectName("labelMetric");
     nhanDocGiaDangMuon = new QLabel("0");
     nhanDocGiaDangMuon->setObjectName("valueBlue");
@@ -176,7 +176,7 @@ void ManHinhThongKe::thietLapGiaoDien() {
     row++;
     
     // Tổng sách đang mượn
-    QLabel* lblTongSachMuon = new QLabel("📚 Tổng sách đang mượn:");
+    QLabel* lblTongSachMuon = new QLabel(LanguageManager::instance().getText("LBL_TOTAL_BORROWED_BOOKS"));
     lblTongSachMuon->setObjectName("labelMetric");
     nhanTongSachDangMuon = new QLabel("0");
     nhanTongSachDangMuon->setObjectName("valueMetric");
@@ -185,7 +185,7 @@ void ManHinhThongKe::thietLapGiaoDien() {
     row++;
     
     // Có sách quá hạn
-    QLabel* lblQuaHan = new QLabel("⚠️ Có sách quá hạn:");
+    QLabel* lblQuaHan = new QLabel(LanguageManager::instance().getText("LBL_READERS_OVERDUE"));
     lblQuaHan->setObjectName("labelMetric");
     nhanDocGiaCoSachQuaHan = new QLabel("0");
     nhanDocGiaCoSachQuaHan->setObjectName("valueOrange");
@@ -202,7 +202,7 @@ void ManHinhThongKe::thietLapGiaoDien() {
     QHBoxLayout* buttonLayout = new QHBoxLayout();
     buttonLayout->addStretch();
     
-    nutDong = new QPushButton("✖️ Đóng");
+    nutDong = new QPushButton("✖️ " + LanguageManager::instance().getText("BTN_CLOSE"));
     nutDong->setObjectName("primaryButton");
     nutDong->setMinimumWidth(150);
     connect(nutDong, &QPushButton::clicked, this, &QDialog::accept);

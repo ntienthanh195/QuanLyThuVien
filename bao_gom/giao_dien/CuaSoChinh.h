@@ -18,6 +18,7 @@ class BangDieuKhien;
 class WidgetQuanLySach;
 class WidgetQuanLyDocGia;
 class WidgetMuonTraSach;
+class WidgetQuanLyNguoiDung;
 class AutoSaveManager;
 
 /**
@@ -60,6 +61,9 @@ private slots:
     void hienThiIn();
     void capNhatThanhTrangThai(const QString &thongDiep, int thoiGianHienThi = 3000);
     void toggleSidebar();
+    void hienThiQuanLyNguoiDung(); // New method
+    void onAutoBackup(); // Periodic backup slot
+    void capNhatNgonNgu(); // Update UI Language
 
 private:
     // Thiết lập giao diện
@@ -83,12 +87,14 @@ private:
     WidgetQuanLySach *widgetSach;
     WidgetQuanLyDocGia *widgetDocGia;
     WidgetMuonTraSach *widgetMuonTra;
+    WidgetQuanLyNguoiDung *widgetNguoiDung;
     
     // Menu sidebar
     QWidget *khungMenuBen;
     QListWidget *danhSachMenu;
     QVBoxLayout *boTriMenuBen;
     QPushButton *nutToggleSidebar;
+    QPushButton *btnLang; // Language toggle button
     bool sidebarDangMoRong;
     int sidebarWidthMax;
     int sidebarWidthMin;
@@ -103,6 +109,7 @@ private:
     // Filesystem watcher to detect external changes to `data/` or legacy `files/`
     QFileSystemWatcher *fsWatcher;
     QTimer *fsDebounceTimer;
+    QTimer *backupTimer; // Timer for periodic backups
     
     // Lưu trạng thái
     int chiSoManHinhHienTai;

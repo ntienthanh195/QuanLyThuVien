@@ -1,5 +1,6 @@
 <RCC>
     <qresource prefix="/icons">
+        <!-- icons maintained here -->
         <file>icons/book.svg</file>
         <file>icons/user.svg</file>
         <file>icons/exchange.svg</file>
@@ -17,5 +18,8 @@
         <file>icons/filter.svg</file>
         <file>icons/stats.svg</file>
         <file>icons/trophy.svg</file>
+        <file>icons/refresh_custom.svg</file>
+        <file>icons/settings.svg</file>
+        <file>icons/admin.svg</file>
     </qresource>
 </RCC>

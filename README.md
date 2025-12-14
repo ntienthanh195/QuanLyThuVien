@@ -1,235 +1,91 @@
-# 📚 Hệ Thống Quản Lý Thư Viện (Qt Desktop Application)
+# 📚 HỆ THỐNG QUẢN LÝ THƯ VIỆN V2.0
 
-## 🌟 Giới Thiệu
+## 🎯 Giới Thiệu
 
-Ứng dụng desktop hoàn chỉnh để quản lý thư viện, được xây dựng bằng **Qt 6.10.1** framework. Chạy như một ứng dụng thực sự trên Windows với giao diện đẹp mắt và nhiều tính năng mạnh mẽ.
+Phiên bản 2.0 của hệ thống Quản lý Thư viện là một bước lột xác toàn diện với giao diện hiện đại và các tính năng nghiệp vụ chuyên sâu.
 
-## ✨ Tính Năng Chính
+✨ **Điểm Nổi Bật:**
+- **Giao diện Modern Dark Theme**: Thiết kế phẳng, đẹp mắt, thân thiện người dùng.
+- **Import Excel Thông Minh**: Xem trước dữ liệu (Preview), kiểm tra lỗi logic trước khi nhập.
+- **Hệ thống In Ấn Nâng Cao**: Hỗ trợ in phiếu mượn, thẻ độc giả, và **Mã vạch Code128** sắc nét (High-DPI).
+- **Deployment Portable**: "Đóng gói mang đi" dễ dàng, tích hợp sẵn môi trường Python nhẹ.
 
-### 📖 Quản Lý Sách
-- ✅ Tìm kiếm sách real-time với debounce 300ms
-- ✅ Sắp xếp theo cột (click header)
-- ✅ Thêm/Sửa/Xóa đầu sách và bản sao
-- ✅ Import/Export CSV
-- ✅ In danh sách sách với HTML formatting
-- ✅ Xem chi tiết bản sao, thanh lý sách
+## 📁 Cấu Trúc Dự Án
 
-### 👥 Quản Lý Độc Giả
-- ✅ Tìm kiếm và sắp xếp độc giả
-- ✅ Khóa/Mở khóa tài khoản
-- ✅ Xem lịch sử mượn trả chi tiết
-- ✅ In thẻ độc giả (khổ A7)
-- ✅ Cảnh báo quá hạn và trạng thái
-- ✅ Export danh sách CSV
-- ✅ Toolbar với các thao tác nhanh
+```
+QuanLyThuVien/
+├── bao_gom/                    # Header files (UI & Logic V2)
+├── nguon/                      # Source files (Implementations)
+├── include/                    # Backend headers (Legacy Core)
+├── src/                        # Backend source (Legacy Core)
+├── resources/                  # Assets (Fonts, Icons, QSS)
+│
+├── tools/                      # Scripts phụ trợ
+│   └── import_from_excel.py    # Logic đọc Excel bằng Python
+├── python_runtime/             # Môi trường Python Portable (Tự sinh)
+├── setup_runtime.ps1           # Script cài đặt môi trường
+├── QuanLyThuVien_V2.pro        # Project configuration
+└── DEPLOY_INSTRUCTIONS.md      # Hướng dẫn đóng gói chi tiết
+```
 
-### 📚 Mượn - Trả Sách
-- ✅ Model bảng 7 cột với màu sắc rõ ràng
-- ✅ Tự động tính phí phạt (5,000đ/ngày)
-- ✅ Gia hạn nhanh
-- ✅ In biên lai (Ctrl+P)
-- ✅ Trả nhiều sách cùng lúc
-- ✅ Tự động cập nhật khi đổi độc giả
-
-### 📊 Báo Cáo & Thống Kê
-
-#### 🏆 Top 10 Sách (Nâng Cao)
-- ✅ Bộ lọc thời gian: Tất cả, Tháng này, Tháng trước, Tùy chỉnh
-- ✅ So sánh xu hướng với kỳ trước (🔼/🔽)
-- ✅ Bảng 7 cột với chỉ số thay đổi
-- ✅ Panel phân tích xu hướng màu sắc
-- ✅ Xuất báo cáo PDF (Ctrl+P)
-
-#### ⚠️ Báo Cáo Quá Hạn (Nâng Cao)
-- ✅ Thống kê doanh thu từ phí phạt
-- ✅ Đếm độc giả hoạt động (7/30 ngày)
-- ✅ Bảng 8 cột với cột phí phạt
-- ✅ Xem chi tiết từng độc giả
-- ✅ Breakdown sách quá hạn và phí
-- ✅ Xuất báo cáo PDF với tổng kết
-
-#### 📈 Thống Kê Hệ Thống
-- ✅ Tổng quan sách: Đầu sách, bản sao, tỷ lệ cho mượn
-- ✅ Thống kê độc giả: Tổng số, hoạt động, bị khóa
-- ✅ Số sách đang mượn và quá hạn
-- ✅ Giao diện 2 cột với màu sắc trực quan
-
-### 💾 Backup & Restore
-- ✅ Backup tự động với timestamp
-- ✅ Khôi phục từ các bản backup
-- ✅ Quản lý danh sách backup
-
-## 🚀 Cài Đặt & Chạy
+## 🚀 Hướng Dẫn Build & Run
 
 ### Yêu Cầu Hệ Thống
-- **Windows 10/11** (64-bit)
-- **Qt 6.10.1** (MinGW 13.1.0)
-- **C++17** compiler
+- **Qt 6.10.1** (MinGW 64-bit)
+- **Windows 10/11**
+- **RAM**: 4GB+ (Khuyên dùng 8GB)
 
-### Cách 1: Chạy File EXE (Đơn Giản)
-```bash
-# Chỉ cần double-click file:
-release\LibraryManagement.exe
-```
+### Các Bước Build
+1. **Mở dự án**: Open `QuanLyThuVien_V2.pro` bằng Qt Creator.
+2. **Setup Môi trường (Lần đầu)**:
+   - Chạy script `setup_runtime.ps1` (Chuột phải -> Run with PowerShell) tại thư mục gốc.
+   - Script sẽ tự động tải Python Portable và thư viện `openpyxl`.
+3. **Build & Run**: Nhấn `Ctrl+R` để chạy.
 
-### Cách 2: Sử Dụng Script
-```bash
-# Build và chạy lần đầu
-build-and-run.bat
+## ✨ Tính Năng Chi Tiết
 
-# Chạy nhanh (không build lại)
-run-app.bat
-```
+### 1. 📖 Quản Lý Sách & Nhập Liệu
+- **CRUD Sách**: Thêm, xoá, sửa thông tin sách và quản lý bản sao.
+- **Import Excel**:
+  - Hỗ trợ file `.xlsx`.
+  - **Màn hình Preview**: Kiểm tra dữ liệu dạng bảng trước khi lưu vào DB.
+  - Tự động phát hiện lỗi sai định dạng.
 
-### Cách 3: Build Thủ Công
-```bash
-# 1. Generate Makefile
-C:\Qt\6.10.1\mingw_64\bin\qmake.exe LibraryManagement.pro
+### 2. �️ In Ấn & Mã Vạch
+- **In Tem Sách**: Tạo mã vạch **Code128** chuẩn công nghiệp, tự động điều chỉnh độ phân giải cho máy in nhiệt.
+- **In Thẻ Độc Giả**: Mẫu thẻ hiện đại kèm mã QR.
+- **In Phiếu & Báo Cáo**:
+  - Phiếu mượn/trả (K80/A6).
+  - Báo cáo thống kê Top 10, Sách quá hạn.
+- **Xem Trước (Print Preview)**: Tích hợp ngay trong phần mềm.
 
-# 2. Build application
-C:\Qt\Tools\mingw1310_64\bin\mingw32-make.exe
+### 3. 👥 Quản Lý Độc Giả
+- Sử dụng cấu trúc cây **AVL Tree** giúp tìm kiếm cực nhanh theo Mã thẻ hoặc Tên.
+- Quản lý trạng thái thẻ (Hoạt động/Khóa).
+- Tra cứu lịch sử mượn trả chi tiết.
 
-# 3. Run
-release\LibraryManagement.exe
-```
+### 4. 🔄 Mượn Trả Tác Vụ
+- Quy trình mượn sách 1 chạm.
+- Tính toán tiền phạt tự động khi trả quá hạn hoặc mất sách.
+- Kiểm tra điều kiện mượn chặt chẽ (Số lượng, quá hạn...).
 
-## 📂 Cấu Trúc Project
+## 📦 Hướng Dẫn Đóng Gói (Deploy)
 
-```
-LibraryManagement/
-├── src/
-│   ├── main.cpp                    # Qt Application entry point
-│   ├── models/                     # Business logic
-│   │   ├── DocGia.cpp             # Reader management (AVL tree)
-│   │   ├── QuanLySach.cpp         # Book management
-│   │   ├── MuonTra.cpp            # Loan/return operations
-│   │   └── ThaoTacFile.cpp        # File I/O
-│   ├── views/
-│   │   ├── MainWindow.cpp         # Main window with tabs
-│   │   ├── WidgetQuanLySach.cpp   # Book management widget
-│   │   ├── WidgetQuanLyDocGia.cpp # Reader management widget
-│   │   ├── WidgetMuonTraSach.cpp  # Loan/return widget
-│   │   └── dialogs/               # Dialog windows
-│   │       ├── ManHinhTop10.cpp   # Advanced Top 10 report
-│   │       ├── ManHinhQuaHan.cpp  # Overdue report with revenue
-│   │       ├── ManHinhThongKe.cpp # System statistics
-│   │       └── ...
-│   └── utils/                      # Utilities
-│       ├── NgayThang.cpp          # Date calculations
-│       ├── XuLyChuoi.cpp          # String processing
-│       └── BackupManager.cpp      # Backup system
-├── include/                        # Header files
-├── files/                          # Data files
-│   ├── dausach.txt                # Book catalog
-│   ├── danhmucsach.txt            # Book copies
-│   ├── docgia.txt                 # Readers
-│   └── muontra.txt                # Loan records
-├── release/
-│   └── LibraryManagement.exe      # Final executable
-├── LibraryManagement.pro          # Qt project file
-├── build-and-run.bat              # Build & run script
-└── run-app.bat                    # Quick run script
-```
+Hệ thống hỗ trợ tính năng **Portable Import** (Import Excel không cần cài đặt Python).
 
-## 🎨 Giao Diện
+1. **Với Lập trình viên**:
+   - Chạy script `setup_runtime.ps1` một lần duy nhất tại thư mục gốc.
+   
+2. **Với Người dùng cuối**:
+   - Khi bàn giao, hãy copy folder `python_runtime` đi kèm với file `.exe`.
+   - Xem chi tiết tại: [DEPLOY_INSTRUCTIONS.md](DEPLOY_INSTRUCTIONS.md)
 
-### Màn Hình Chính
-- 🏠 **Home Screen**: Menu với 6 nút lớn
-- 📚 **Tab Quản Lý Sách**: Bảng sách + Form thêm/sửa
-- 👥 **Tab Quản Lý Độc Giả**: Bảng độc giả + Lịch sử
-- 📖 **Tab Mượn Trả**: Tìm độc giả + Bảng sách mượn
-
-### Phím Tắt
-- **Ctrl+B**: Quản lý sách
-- **Ctrl+R**: Quản lý độc giả
-- **Ctrl+L**: Mượn trả sách
-- **Ctrl+T**: Top 10 sách
-- **Ctrl+S**: Thống kê hệ thống
-- **Ctrl+H**: Báo cáo quá hạn
-- **Ctrl+P**: In báo cáo (trong dialogs)
-- **Ctrl+Q**: Thoát ứng dụng
-
-## 📊 Dữ Liệu
-
-### Cấu Trúc Dữ Liệu
-- **Sách**: Mảng con trỏ, sắp xếp theo tên
-- **Độc Giả**: Cây AVL cân bằng, key = MaThe
-- **Mượn Trả**: Danh sách liên kết đơn cho mỗi độc giả
-
-### File Dữ Liệu
-- `dausach.txt`: ISBN|Tên|Trang|Tác giả|Năm|Thể loại|Số lượng
-- `danhmucsach.txt`: MaSach|ISBN|TrangThai|ViTri
-- `docgia.txt`: MaThe|Ho|Ten|Phai|TrangThai
-- `muontra.txt`: MaThe|MaSach|NgayMuon|NgayTra|TrangThai
-
-### Backup Tự Động
-- Backup tạo timestamp: `backup_YYYYMMDD_HHMMSS_*.txt`
-- Lưu trong thư mục `files/`
-- Khôi phục 1-click từ dialog Backup
-
-## 🔧 Phát Triển
-
-### Build Modes
-```bash
-# Release mode (optimized, small size)
-qmake CONFIG+=release
-mingw32-make
-
-# Debug mode (with symbols)
-qmake CONFIG+=debug
-mingw32-make
-```
-
-### Thêm Module Mới
-1. Tạo `.cpp` và `.h` trong `src/` và `include/`
-2. Thêm vào `LibraryManagement.pro`:
-```qmake
-SOURCES += src/views/MyNewWidget.cpp
-HEADERS += include/views/MyNewWidget.h
-```
-3. Rebuild: `qmake && mingw32-make`
-
-### Coding Style
-- C++17 standard
-- Qt naming conventions
-- Tiếng Việt cho UI text
-- English for code/comments
-
-## 📝 Changelog
-
-### Version 2.0.0 (December 2025)
-- ✅ Chuyển đổi hoàn toàn từ SFML sang Qt 6.10.1
-- ✅ Xây dựng ứng dụng desktop đầy đủ
-- ✅ 3 widget chính: Sách, Độc giả, Mượn trả
-- ✅ Báo cáo nâng cao với PDF export
-- ✅ Revenue tracking cho phí phạt
-- ✅ Trend analysis cho Top 10
-- ✅ System statistics dashboard
-- ✅ Backup & restore system
-
-### Version 1.0.0 (2024)
-- SFML-based console application
-- Basic book/reader management
-- Simple loan/return operations
-
-## 🐛 Known Issues
-
-- ⚠️ IntelliSense có thể báo lỗi Qt headers (không ảnh hưởng build)
-- ⚠️ Resource file (resources.qrc) empty warning (có thể bỏ qua)
-
-## 📞 Support
-
-Nếu gặp lỗi khi build:
-1. Check Qt installation path trong `.pro` file
-2. Verify MinGW 13.1.0 installed
-3. Run `qmake` trước khi `mingw32-make`
-4. Clean build: `mingw32-make clean`
-
-## 📜 License
-
-Educational project - Free to use for learning purposes.
+## �️ Công Nghệ Sử Dụng
+- **Frontend**: Qt Widgets (C++), QSS Styling.
+- **Backend**: C++ (STL, AVL Tree), Python (Data Processing).
+- **Database**: File-based storage (Custom binary/text format).
+- **Barcode**: Custom Code128 Rendering Engine.
 
 ---
 
-**🎉 Chúc bạn sử dụng app vui vẻ!**
-
+**Developed by Team QuanLyThuVien | 2025**

@@ -75,3 +75,14 @@ ui_*.h
 app
 
 bin/
+# Không đẩy file PDF, QR code, tài liệu cá nhân, file tạm
+data/PDF/
+data/qrcodes/
+files/*.docx
+files/*.xlsx
+files/*.csv
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.tmp

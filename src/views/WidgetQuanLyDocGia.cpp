@@ -9,7 +9,9 @@
 #include "utils/DBBatcher.h"
 #include "utils/NgayThang.h"
 #include "utils/Utf8Helper.h"
+#include "utils/Utf8Helper.h"
 #include "utils/SafeGui.h"
+#include "utils/LanguageManager.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -17,10 +19,7 @@
 #include <QInputDialog>
 #include <QFileDialog>
 #include <QTextStream>
-#include <QPrinter>
-#include <QPrintDialog>
-#include <QTextDocument>
-#include <QPageLayout>
+
 #include <QDate>
 #include <QDialog>
 #include <QTextEdit>
@@ -32,6 +31,9 @@
 #include <QFutureWatcher>
 #include <QtConcurrent>
 #include <QIcon>
+#include <QProcess>
+#include <QDesktopServices>
+#include <QUrl>
 
 extern PTRDG rootDocGia;
 
@@ -54,7 +56,7 @@ void WidgetQuanLyDocGia::onSearchFinished() {
     QFuture<std::vector<PTRDG>> f = searchWatcher->future();
     std::vector<PTRDG> results = f.result();
     readerModel->setSearchResults(results);
-    showMessage(QString("Tìm thấy %1 độc giả").arg((int)results.size()));
+    showMessage(QString("Tìm thấy %1 học viên").arg((int)results.size()));
     btnSearch->setEnabled(true);
     searchProgress->setVisible(false);
 }
@@ -82,11 +84,11 @@ QVariant ReaderTableModel::data(const QModelIndex &index, int role) const {
             case 0: return reader->data.MaThe;
             case 1: return QString::fromStdString(reader->data.Ho);
             case 2: return QString::fromStdString(reader->data.Ten);
-            case 3: return reader->data.Phai ? "Nữ" : "Nam";
+            case 3: return reader->data.Phai ? LanguageManager::instance().getText("GENDER_FEMALE") : LanguageManager::instance().getText("GENDER_MALE");
             case 4: {
-                QString status = reader->data.TrangThai ? "Hoạt động" : "Khóa";
+                QString status = reader->data.TrangThai ? LanguageManager::instance().getText("STATUS_ACTIVE") : LanguageManager::instance().getText("STATUS_LOCKED");
                 if (isReaderOverdue(reader)) {
-                    status += " Quá hạn";
+                    status += " " + LanguageManager::instance().getText("STATUS_OVERDUE");
                 }
                 return status;
             }
@@ -132,11 +134,11 @@ QVariant ReaderTableModel::headerData(int section, Qt::Orientation orientation, 
     
     if (orientation == Qt::Horizontal) {
         switch (section) {
-            case 0: return "Mã Thẻ";
-            case 1: return "Họ";
-            case 2: return "Tên";
-            case 3: return "Phái";
-            case 4: return "Trạng Thái";
+            case 0: return LanguageManager::instance().getText("TABLE_HEADER_CODE");
+            case 1: return LanguageManager::instance().getText("TABLE_HEADER_LASTNAME");
+            case 2: return LanguageManager::instance().getText("TABLE_HEADER_FIRSTNAME");
+            case 3: return LanguageManager::instance().getText("TABLE_HEADER_GENDER");
+            case 4: return LanguageManager::instance().getText("TABLE_HEADER_STATUS");
         }
     }
     return QVariant();
@@ -263,7 +265,36 @@ int ReaderTableModel::getBorrowedBookCount(PTRDG reader) const {
 
 WidgetQuanLyDocGia::WidgetQuanLyDocGia(QWidget *parent)
     : QWidget(parent)
+
     , selectedReader(nullptr)
+    , tabWidget(nullptr)
+    , tabQuanLy(nullptr)
+    , tableView(nullptr)
+    , readerModel(nullptr)
+    , searchEdit(nullptr)
+    , searchTypeCombo(nullptr)
+    , filterGioiTinhCombo(nullptr)
+    , filterTrangThaiCombo(nullptr)
+    , filterStatusCombo(nullptr)
+    , btnSearch(nullptr)
+    , btnClearSearch(nullptr)
+    , btnAdd(nullptr)
+    , btnEdit(nullptr)
+    , btnDelete(nullptr)
+    , btnDetails(nullptr)
+    , btnUnlock(nullptr)
+    , btnViewLoans(nullptr)
+    , btnBack(nullptr)
+    , statusLabel(nullptr)
+    , toolbar(nullptr)
+    , badgeDelegate(nullptr)
+    , tabQuaHan(nullptr)
+    , tableQuaHan(nullptr)
+    , modelQuaHan(nullptr)
+    , btnRefreshQuaHan(nullptr)
+    , lblThongKeQuaHan(nullptr)
+    , searchProgress(nullptr)
+    , searchWatcher(nullptr)
 {
     // Ensure QSS selectors targeting object name also apply
     this->setObjectName("WidgetQuanLyDocGia");
@@ -296,6 +327,9 @@ void WidgetQuanLyDocGia::setupUI() {
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->setSpacing(25);
     mainLayout->setContentsMargins(35, 35, 35, 35);
+
+    // Initial Language Update (Wait until widgets are created)
+    QTimer::singleShot(0, this, &WidgetQuanLyDocGia::capNhatNgonNgu);
     
     // --- CARD 1: HEADER & TÌM KIẾM ---
     QFrame *headerCard = new QFrame(this);
@@ -308,10 +342,10 @@ void WidgetQuanLyDocGia::setupUI() {
     // Dòng 1: Tiêu đề + Nút Thêm
     QHBoxLayout *topRow = new QHBoxLayout();
     
-    QLabel *titleLabel = new QLabel("👥 Quản Lý Độc Giả", headerCard);
+    QLabel *titleLabel = new QLabel("Quản Lý Học Viên", headerCard);
     titleLabel->setProperty("class", "PageTitle");
     
-    btnAdd = new QPushButton("+ Thêm Độc Giả", headerCard);
+    btnAdd = new QPushButton("+ Thêm Học Viên", headerCard);
     btnAdd->setProperty("class", "Primary");
     btnAdd->setCursor(Qt::PointingHandCursor);
     btnAdd->setMinimumHeight(40);
@@ -372,7 +406,7 @@ void WidgetQuanLyDocGia::setupUI() {
     layChucNang->setSpacing(12);
     layChucNang->setContentsMargins(6, 6, 6, 6);
 
-    QPushButton *btnAddReader = new QPushButton(QIcon(":/icons/plus.svg"), " + Thêm Độc Giả", nhomChucNang);
+    QPushButton *btnAddReader = new QPushButton(QIcon(":/icons/plus.svg"), " + Thêm Học Viên", nhomChucNang);
     QPushButton *btnImport = new QPushButton(QIcon(":/icons/upload.svg"), " Nhập Excel", nhomChucNang);
     QPushButton *btnPrint = new QPushButton(QIcon(":/icons/print.svg"), " In", nhomChucNang);
     QPushButton *btnEditTop = new QPushButton(QIcon(":/icons/edit.svg"), " Sửa", nhomChucNang);
@@ -426,6 +460,7 @@ void WidgetQuanLyDocGia::setupUI() {
     toolbar->addSeparator();
     QAction *actPrintTop = toolbar->addAction(QIcon(":/icons/info.svg"), "In Danh Sách");
     actPrintTop->setShortcut(QKeySequence::Print);
+    connect(actPrintTop, &QAction::triggered, this, &WidgetQuanLyDocGia::onPrintList);
     tableLayout->addWidget(toolbar);
     
     tableView = new QTableView(tableCard);
@@ -456,7 +491,7 @@ void WidgetQuanLyDocGia::setupUI() {
     QHBoxLayout *footerLayout = new QHBoxLayout();
     footerLayout->setContentsMargins(20, 10, 20, 20);
     
-    statusLabel = new QLabel("Tổng số: 0 độc giả", tableCard);
+    statusLabel = new QLabel("Tổng số: 0 học viên", tableCard);
     statusLabel->setProperty("class", "SubText");
     
     btnEdit = new QPushButton("Sửa", tableCard);
@@ -509,15 +544,15 @@ void WidgetQuanLyDocGia::setupTabQuanLy() {
     toolbar->setProperty("class", "ToolbarDark");
     
     QAction *actToggleStatus = toolbar->addAction(QIcon(":/icons/lock.svg"), "Đổi Trạng Thái");
-    actToggleStatus->setToolTip("Khóa/Mở khóa độc giả được chọn");
+    actToggleStatus->setToolTip("Khóa/Mở khóa học viên được chọn");
     connect(actToggleStatus, &QAction::triggered, this, &WidgetQuanLyDocGia::onToggleStatus);
     
     QAction *actHistory = toolbar->addAction(QIcon(":/icons/exchange.svg"), "Lịch Sử Mượn");
-    actHistory->setToolTip("Xem lịch sử mượn trả của độc giả");
+    actHistory->setToolTip("Xem lịch sử mượn trả của học viên");
     connect(actHistory, &QAction::triggered, this, &WidgetQuanLyDocGia::onViewHistory);
     
     QAction *actPrintCard = toolbar->addAction(QIcon(":/icons/user.svg"), "In Thẻ");
-    actPrintCard->setToolTip("In thẻ độc giả (Ctrl+P)");
+    actPrintCard->setToolTip("In thẻ học viên (Ctrl+P)");
     actPrintCard->setShortcut(QKeySequence::Print);
     connect(actPrintCard, &QAction::triggered, this, &WidgetQuanLyDocGia::onPrintCard);
     
@@ -530,11 +565,11 @@ void WidgetQuanLyDocGia::setupTabQuanLy() {
     toolbar->addSeparator();
     
     QAction *actExport = toolbar->addAction(QIcon(":/icons/copy.svg"), "Xuất CSV");
-    actExport->setToolTip("Xuất danh sách độc giả ra CSV");
+    actExport->setToolTip("Xuất danh sách học viên ra CSV");
     connect(actExport, &QAction::triggered, this, &WidgetQuanLyDocGia::onExportCSV);
     
     QAction *actImport = toolbar->addAction(QIcon(":/icons/copy.svg"), "Nhập CSV");
-    actImport->setToolTip("Nhập độc giả từ file CSV");
+    actImport->setToolTip("Nhập học viên từ file CSV");
     connect(actImport, &QAction::triggered, this, &WidgetQuanLyDocGia::onImportCSV);
     
     layout->addWidget(toolbar);
@@ -557,7 +592,7 @@ void WidgetQuanLyDocGia::setupTabQuanLy() {
     searchTypeCombo->addItem("Lọc theo trạng thái", 4);
     searchTypeCombo->setToolTip(
         "Loại tìm kiếm:\n"
-        "• Theo mã: Nhập mã thẻ độc giả (số nguyên)\n"
+        "• Theo mã: Nhập mã thẻ học viên (số nguyên)\n"
         "• Theo tên: Tìm theo tên (VD: 'Lan')\n"
         "• Theo họ: Tìm theo họ đệm (VD: 'Nguyễn')\n"
         "• Theo họ tên: Tìm theo họ và tên\n"
@@ -568,7 +603,7 @@ void WidgetQuanLyDocGia::setupTabQuanLy() {
     searchLayout->addWidget(searchTypeCombo);
 
     btnSearch = new QPushButton("Tìm", tabQuanLy);
-    btnSearch->setToolTip("Tìm kiếm độc giả (Enter hoặc Ctrl+F)");
+    btnSearch->setToolTip("Tìm kiếm học viên (Enter hoặc Ctrl+F)");
     btnSearch->setShortcut(QKeySequence(Qt::Key_Return));
     btnSearch->setMinimumHeight(40);
     btnSearch->setProperty("class", "GradientPrimary");
@@ -640,7 +675,7 @@ void WidgetQuanLyDocGia::setupTabQuanLy() {
     
     // Cac nut chuc nang
     QHBoxLayout *buttonLayout = new QHBoxLayout();
-    btnAdd = new QPushButton("+ Thêm Độc Giả", tabQuanLy);
+    btnAdd = new QPushButton("+ Thêm Học Viên", tabQuanLy);
     btnAdd->setIcon(QIcon(":/icons/plus.svg"));
     btnAdd->setMinimumHeight(40);
     btnEdit = new QPushButton("Sửa", tabQuanLy);
@@ -657,9 +692,9 @@ void WidgetQuanLyDocGia::setupTabQuanLy() {
     btnBack->setMinimumHeight(40);
 
     // Add keyboard shortcut tooltips
-    btnAdd->setToolTip("Thêm độc giả mới (Ctrl+N)");
-    btnEdit->setToolTip("Sửa thông tin độc giả (Ctrl+E)");
-    btnDelete->setToolTip("Xóa độc giả đã chọn (Delete hoặc Ctrl+D)");
+    btnAdd->setToolTip("Thêm học viên mới (Ctrl+N)");
+    btnEdit->setToolTip("Sửa thông tin học viên (Ctrl+E)");
+    btnDelete->setToolTip("Xóa học viên đã chọn (Delete hoặc Ctrl+D)");
     btnViewLoans->setToolTip("Xem lịch sử mượn trả");
     btnBack->setToolTip("Quay lại màn hình chính (ESC)");
 
@@ -679,7 +714,7 @@ void WidgetQuanLyDocGia::setupTabQuanLy() {
     
     layout->addLayout(buttonLayout);
     
-    tabWidget->addTab(tabQuanLy, "Danh Sách Độc Giả");
+    tabWidget->addTab(tabQuanLy, "Danh Sách Học Viên");
 }
 
 void WidgetQuanLyDocGia::setupTabQuaHan() {
@@ -689,7 +724,7 @@ void WidgetQuanLyDocGia::setupTabQuaHan() {
     layout->setContentsMargins(16, 16, 16, 16);
     
     // Hướng dẫn
-    QLabel *lblHuongDan = new QLabel("DANH SÁCH ĐỘC GIẢ QUÁ HẠN", tabQuaHan);
+    QLabel *lblHuongDan = new QLabel("DANH SÁCH HỌC VIÊN QUÁ HẠN", tabQuaHan);
     QFont font = lblHuongDan->font();
     font.setPointSize(16);
     font.setBold(true);
@@ -704,7 +739,7 @@ void WidgetQuanLyDocGia::setupTabQuaHan() {
     
     // Placeholder message
     QLabel *placeholderMsg = new QLabel("Chức năng đang được phát triển...\n\n"
-        "Sẽ hiển thị danh sách độc giả có sách mượn quá hạn.", tabQuaHan);
+        "Sẽ hiển thị danh sách học viên có sách mượn quá hạn.", tabQuaHan);
     placeholderMsg->setAlignment(Qt::AlignCenter);
     placeholderMsg->setProperty("class", "PlaceholderMsg");
     layout->addWidget(placeholderMsg, 1);
@@ -717,7 +752,7 @@ void WidgetQuanLyDocGia::setupTabQuaHan() {
     connect(btnRefresh, &QPushButton::clicked, this, &WidgetQuanLyDocGia::onRefreshQuaHan);
     layout->addWidget(btnRefresh, 0, Qt::AlignRight);
     
-    tabWidget->addTab(tabQuaHan, "Độc Giả Quá Hạn");
+    tabWidget->addTab(tabQuaHan, "Học Viên Quá Hạn");
 }
 
 void WidgetQuanLyDocGia::setupConnections() {
@@ -745,6 +780,11 @@ void WidgetQuanLyDocGia::setupConnections() {
                 }
                 updateButtonStates();
             });
+                updateButtonStates();
+            });
+            
+    // Connect Language Change
+    connect(&LanguageManager::instance(), &LanguageManager::languageChanged, this, &WidgetQuanLyDocGia::capNhatNgonNgu);
 }
 
 void WidgetQuanLyDocGia::setupKeyboardShortcuts() {
@@ -807,7 +847,7 @@ void WidgetQuanLyDocGia::applyFilters() {
     if (gioiTinh != "Tất cả" || trangThai != "Tất cả") {
         filterMsg = QString(" (Lọc: %1, %2)").arg(gioiTinh).arg(trangThai);
     }
-    showMessage(QString("Hiển thị %1 độc giả%2").arg(totalCount).arg(filterMsg));
+    showMessage(QString("Hiển thị %1 học viên%2").arg(totalCount).arg(filterMsg));
 }
 
 QString WidgetQuanLyDocGia::validateCMND(const QString &cmnd) {
@@ -831,7 +871,7 @@ void WidgetQuanLyDocGia::refreshData() {
     readerModel->refreshData();
     selectedReader = nullptr;
     updateButtonStates();
-    showMessage(QString("Đã tải %1 độc giả").arg(readerModel->rowCount()));
+    showMessage(QString("Đã tải %1 học viên").arg(readerModel->rowCount()));
 }
 
 void WidgetQuanLyDocGia::updateButtonStates() {
@@ -855,7 +895,7 @@ void WidgetQuanLyDocGia::onSearchClicked() {
     
     // Validate root pointer
     if (!rootDocGia) {
-        showMessage("Danh sách độc giả trống!", true);
+        showMessage("Danh sách học viên trống!", true);
         return;
     }
     
@@ -873,18 +913,18 @@ void WidgetQuanLyDocGia::onSearchClicked() {
         try {
             reader = timDocGia(rootDocGia, maThe);
         } catch (...) {
-            showMessage("Lỗi khi tìm kiếm độc giả!", true);
+            showMessage(LanguageManager::instance().getText("MSG_ERROR_SEARCH_READER"), true);
             return;
         }
 
         if (reader) {
             std::vector<PTRDG> v{reader};
             readerModel->setSearchResults(v);
-            showMessage(QString("🎫 Tìm thấy độc giả: %1 %2")
+            showMessage(QString(" Tìm thấy học viên: %1 %2")
                 .arg(QString::fromStdString(reader->data.Ho),
                      QString::fromStdString(reader->data.Ten)));
         } else {
-            showMessage("Không tìm thấy độc giả!", true);
+            showMessage(LanguageManager::instance().getText("MSG_READER_NOT_FOUND_SIMPLE"), true);
             // clear model
             readerModel->setSearchResults(std::vector<PTRDG>());
         }
@@ -892,19 +932,19 @@ void WidgetQuanLyDocGia::onSearchClicked() {
     } else if (searchType == 1) {
         // Search by first name
         if (keyword.isEmpty()) {
-            showMessage("Vui lòng nhập tên!", true);
+            showMessage(LanguageManager::instance().getText("MSG_ENTER_NAME"), true);
             return;
         }
         
             // Run search in background
             try {
-                showMessage("⏳ Đang tìm kiếm...");
+                showMessage(LanguageManager::instance().getText("MSG_SEARCHING_PROGRESS"));
                 btnSearch->setEnabled(false);
                 searchProgress->setVisible(true);
                 QFuture<std::vector<PTRDG>> future = QtConcurrent::run(&DBBatcher::timDocGiaTheoTen, keyword.toStdString(), 1000);
                 searchWatcher->setFuture(future);
             } catch (...) {
-                showMessage("Lỗi khi tìm kiếm!", true);
+                showMessage(LanguageManager::instance().getText("MSG_ERROR_SEARCH"), true);
                 btnSearch->setEnabled(true);
                 return;
             }
@@ -912,18 +952,18 @@ void WidgetQuanLyDocGia::onSearchClicked() {
     } else if (searchType == 2) {
         // Search by last name
         if (keyword.isEmpty()) {
-            showMessage("Vui lòng nhập họ!", true);
+            showMessage(LanguageManager::instance().getText("MSG_ENTER_LASTNAME"), true);
             return;
         }
         
         try {
-            showMessage("⏳ Đang tìm kiếm...");
+            showMessage(LanguageManager::instance().getText("MSG_SEARCHING_PROGRESS"));
             btnSearch->setEnabled(false);
             searchProgress->setVisible(true);
             QFuture<std::vector<PTRDG>> future = QtConcurrent::run(&DBBatcher::timDocGiaTheoHo, keyword.toStdString(), 1000);
             searchWatcher->setFuture(future);
         } catch (...) {
-            showMessage("Lỗi khi tìm kiếm!", true);
+            showMessage(LanguageManager::instance().getText("MSG_ERROR_SEARCH"), true);
             btnSearch->setEnabled(true);
             return;
         }
@@ -931,18 +971,18 @@ void WidgetQuanLyDocGia::onSearchClicked() {
     } else if (searchType == 3) {
         // Search by full name
         if (keyword.isEmpty()) {
-            showMessage("Vui lòng nhập họ tên!", true);
+            showMessage(LanguageManager::instance().getText("MSG_ENTER_FULLNAME"), true);
             return;
         }
         
         try {
-            showMessage("⏳ Đang tìm kiếm...");
+            showMessage(LanguageManager::instance().getText("MSG_SEARCHING_PROGRESS"));
             btnSearch->setEnabled(false);
             searchProgress->setVisible(true);
             QFuture<std::vector<PTRDG>> future = QtConcurrent::run(&DBBatcher::timDocGiaTheoHoTen, keyword.toStdString(), 1000);
             searchWatcher->setFuture(future);
         } catch (...) {
-            showMessage("Lỗi khi tìm kiếm!", true);
+            showMessage(LanguageManager::instance().getText("MSG_ERROR_SEARCH"), true);
             btnSearch->setEnabled(true);
             return;
         }
@@ -950,22 +990,22 @@ void WidgetQuanLyDocGia::onSearchClicked() {
     } else if (searchType == 4) {
         // Filter by status
         QStringList options;
-        options << "1 - Hoạt động" << "0 - Bị khóa";
+        options << LanguageManager::instance().getText("OPTION_STATUS_ACTIVE") << LanguageManager::instance().getText("OPTION_STATUS_LOCKED");
         
         bool ok;
-        QString item = QInputDialog::getItem(this, "Lọc theo trạng thái",
-                                            "Chọn trạng thái:", options, 0, false, &ok);
+        QString item = QInputDialog::getItem(this, LanguageManager::instance().getText("TITLE_FILTER_STATUS"),
+                                            LanguageManager::instance().getText("LBL_CHOOSE_STATUS"), options, 0, false, &ok);
         if (!ok) return;
         
         int status = item.left(1).toInt();
         
         try {
-            showMessage("⏳ Đang lọc...");
+            showMessage(LanguageManager::instance().getText("MSG_FILTERING_PROGRESS"));
             btnSearch->setEnabled(false);
             QFuture<std::vector<PTRDG>> future = QtConcurrent::run(&DBBatcher::timDocGiaTheoTrangThai, status, 1000);
             searchWatcher->setFuture(future);
         } catch (...) {
-            showMessage("Lỗi khi tìm kiếm!", true);
+            showMessage(LanguageManager::instance().getText("MSG_ERROR_SEARCH"), true);
             btnSearch->setEnabled(true);
             return;
         }
@@ -1025,11 +1065,11 @@ void WidgetQuanLyDocGia::onDeleteReaderClicked() {
     QString warningMsg;
     if (borrowedCount > 0) {
         warningMsg = "\n\nLƯU Ý:\n";
-        warningMsg += "• Độc giả đang mượn sách, nên xử lý trả sách trước\n";
+        warningMsg += "• Học viên đang mượn sách, nên xử lý trả sách trước\n";
         warningMsg += "• Xóa sẽ mất toàn bộ lịch sử mượn trả\n";
         warningMsg += "• Hành động này không thể hoàn tác";
     } else {
-        warningMsg = "\n\nLịch sử mượn trả của độc giả này sẽ bị xóa vĩnh viễn.";
+        warningMsg = "\n\nLịch sử mượn trả của học viên này sẽ bị xóa vĩnh viễn.";
     }
     
     // Use ConfirmationDialog with warning type if has borrowed books
@@ -1040,7 +1080,7 @@ void WidgetQuanLyDocGia::onDeleteReaderClicked() {
     bool confirmed = ConfirmationDialog::confirm(
         this,
         "Xác nhận xóa độc giả",
-        QString("Bạn có chắc chắn muốn xóa độc giả này?%1").arg(warningMsg),
+        QString("Bạn có chắc chắn muốn xóa học viên này?%1").arg(warningMsg),
         detail,
         dialogType
     );
@@ -1049,8 +1089,8 @@ void WidgetQuanLyDocGia::onDeleteReaderClicked() {
         // TODO: Call backend delete function
         // For now, just show placeholder
         AnimationHelper::shake(this);
-        QMessageBox::information(this, "Xóa Độc Giả", 
-            "Chức năng xóa độc giả đang được phát triển.\n"
+        QMessageBox::information(this, "Xóa Học Viên", 
+            "Chức năng xóa học viên đang được phát triển.\n"
             "Cần implement hàm XoaDocGia() trong backend.");
         
         // When implemented:
@@ -1107,7 +1147,7 @@ void WidgetQuanLyDocGia::performSearch() {
 
 void WidgetQuanLyDocGia::onToggleStatus() {
     if (!selectedReader) {
-        QMessageBox::warning(this, "Chưa chọn", "Vui lòng chọn độc giả để đổi trạng thái!");
+        QMessageBox::warning(this, "Chưa chọn", "Vui lòng chọn học viên để đổi trạng thái!");
         return;
     }
     
@@ -1116,7 +1156,7 @@ void WidgetQuanLyDocGia::onToggleStatus() {
     
     QMessageBox::StandardButton reply = QMessageBox::question(this,
         "Xác nhận đổi trạng thái",
-        QString("Độc giả: %1 %2\nTrạng thái hiện tại: %3\n\n"
+        QString("Học viên: %1 %2\nTrạng thái hiện tại: %3\n\n"
                 "Bạn có muốn chuyển sang trạng thái: %4?")
             .arg(QString::fromStdString(selectedReader->data.Ho))
             .arg(QString::fromStdString(selectedReader->data.Ten))
@@ -1135,7 +1175,7 @@ void WidgetQuanLyDocGia::onToggleStatus() {
 
 void WidgetQuanLyDocGia::onViewHistory() {
     if (!selectedReader) {
-        QMessageBox::warning(this, "Chưa chọn", "Vui lòng chọn độc giả để xem lịch sử!");
+        QMessageBox::warning(this, "Chưa chọn", "Vui lòng chọn học viên để xem lịch sử!");
         return;
     }
     
@@ -1155,7 +1195,7 @@ void WidgetQuanLyDocGia::onViewHistory() {
                    "</style></head><body>";
     
     html += QString("<h2>📚 Lịch Sử Mượn Trả</h2>");
-    html += QString("<p><b>Độc giả:</b> %1 %2 (Mã thẻ: %3)</p>")
+    html += QString("<p><b>Học viên:</b> %1 %2 (Mã thẻ: %3)</p>")
             .arg(QString::fromStdString(selectedReader->data.Ho))
             .arg(QString::fromStdString(selectedReader->data.Ten))
             .arg(selectedReader->data.MaThe);
@@ -1256,64 +1296,15 @@ void WidgetQuanLyDocGia::onViewHistory() {
 
 void WidgetQuanLyDocGia::onPrintCard() {
     if (!selectedReader) {
-        QMessageBox::warning(this, "Chưa chọn", "Vui lòng chọn độc giả để in thẻ!");
+        QMessageBox::warning(this, "Chưa chọn", "Vui lòng chọn học viên để in thẻ!");
         return;
     }
     
-    QPrinter printer(QPrinter::HighResolution);
-    printer.setPageSize(QPageSize::A7);
+    // Use centralized PrintHelper
+    // Correctly handles formatting, barcodes, and print dialogs
+    PrintHelper::inTheDocGia(selectedReader, this);
     
-    QPrintDialog printDialog(&printer, this);
-    if (printDialog.exec() != QDialog::Accepted) {
-        return;
-    }
-    
-    // Card HTML (A7 size - like ID card)
-    QString html = "<html><head><style>"
-                   "body { font-family: Arial, sans-serif; margin: 20px; }"
-                   ".card { border: 3px solid #3498db; padding: 20px; border-radius: 10px; }"
-                   ".header { text-align: center; color: #2c3e50; margin-bottom: 20px; }"
-                   ".info { margin: 10px 0; font-size: 14pt; }"
-                   ".label { font-weight: bold; color: #7f8c8d; }"
-                   ".value { color: #2c3e50; }"
-                   ".barcode { text-align: center; font-size: 24pt; font-family: monospace; "
-                   "           border: 2px dashed #95a5a6; padding: 10px; margin-top: 20px; }"
-                   "</style></head><body>";
-    
-    html += "<div class='card'>";
-    html += "<div class='header'>";
-    html += "<h1>📚 THƯ VIỆN</h1>";
-    html += "<h3>THẺ ĐỘC GIẢ</h3>";
-    html += "</div>";
-    
-    html += QString("<div class='info'><span class='label'>Mã thẻ:</span> "
-                   "<span class='value'>%1</span></div>")
-            .arg(selectedReader->data.MaThe);
-    
-    html += QString("<div class='info'><span class='label'>Họ tên:</span> "
-                   "<span class='value'>%1 %2</span></div>")
-            .arg(QString::fromStdString(selectedReader->data.Ho))
-            .arg(QString::fromStdString(selectedReader->data.Ten));
-    
-    html += QString("<div class='info'><span class='label'>Giới tính:</span> "
-                   "<span class='value'>%1</span></div>")
-            .arg(selectedReader->data.Phai ? "Nữ" : "Nam");
-    
-    html += QString("<div class='info'><span class='label'>Trạng thái:</span> "
-                   "<span class='value' style='color: %2;'>%1</span></div>")
-            .arg(selectedReader->data.TrangThai ? "Hoạt động ✓" : "Khóa ✗")
-            .arg(selectedReader->data.TrangThai ? "#27ae60" : "#e74c3c");
-    
-    html += QString("<div class='barcode'>*%1*</div>")
-            .arg(QString::number(selectedReader->data.MaThe).rightJustified(8, '0'));
-    
-    html += "</div></body></html>";
-    
-    QTextDocument document;
-    document.setHtml(html);
-    document.print(&printer);
-    
-    showMessage("✅ Đã in thẻ độc giả!");
+    // Success message is handled by user interaction or implicit success
 }
 
 void WidgetQuanLyDocGia::onShowWarnings() {
@@ -1349,7 +1340,7 @@ void WidgetQuanLyDocGia::onShowWarnings() {
             }
             
             if (borrowing > 0) {
-                warnings += QString("Độc giả KHÓA nhưng còn %1 sách chưa trả: %2 %3 (Mã: %4)\n")
+                warnings += QString("Học viên KHÓA nhưng còn %1 sách chưa trả: %2 %3 (Mã: %4)\n")
                             .arg(borrowing)
                             .arg(QString::fromStdString(reader->data.Ho))
                             .arg(QString::fromStdString(reader->data.Ten))
@@ -1384,16 +1375,27 @@ void WidgetQuanLyDocGia::onShowWarnings() {
     if (warnCount == 0) {
         QMessageBox::information(this, "Cảnh Báo ✅", 
             "Không có cảnh báo nào!\n\n"
-            "✓ Tất cả độc giả đều ổn định.");
+            "✓ Tất cả học viên đều ổn định.");
     } else {
         QMessageBox::warning(this, QString("Cảnh Báo (%1)").arg(warnCount),
             QString("Phát hiện %1 vấn đề:\n\n%2").arg(warnCount).arg(warnings));
     }
 }
 
+void WidgetQuanLyDocGia::onPrintList() {
+    extern PTRDG rootDocGia;
+    if (!rootDocGia) {
+        showMessage("Danh sách học viên trống!", true);
+        return;
+    }
+    
+    // Use centralized PrintHelper
+    PrintHelper::inDanhSachDocGia(rootDocGia, this);
+}
+
 void WidgetQuanLyDocGia::onExportCSV() {
     QString fileName = QFileDialog::getSaveFileName(this,
-        "Export danh sách độc giả", 
+        "Export danh sách học viên", 
         "readers_export.csv",
         "CSV Files (*.csv);;All Files (*)");
     
@@ -1446,14 +1448,186 @@ void WidgetQuanLyDocGia::onExportCSV() {
     file.close();
     
     QMessageBox::information(this, "Thành công ✅",
-        QString("Đã export %1 độc giả ra file:\n%2")
+        QString("Đã export %1 học viên ra file:\n%2")
         .arg(totalCount).arg(fileName));
 }
 
 void WidgetQuanLyDocGia::onImportCSV() {
-    QMessageBox::information(this, "Import CSV", 
-        "Tính năng import độc giả từ CSV sẽ được triển khai trong phiên bản sau.\n\n"
-        "Hiện tại vui lòng sử dụng chức năng 'Thêm Độc Giả' để thêm từng người.");
+    // Ask whether user wants native CSV import or Excel (.xlsx via tools script)
+    QMessageBox msg(this);
+    msg.setWindowTitle("Chọn nguồn Import");
+    msg.setText("Bạn muốn import từ file CSV (nội bộ) hay Excel (.xlsx) (cần script tools/import_from_excel.py)?");
+    QPushButton *btnCsv = msg.addButton("CSV (nội bộ)", QMessageBox::AcceptRole);
+    QPushButton *btnXlsx = msg.addButton("Excel (.xlsx)", QMessageBox::AcceptRole);
+    msg.addButton(QMessageBox::Cancel);
+    msg.exec();
+
+    if (msg.clickedButton() == nullptr) return;
+
+    // --- CSV (native) flow ---
+    if (msg.clickedButton() == btnCsv) {
+        QMessageBox::StandardButton reply = QMessageBox::question(this,
+            "Xác nhận Import",
+            "Import sẽ THÊM độc giả mới từ CSV.\n"
+            "Học viên trùng Mã Thẻ sẽ bị bỏ qua.\n\n"
+            "Format CSV: ma_the,ho,ten,phai,trang_thai,so_dien_thoai,email,ngay_dang_ky\n\n"
+            "Bạn có muốn tiếp tục?",
+            QMessageBox::Yes | QMessageBox::No);
+        if (reply != QMessageBox::Yes) return;
+
+        QString fileName = QFileDialog::getOpenFileName(this,
+            "Import danh sách học viên",
+            "",
+            "CSV Files (*.csv);;All Files (*)");
+        if (fileName.isEmpty()) return;
+
+        QFile file(fileName);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QMessageBox::critical(this, "Lỗi", "Không thể mở file để đọc!");
+            return;
+        }
+
+        QTextStream in(&file);
+        in.setEncoding(QStringConverter::Utf8);
+
+        // Skip header if present
+        if (!in.atEnd()) in.readLine();
+
+        int imported = 0;
+        int skipped = 0;
+        QString errors;
+
+        extern PTRDG rootDocGia;
+
+        while (!in.atEnd()) {
+            QString line = in.readLine();
+            if (line.trimmed().isEmpty()) continue;
+            // Split by comma but allow quoted fields - simple implementation: split and trim quotes
+            QStringList fields = line.split(',');
+            if (fields.size() < 3) { skipped++; continue; }
+
+            int maThe = fields[0].trimmed().toInt();
+            QString ho = fields[1].trimmed().remove('"');
+            QString ten = fields[2].trimmed().remove('"');
+            bool phai = true;
+            if (fields.size() > 3) phai = (fields[3].trimmed().toInt() != 0);
+            int trangThai = 1;
+            if (fields.size() > 4) trangThai = fields[4].trimmed().toInt();
+
+            // Skip if maThe provided and already exists
+            if (maThe > 0 && timDocGia(rootDocGia, maThe)) { skipped++; continue; }
+
+            try {
+                std::string hoStd = Utf8Helper::toStdString(ho);
+                std::string tenStd = Utf8Helper::toStdString(ten);
+                PTRDG node = nullptr;
+                if (maThe > 0) {
+                    node = taoDocGia(hoStd, tenStd, phai, trangThai, maThe);
+                } else {
+                    node = taoDocGia(hoStd, tenStd, phai, trangThai, rootDocGia);
+                }
+                if (node) {
+                    InsertDocGia(rootDocGia, node);
+                    imported++;
+                } else {
+                    skipped++;
+                    errors += QString("%1 %2: Failed to create\n").arg(ho, ten);
+                }
+            } catch (...) {
+                skipped++;
+                errors += QString("%1 %2: Exception\n").arg(ho, ten);
+            }
+        }
+
+        file.close();
+        // Persist changes
+        try { saveDocGia(rootDocGia); } catch(...) {}
+        refreshData();
+
+        QString message = QString("Đã import %1 học viên mới\n").arg(imported);
+        if (skipped > 0) message += QString("Đã bỏ qua %1 dòng (trùng/lỗi)").arg(skipped);
+        if (!errors.isEmpty()) message += "\n\nLỗi:\n" + errors.left(1000);
+        QMessageBox::information(this, "Kết quả Import", message);
+        return;
+    }
+
+    // --- Excel (.xlsx) flow via tools/import_from_excel.py ---
+    QString fileName = QFileDialog::getOpenFileName(this,
+        "Chọn file Excel để nhập", QDir::currentPath(), "Excel Files (*.xlsx);;All Files (*)");
+    if (fileName.isEmpty()) return;
+
+    // Find import script in multiple locations
+    QString repoRoot = QDir(FilePathManager::getRootPath()).absolutePath();
+    QStringList candidates;
+    candidates << QDir(repoRoot).filePath("tools/import_from_excel.py");
+    candidates << QDir(QCoreApplication::applicationDirPath()).filePath("tools/import_from_excel.py");
+    candidates << QDir(QCoreApplication::applicationDirPath()).filePath("..\\tools/import_from_excel.py");
+    candidates << QDir(QDir::currentPath()).filePath("tools/import_from_excel.py");
+    QString scriptToRun;
+    for (const QString &cand : candidates) { if (QFile::exists(cand)) { scriptToRun = cand; break; } }
+    if (scriptToRun.isEmpty()) {
+        QMessageBox::warning(this, tr("Không tìm thấy script"), tr("Không thể tìm thấy file tools/import_from_excel.py trong thư mục dự án hoặc thư mục của ứng dụng. Hãy đảm bảo file tồn tại tại 'tools/import_from_excel.py'."));
+        return;
+    }
+
+    // Prefer repo venv python
+    QString pythonExe;
+    QString venvPython = QDir(repoRoot).filePath(".venv\\Scripts\\python.exe");
+    if (QFile::exists(venvPython)) pythonExe = venvPython;
+    else {
+        QString appVenv = QDir(QCoreApplication::applicationDirPath()).filePath(".venv\\Scripts\\python.exe");
+        if (QFile::exists(appVenv)) pythonExe = appVenv; else pythonExe = "python";
+    }
+
+    // Run preview
+    QProcess proc;
+    QStringList args;
+    args << scriptToRun << "--file" << fileName << "--preview" << "--out" << "tools";
+    proc.start(pythonExe, args);
+    bool started = proc.waitForStarted(10000);
+    if (!started) {
+        QMessageBox::critical(this, tr("Lỗi"), tr("Không thể khởi chạy python. Hãy đảm bảo Python có trong PATH hoặc .venv được cài dependencies."));
+        return;
+    }
+    proc.waitForFinished(-1);
+    QString stdoutStr = QString::fromUtf8(proc.readAllStandardOutput());
+    QString stderrStr = QString::fromUtf8(proc.readAllStandardError());
+
+    // Build preview dialog
+    QDialog dlg(this);
+    dlg.setWindowTitle(tr("Kết quả Import (Preview)"));
+    dlg.setModal(true);
+    QVBoxLayout *lay = new QVBoxLayout(&dlg);
+    QLabel *lbl = new QLabel(tr("Kết quả preview từ script import:")); lay->addWidget(lbl);
+    QTextEdit *out = new QTextEdit(); out->setReadOnly(true);
+    out->setPlainText(stdoutStr + (stderrStr.isEmpty() ? QString() : QString("\n--- ERRORS ---\n") + stderrStr));
+    out->setMinimumSize(700, 380); lay->addWidget(out);
+    QHBoxLayout *btnLay = new QHBoxLayout(); btnLay->addStretch();
+    QPushButton *btnApply = new QPushButton(tr("Áp dụng (ghi file import)"));
+    QPushButton *btnOpenPreviews = new QPushButton(tr("Mở file preview"));
+    QPushButton *btnClose = new QPushButton(tr("Đóng"));
+    btnLay->addWidget(btnOpenPreviews); btnLay->addWidget(btnApply); btnLay->addWidget(btnClose); lay->addLayout(btnLay);
+    connect(btnClose, &QPushButton::clicked, &dlg, &QDialog::reject);
+    connect(btnOpenPreviews, &QPushButton::clicked, this, [this]() {
+        QString folder = QDir(FilePathManager::getRootPath()).filePath("tools");
+        QDesktopServices::openUrl(QUrl::fromLocalFile(folder));
+    });
+    connect(btnApply, &QPushButton::clicked, this, [this, &dlg, pythonExe, scriptToRun, fileName]() {
+        QProcess p2;
+        QStringList a2; a2 << scriptToRun << "--file" << fileName << "--apply" << "--mode" << "merge";
+        p2.start(pythonExe, a2);
+        if (!p2.waitForStarted(10000)) { QMessageBox::critical(this, tr("Lỗi"), tr("Không thể khởi chạy python để áp dụng import.")); return; }
+        p2.waitForFinished(-1);
+        QString out2 = QString::fromUtf8(p2.readAllStandardOutput());
+        QString err2 = QString::fromUtf8(p2.readAllStandardError());
+        QString msg = "Import applied.\n" + out2 + (err2.isEmpty()?QString():QString("\n--- ERR ---\n") + err2);
+        QMessageBox::information(this, tr("Kết quả Áp dụng"), msg.left(2000));
+        dlg.accept();
+    });
+    dlg.exec();
+    // after apply/close, refresh
+    refreshData();
+    return;
 }
 
 void WidgetQuanLyDocGia::onRefreshQuaHan() {
@@ -1464,4 +1638,33 @@ void WidgetQuanLyDocGia::onRefreshQuaHan() {
 void WidgetQuanLyDocGia::onTableQuaHanDoubleClicked(const QModelIndex &index) {
     Q_UNUSED(index);
     // TODO: Handle double click on overdue readers table
+}
+
+void WidgetQuanLyDocGia::capNhatNgonNgu() {
+    // 1. Header
+    QList<QLabel*> labels = this->findChildren<QLabel*>();
+    for(auto l : labels) {
+        if(l->property("class") == "PageTitle") l->setText(LanguageManager::instance().getText("PAGE_TITLE_READERS"));
+    }
+    
+    // 2. Buttons
+    if(btnAdd) btnAdd->setText(LanguageManager::instance().getText("BTN_ADD_READER"));
+    if(btnSearch) btnSearch->setText(LanguageManager::instance().getText("BTN_SEARCH"));
+    if(btnClearSearch) btnClearSearch->setText(LanguageManager::instance().getText("BTN_CLEAR"));
+    if(btnEdit) btnEdit->setText(LanguageManager::instance().getText("BTN_EDIT"));
+    if(btnDelete) btnDelete->setText(LanguageManager::instance().getText("BTN_DELETE"));
+    if(btnUnlock) btnUnlock->setText(LanguageManager::instance().getText("BTN_UNLOCK"));
+    if(btnDetails) btnDetails->setText(LanguageManager::instance().getText("BTN_DETAILS"));
+    if(btnBack) btnBack->setText(LanguageManager::instance().getText("BTN_Back"));
+    
+    // 3. Search Placeholder
+    if(searchEdit) searchEdit->setPlaceholderText(LanguageManager::instance().getText("PLACEHOLDER_SEARCH_READER"));
+    
+    // 4. Refresh Table Headers and Data (to update Status text)
+    if(readerModel) {
+        readerModel->refreshData(); // Triggers data change which updates views
+        // Force header update
+        QEvent e(QEvent::LanguageChange);
+        QApplication::sendEvent(tableView->horizontalHeader(), &e);
+    }
 }

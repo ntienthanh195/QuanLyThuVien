@@ -31,6 +31,7 @@ public:
                 QString candidateDb = probeDir.filePath("data/files/library.db");
                 if (QFile::exists(candidateDb)) {
                     foundData = probeDir.filePath("data");
+                    rootPath = probeDir.absolutePath(); // Fix: Update rootPath to Project Root
                     break;
                 }
                 if (!probeDir.cdUp()) break;

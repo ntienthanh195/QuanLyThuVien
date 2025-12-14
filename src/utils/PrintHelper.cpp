@@ -1,5 +1,9 @@
 #include "utils/PrintHelper.h"
+#include <QPainter>
+#include "qrcode/Code128.h"
 #include "utils/QrCodeGenerator.h"
+#include "utils/SettingsManager.h"
+#include "utils/CustomPrintDialog.h"
 #include <QPrinter>
 #include <QPrintDialog>
 #include <QTextDocument>
@@ -15,16 +19,23 @@
 #include <QFileDialog>
 #include <QDir>
 #include <QRegularExpression>
+#include <functional> // For std::function
+#include <QBuffer>
 
 // Static config
+// Static config
 PrintHelper::PrintConfig PrintHelper::s_config;
+static bool s_configLoaded = false; // Flag to track initialization
+
+// Forward declarations
+// static QImage generateCode39Image(const QString &text, int height);
 
 // helper to ensure directories exist
-static bool ensureDirExists(const QString &path) {
+/* static bool ensureDirExists(const QString &path) {
     QDir dir(path);
     if (dir.exists()) return true;
     return dir.mkpath(".");
-}
+} */
 
 // ==================== PUBLIC API ====================
 
@@ -35,44 +46,19 @@ bool PrintHelper::inTheDocGia(PTRDG docGia, QWidget* parent) {
     QTextDocument doc;
     doc.setHtml(html);
     
-    // Hỏi người dùng
-    QMessageBox msgBox(parent);
-    msgBox.setWindowTitle("In Thẻ Độc Giả");
-    msgBox.setText(QString("In thẻ cho: %1 %2 (Mã: %3)")
+    QString question = QString("In thẻ cho: %1 %2 (Mã: %3)")
         .arg(QString::fromStdString(docGia->data.Ho))
         .arg(QString::fromStdString(docGia->data.Ten))
-        .arg(docGia->data.MaThe));
-    QPushButton* btnIn = msgBox.addButton("🖨️ In Ngay", QMessageBox::AcceptRole);
-    QPushButton* btnPDF = msgBox.addButton("💾 Lưu PDF", QMessageBox::ActionRole);
-    msgBox.addButton("❌ Hủy", QMessageBox::RejectRole);
-    msgBox.exec();
-    
-    QAbstractButton* clicked = msgBox.clickedButton();
-    if (clicked == btnIn) {
-        return inDocument(&doc, parent);
-    } else if (clicked == btnPDF) {
-        QString tenFileMacDinh = taoTenFileTheDocGia(docGia->data.MaThe);
-        PrintConfig cfg = getCauHinh();
-        QString defaultDir;
-        if (!cfg.pdfOutputDir.isEmpty()) {
-            defaultDir = QDir(cfg.pdfOutputDir).isAbsolute() ? cfg.pdfOutputDir : QApplication::applicationDirPath() + "/" + cfg.pdfOutputDir;
-        } else {
-            defaultDir = QApplication::applicationDirPath() + "/" + cfg.duongDanThuMucIn + "/" + cfg.thuMucPdf;
-        }
-        QDir().mkpath(defaultDir);
-        QString filePath = QFileDialog::getSaveFileName(
-            parent,
-            "Lưu Thẻ Độc Giả",
-            QDir(defaultDir).filePath(tenFileMacDinh),
-            "PDF Files (*.pdf)"
-        );
+        .arg(docGia->data.MaThe);
+        
+    return xuLyYeuCauIn(&doc, "In Thẻ Học Viên", question, taoTenFileTheDocGia(docGia->data.MaThe), parent, s_config.printerReport);
 
-        if (!filePath.isEmpty()) {
-            return xuatPDF(&doc, filePath, parent);
-        }
-    }
-    
-    return false;
+}
+
+bool PrintHelper::inTheDocGiaTuDong(PTRDG docGia, QWidget* parent) {
+    if (!docGia) return false;
+
+    return inTheDocGia(docGia, parent);
 }
 
 bool PrintHelper::inNhieuTheDocGia(const QList<PTRDG>& danhSach, QWidget* parent) {
@@ -98,46 +84,28 @@ bool PrintHelper::inA4NhieuThe(const QList<PTRDG>& danhSach, int soCot, QWidget*
     QTextDocument doc;
     doc.setHtml(html);
     
-    // Hỏi người dùng
-    QMessageBox msgBox(parent);
-    msgBox.setWindowTitle("In Hàng Loạt");
-    msgBox.setText(QString("Sẵn sàng in %1 thẻ độc giả").arg(danhSach.size()));
-    QPushButton* btnIn = msgBox.addButton("🖨️ In Ngay", QMessageBox::AcceptRole);
-    QPushButton* btnPDF = msgBox.addButton("💾 Lưu PDF", QMessageBox::ActionRole);
-    msgBox.addButton("❌ Hủy", QMessageBox::RejectRole);
-    msgBox.exec();
+    QString question = QString("Sẵn sàng in %1 thẻ học viên").arg(danhSach.size());
+    QString ngayFile = QDate::currentDate().toString("yyyyMMdd");
+    QString tenFile = QString("TheHocVien_Batch_%1the_%2.pdf").arg(danhSach.size()).arg(ngayFile);
     
-    QAbstractButton* clicked = msgBox.clickedButton();
-    if (clicked == btnIn) {
-        return inDocument(&doc, parent);
-    } else if (clicked == btnPDF) {
-        QString ngayFile = QDate::currentDate().toString("yyyyMMdd");
-        QString tenFileMacDinh = QString("TheDocGia_Batch_%1the_%2.pdf")
-            .arg(danhSach.size())
-            .arg(ngayFile);
+    return xuLyYeuCauIn(&doc, "In Hàng Loạt", question, tenFile, parent);
 
-        PrintConfig cfg = getCauHinh();
-        QString defaultDir;
-        if (!cfg.pdfOutputDir.isEmpty()) {
-            defaultDir = QDir(cfg.pdfOutputDir).isAbsolute() ? cfg.pdfOutputDir : QApplication::applicationDirPath() + "/" + cfg.pdfOutputDir;
-        } else {
-            defaultDir = QApplication::applicationDirPath() + "/" + cfg.duongDanThuMucIn + "/" + cfg.thuMucPdf;
-        }
-        QDir().mkpath(defaultDir);
+}
 
-        QString filePath = QFileDialog::getSaveFileName(
-            parent,
-            "Lưu Thẻ Độc Giả Hàng Loạt",
-            QDir(defaultDir).filePath(tenFileMacDinh),
-            "PDF Files (*.pdf)"
-        );
+bool PrintHelper::inHangLoatTheDocGia(PTRDG root, QWidget* parent) {
+    if (!root) return false;
 
-        if (!filePath.isEmpty()) {
-            return xuatPDF(&doc, filePath, parent);
-        }
-    }
-    
-    return false;
+    // Flatten tree
+    QList<PTRDG> list;
+    std::function<void(PTRDG)> traverse = [&](PTRDG p) {
+        if (!p) return;
+        traverse(p->left);
+        list.append(p);
+        traverse(p->right);
+    };
+    traverse(root);
+
+    return inA4NhieuThe(list, 2, parent); // Default 2 cols
 }
 
 bool PrintHelper::inTemMaVachSach(const QString& maSach, const QString& tenSach, QWidget* parent) {
@@ -145,41 +113,21 @@ bool PrintHelper::inTemMaVachSach(const QString& maSach, const QString& tenSach,
     QTextDocument doc;
     doc.setHtml(html);
     
-    // Hỏi người dùng
-    QMessageBox msgBox(parent);
-    msgBox.setWindowTitle("In Tem Sách");
-    msgBox.setText(QString("In tem cho sách: %1").arg(tenSach));
-    QPushButton* btnIn = msgBox.addButton("🖨️ In Ngay", QMessageBox::AcceptRole);
-    QPushButton* btnPDF = msgBox.addButton("💾 Lưu PDF", QMessageBox::ActionRole);
-    msgBox.addButton("❌ Hủy", QMessageBox::RejectRole);
-    msgBox.exec();
-    
-    QAbstractButton* clicked = msgBox.clickedButton();
-    if (clicked == btnIn) {
-        return inDocument(&doc, parent);
-    } else if (clicked == btnPDF) {
-        QString tenFileMacDinh = taoTenFileTemSach(maSach, 1);
-        PrintConfig cfg = getCauHinh();
-        QString defaultDir;
-        if (!cfg.pdfOutputDir.isEmpty()) {
-            defaultDir = QDir(cfg.pdfOutputDir).isAbsolute() ? cfg.pdfOutputDir : QApplication::applicationDirPath() + "/" + cfg.pdfOutputDir;
-        } else {
-            defaultDir = QApplication::applicationDirPath() + "/" + cfg.duongDanThuMucIn + "/" + cfg.thuMucPdf;
-        }
-        QDir().mkpath(defaultDir);
-        QString filePath = QFileDialog::getSaveFileName(
-            parent,
-            "Lưu Tem Sách",
-            QDir(defaultDir).filePath(tenFileMacDinh),
-            "PDF Files (*.pdf)"
-        );
+    QString question = QString("In tem cho sách: %1").arg(tenSach);
+    return xuLyYeuCauIn(&doc, "In Tem Sách", question, taoTenFileTemSach(maSach, 1), parent, s_config.printerReceipt);
 
-        if (!filePath.isEmpty()) {
-            return xuatPDF(&doc, filePath, parent);
-        }
+}
+
+bool PrintHelper::inTemSachTuDong(PTRDS dauSach, QWidget* parent) {
+    if (!dauSach) return false;
+    QString tenSach = QString::fromStdString(dauSach->tenSach);
+    QString maSach = QString::fromStdString(dauSach->ISBN); // Default to ISBN
+    if (dauSach->dms) {
+        maSach = QString::fromStdString(dauSach->dms->maSach); // Use first copy code if available
     }
-    
-    return false;
+
+    return inTemMaVachSach(maSach, tenSach, parent);
+
 }
 
 bool PrintHelper::inNhieuTemSach(PTRDS dauSach, int soLuong, QWidget* parent) {
@@ -204,76 +152,10 @@ bool PrintHelper::inNhieuTemSach(PTRDS dauSach, int soLuong, QWidget* parent) {
     QTextDocument doc;
     doc.setHtml(htmlToanBo);
     
-    // Hỏi người dùng
-    QMessageBox msgBox(parent);
-    msgBox.setWindowTitle("In Tem Sách Hàng Loạt");
-    msgBox.setText(QString("In %1 tem cho: %2").arg(soLuong).arg(tenSach));
-    QPushButton* btnIn = msgBox.addButton("🖨️ In Ngay", QMessageBox::AcceptRole);
-    QPushButton* btnPDF = msgBox.addButton("💾 Lưu PDF", QMessageBox::ActionRole);
-    msgBox.addButton("❌ Hủy", QMessageBox::RejectRole);
-    msgBox.exec();
-    
-    QAbstractButton* clicked = msgBox.clickedButton();
-    if (clicked == btnIn) {
-        return inDocument(&doc, parent);
-    } else if (clicked == btnPDF) {
-        QString tenFileMacDinh = taoTenFileTemSach(QString::fromStdString(dauSach->ISBN), soLuong);
-        PrintConfig cfg = getCauHinh();
-        QString defaultDir;
-        if (!cfg.pdfOutputDir.isEmpty()) {
-            defaultDir = QDir(cfg.pdfOutputDir).isAbsolute() ? cfg.pdfOutputDir : QApplication::applicationDirPath() + "/" + cfg.pdfOutputDir;
-        } else {
-            defaultDir = QApplication::applicationDirPath() + "/" + cfg.duongDanThuMucIn + "/" + cfg.thuMucPdf;
-        }
-        QDir().mkpath(defaultDir);
-        QString filePath = QFileDialog::getSaveFileName(
-            parent,
-            "Lưu Tem Sách Hàng Loạt",
-            QDir(defaultDir).filePath(tenFileMacDinh),
-            "PDF Files (*.pdf)"
-        );
+    QString question = QString("In %1 tem cho: %2").arg(soLuong).arg(tenSach);
+    QString tenFile = taoTenFileTemSach(QString::fromStdString(dauSach->ISBN), soLuong);
+    return xuLyYeuCauIn(&doc, "In Tem Sách Hàng Loạt", question, tenFile, parent, s_config.printerReceipt);
 
-        if (!filePath.isEmpty()) {
-            return xuatPDF(&doc, filePath, parent);
-        }
-    }
-    
-    return false;
-}
-
-bool PrintHelper::inDanhSachDocGia(PTRDG root, QWidget* parent) {
-    if (!root) return false;
-    
-    QString noiDungBang = "<table border='1' cellpadding='5' cellspacing='0' style='width:100%; border-collapse:collapse;'>"
-                          "<tr style='background:#f0f0f0;'>"
-                          "<th>Mã thẻ</th><th>Họ tên</th><th>Giới tính</th><th>Trạng thái</th>"
-                          "</tr>";
-    
-    // Duyệt cây in-order để thu thập dữ liệu
-    std::function<void(PTRDG)> duyetCay = [&](PTRDG p) {
-        if (!p) return;
-        duyetCay(p->left);
-        
-        QString hoTen = QString::fromStdString(p->data.Ho + " " + p->data.Ten);
-        QString phai = p->data.Phai ? "Nữ" : "Nam";
-        QString trangThai = p->data.TrangThai == 1 ? "Hoạt động" : "Khóa";
-        
-        noiDungBang += QString("<tr><td>%1</td><td>%2</td><td>%3</td><td>%4</td></tr>")
-                          .arg(p->data.MaThe)
-                          .arg(hoTen)
-                          .arg(phai)
-                          .arg(trangThai);
-        
-        duyetCay(p->right);
-    };
-    
-    duyetCay(root);
-    noiDungBang += "</table>";
-    
-    QString html = taoHTMLDanhSach("DANH SÁCH ĐỘC GIẢ", noiDungBang);
-    QTextDocument doc;
-    doc.setHtml(html);
-    return inDocument(&doc, parent);
 }
 
 bool PrintHelper::inDanhSachSach(PTRDS* dsDauSach, int soLuong, QWidget* parent) {
@@ -302,14 +184,19 @@ bool PrintHelper::inDanhSachSach(PTRDS* dsDauSach, int soLuong, QWidget* parent)
     QString html = taoHTMLDanhSach("DANH MỤC SÁCH", noiDungBang);
     QTextDocument doc;
     doc.setHtml(html);
-    return inDocument(&doc, parent);
+    return xuLyYeuCauIn(&doc, "In Danh Mục Sách", QString("In danh sách %1 đầu sách").arg(soLuong), taoTenFileBaoCao("DMSach"), parent, s_config.printerReport);
+}
+
+bool PrintHelper::inDanhMucSach(PTRDS* dsDauSach, int soLuong, QWidget* parent) {
+    return inDanhSachSach(dsDauSach, soLuong, parent);
 }
 
 bool PrintHelper::inBaoCaoThongKe(const QString& tieuDe, const QString& noiDungHTML, QWidget* parent) {
     QString html = taoHTMLDanhSach(tieuDe, noiDungHTML);
     QTextDocument doc;
     doc.setHtml(html);
-    return inDocument(&doc, parent);
+    return xuLyYeuCauIn(&doc, tieuDe, "In báo cáo thống kê", taoTenFileBaoCao("ThongKe"), parent);
+
 }
 
 bool PrintHelper::inPhieuMuonTra(PTRDG docGia, const QList<QString>& danhSachSach, bool laMuon, QWidget* parent) {
@@ -321,7 +208,7 @@ bool PrintHelper::inPhieuMuonTra(PTRDG docGia, const QList<QString>& danhSachSac
     QString html = QString(
         "<html><head>"
         "<style>"
-        "body { font-family: 'Times New Roman', serif; margin: 20px; }"
+        "body { font-family: 'Siemreap', 'Khmer OS Siemreap', 'Times New Roman', serif; margin: 20px; }"
         ".header { text-align: center; font-size: 18pt; font-weight: bold; margin-bottom: 20px; }"
         "table { width: 100%%; border-collapse: collapse; margin-top: 20px; }"
         "td, th { border: 1px solid black; padding: 8px; }"
@@ -346,213 +233,252 @@ bool PrintHelper::inPhieuMuonTra(PTRDG docGia, const QList<QString>& danhSachSac
     return inDocument(&doc, parent);
 }
 
-bool PrintHelper::inPhieuMuonTuDong(PTRDG docGia, const QString& maSach, const QString& tenSach,
-                                     const QString& ngayMuon, QWidget* parent) {
-    if (!docGia) return false;
+bool PrintHelper::inDanhSachDocGia(PTRDG root, QWidget* parent) {
+    if (!root) return false;
     
-    QString hoTen = QString::fromStdString(docGia->data.Ho + " " + docGia->data.Ten);
-    int maThe = docGia->data.MaThe;
+    // Convert Tree to List for Table
+    QList<PTRDG> list;
+    std::function<void(PTRDG)> traverse = [&](PTRDG p) {
+        if (!p) return;
+        traverse(p->left);
+        list.append(p);
+        traverse(p->right);
+    };
+    traverse(root);
     
-    // Tạo tên file: PhieuMuon_MaThe_MaSach_Ngay.pdf
-    QString ngayFile = QDate::currentDate().toString("yyyyMMdd");
-    QString tenFile = QString("PhieuMuon_%1_%2_%3.pdf")
-        .arg(maThe)
-        .arg(maSach)
-        .arg(ngayFile);
+    if (list.isEmpty()) return false;
     
-    // Tạo mã QR chứa thông tin: MaThe|MaSach|NgayMuon
-    QString qrData = QString("%1|%2|%3").arg(maThe).arg(maSach).arg(ngayMuon);
-    QString qrCode = taoMaQRHTML(qrData, 150);
-    
-    QString html = QString(
-        "<html><head>"
-        "<style>"
-        "body { font-family: Arial; margin: 15px; font-size: 11pt; }"
-        ".header { text-align: center; font-size: 16pt; font-weight: bold; margin-bottom: 15px; color: #2c3e50; }"
-        ".section { margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 5px; }"
-        ".label { font-weight: bold; color: #555; width: 120px; display: inline-block; }"
-        ".value { color: #000; }"
-        ".qr-section { text-align: center; margin: 15px 0; padding: 15px; background: white; border: 2px solid #3498db; border-radius: 8px; }"
-        ".footer { margin-top: 15px; text-align: center; font-size: 9pt; color: #888; }"
-        "</style>"
-        "</head><body>"
-        "%7"
-        "<div class='header'>📚 PHIẾU MƯỢN SÁCH</div>"
-        "<div class='section'>"
-        "  <div><span class='label'>Họ tên:</span><span class='value'>%1</span></div>"
-        "  <div><span class='label'>Mã thẻ:</span><span class='value'>%2</span></div>"
-        "  <div><span class='label'>Tên sách:</span><span class='value'>%3</span></div>"
-        "  <div><span class='label'>Mã sách:</span><span class='value'>%4</span></div>"
-        "  <div><span class='label'>Ngày mượn:</span><span class='value'>%5</span></div>"
-        "</div>"
-        "<div class='qr-section'>"
-        "  <div style='font-size: 10pt; margin-bottom: 10px; color: #555;'>Quét mã QR để trả sách:</div>"
-        "  %6"
-        "</div>"
-        "<div class='footer'>Vui lòng giữ phiếu này để trả sách nhanh hơn</div>"
-        "</body></html>"
-    ).arg(hoTen).arg(maThe).arg(tenSach).arg(maSach).arg(ngayMuon).arg(qrCode);
-    // Insert logo if configured
-    QString logoHtml;
-    if (s_config.hienThiLogo && !s_config.duongDanLogo.isEmpty() && QFile::exists(s_config.duongDanLogo)) {
-        QString logoPath = QDir::toNativeSeparators(s_config.duongDanLogo);
-        logoHtml = QString("<div style='text-align:center; margin-bottom:6px;'><img src='file:///%1' style='height:36px;'/></div>");
-        logoHtml = logoHtml.arg(logoPath);
+    QString bangHTML = "<table border='1' cellpadding='5' cellspacing='0' style='width:100%; border-collapse:collapse;'>"
+                       "<tr style='background:#f0f0f0;'>"
+                       "<th>STT</th><th>Mã Thẻ</th><th>Họ Tên</th>"
+                       "<th>Giới Tính</th><th>Trạng Thái</th><th>Đang Mượn</th>"
+                       "</tr>";
+                       
+    for (int i = 0; i < list.size(); i++) {
+        PTRDG p = list[i];
+        QString hoTen = QString::fromStdString(p->data.Ho + " " + p->data.Ten);
+        QString phai = p->data.Phai ? "Nữ" : "Nam";
+        QString trangThai = (p->data.TrangThai == 1) ? "Hoạt động" : "Khóa";
+        
+        bangHTML += QString("<tr>"
+                           "<td>%1</td><td>%2</td><td>%3</td>"
+                           "<td>%4</td><td>%5</td><td>%6</td>"
+                           "</tr>")
+            .arg(i + 1)
+            .arg(p->data.MaThe)
+            .arg(hoTen)
+            .arg(phai)
+            .arg(trangThai)
+            .arg(p->data.soSachDangMuon);
     }
-    html = html.arg(logoHtml);
+    bangHTML += "</table>";
     
+    QString html = taoHTMLDanhSach("DANH SÁCH HỌC VIÊN", bangHTML);
     QTextDocument doc;
     doc.setHtml(html);
     
-    // Hỏi người dùng muốn in hay lưu PDF
-    QMessageBox msgBox(parent);
-    msgBox.setWindowTitle("Chọn Hành Động");
-    msgBox.setText("Bạn muốn in ngay hay lưu thành file PDF?");
-    QPushButton* btnIn = msgBox.addButton("🖨️ In Ngay", QMessageBox::AcceptRole);
-    QPushButton* btnPDF = msgBox.addButton("💾 Lưu PDF", QMessageBox::ActionRole);
-    msgBox.addButton("❌ Hủy", QMessageBox::RejectRole);
-    msgBox.setDefaultButton(btnIn);
-    msgBox.exec();
+    QString question = QString("Tìm thấy %1 học viên.").arg(list.size());
+    return xuLyYeuCauIn(&doc, "In Danh Sách Học Viên", question, taoTenFileBaoCao("DSHocVien"), parent, s_config.printerReport);
+
+}
+
+bool PrintHelper::inBienLaiPhat(PTRDG docGia, const QString& lyDo, long long soTien, QWidget* parent) {
+    if (!docGia) return false;
+    QString hoTen = QString::fromStdString(docGia->data.Ho + " " + docGia->data.Ten);
     
-    QAbstractButton* clicked = msgBox.clickedButton();
-    if (clicked == btnIn) {
-        return inDocument(&doc, parent);
-    } else if (clicked == btnPDF) {
-        QString ngayFile = QDate::currentDate().toString("yyyyMMdd");
-        QString tenFile = QString("PhieuMuon_%1_%2_%3.pdf")
-            .arg(maThe)
-            .arg(maSach)
-            .arg(ngayFile);
+    QString html = QString(
+        "<html><head><style>"
+        "body { font-family: 'Siemreap', 'Khmer OS Siemreap', 'Times New Roman', serif; padding: 20px; }"
+        ".header { text-align: center; font-size: 16pt; font-weight: bold; margin-bottom: 20px; }"
+        ".row { display: flex; justify-content: space-between; margin-bottom: 10px; }"
+        "</style></head><body>"
+        "<div class='header'>BIÊN LAI THU TIỀN PHẠT</div>"
+        "<div><b>Họ tên học viên:</b> %1</div>"
+        "<div><b>Mã thẻ:</b> %2</div>"
+        "<div><b>Lý do phạt:</b> %3</div>"
+        "<div><b>Số tiền:</b> %4 VNĐ</div>"
+        "<br><br>"
+        "<div style='text-align: right;'>Ngày %5 tháng %6 năm %7</div>"
+        "<div style='display: flex; justify-content: space-between; margin-top: 30px;'>"
+        "  <div style='text-align: center;'><b>Người nộp tiền</b><br>(Ký tên)</div>"
+        "  <div style='text-align: center;'><b>Người thu tiền</b><br>(Ký tên)</div>"
+        "</div>"
+        "</body></html>"
+    ).arg(hoTen)
+     .arg(docGia->data.MaThe)
+     .arg(lyDo)
+     .arg(QLocale(QLocale::Vietnamese).toString(soTien))
+     .arg(QDate::currentDate().day())
+     .arg(QDate::currentDate().month())
+     .arg(QDate::currentDate().year());
+     
+    QTextDocument doc;
+    doc.setHtml(html);
+    QString question = QString("In biên lai phạt cho: %1\nSố tiền: %2").arg(hoTen).arg(soTien);
+    return xuLyYeuCauIn(&doc, "Biên Lai Phạt", question, taoTenFileBaoCao("Phat"), parent, s_config.printerReceipt);
 
-        PrintConfig cfg = getCauHinh();
-        QString defaultDir;
-        if (!cfg.pdfOutputDir.isEmpty()) {
-            defaultDir = QDir(cfg.pdfOutputDir).isAbsolute() ? cfg.pdfOutputDir : QApplication::applicationDirPath() + "/" + cfg.pdfOutputDir;
-        } else {
-            defaultDir = QApplication::applicationDirPath() + "/" + cfg.duongDanThuMucIn + "/" + cfg.thuMucPdf;
+}
+
+// ===== HELPER FUNCTIONS =====
+// Helper to generate barcode image (Code128 preferred)
+static QImage generateBarcodeImage(const QString &text, int height) {
+    // 1. Generate Code128 Pattern
+    QVector<bool> pattern = Code128::encode(text);
+    if (pattern.isEmpty()) return QImage();
+
+    // 2. High DPI Settings
+    // Minimum 3px per module for good print sharpness (3px * 128 chars ~= 400px width)
+    int moduleW = 3; 
+    int quietZone = 10 * moduleW;
+    
+    int totalWidth = (pattern.size() * moduleW) + (2 * quietZone);
+    // Ensure height is reasonable (passed 200 usually)
+    
+    QImage image(totalWidth, height, QImage::Format_ARGB32);
+    image.fill(Qt::white);
+    
+    QPainter painter(&image);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(Qt::black);
+    
+    int x = quietZone;
+    for (bool isBar : pattern) {
+        if (isBar) {
+            painter.drawRect(x, 0, moduleW, height);
         }
-        QDir().mkpath(defaultDir);
-
-        QString filePath = QFileDialog::getSaveFileName(
-            parent,
-            "Lưu Phiếu Mượn",
-            QDir(defaultDir).filePath(tenFile),
-            "PDF Files (*.pdf)"
-        );
-
-        if (!filePath.isEmpty()) {
-            return xuatPDF(&doc, filePath, parent);
-        }
+        x += moduleW;
     }
     
-    return false;
+    return image;
 }
 
 QString PrintHelper::taoMaVachHTML(const QString& maSo, int fontSize) {
-    return QString("<span style='font-family: \"Libre Barcode 128\", \"Code 128\"; font-size: %1px;'>*%2*</span>")
-               .arg(fontSize)
-               .arg(maSo);
-}
-
-// ===== TẠO TÊN FILE TỰ ĐỘNG =====
-QString PrintHelper::taoTenFilePhieuMuon(int maThe, const QString& maSach) {
-    QString ngay = QDate::currentDate().toString("yyyyMMdd");
-    QString gio = QTime::currentTime().toString("HHmmss");
-    return QString("PhieuMuon_MT%1_MS%2_%3_%4.pdf")
-        .arg(maThe, 5, 10, QChar('0'))
-        .arg(maSach)
-        .arg(ngay)
-        .arg(gio);
-}
-
-QString PrintHelper::taoTenFilePhieuTra(int maThe, const QString& maSach) {
-    QString ngay = QDate::currentDate().toString("yyyyMMdd");
-    QString gio = QTime::currentTime().toString("HHmmss");
-    return QString("PhieuTra_MT%1_MS%2_%3_%4.pdf")
-        .arg(maThe, 5, 10, QChar('0'))
-        .arg(maSach)
-        .arg(ngay)
-        .arg(gio);
-}
-
-QString PrintHelper::taoTenFileTheDocGia(int maThe) {
-    QString ngay = QDate::currentDate().toString("yyyyMMdd");
-    return QString("TheDocGia_MT%1_%2.pdf")
-        .arg(maThe, 5, 10, QChar('0'))
-        .arg(ngay);
-}
-
-QString PrintHelper::taoTenFileTemSach(const QString& isbn, int soLuong) {
-    QString ngay = QDate::currentDate().toString("yyyyMMdd");
-    QString isbnClean = isbn;
-    isbnClean.replace("-", "").replace(" ", "");
-    return QString("TemSach_ISBN%1_SL%2_%3.pdf")
-        .arg(isbnClean)
-        .arg(soLuong)
-        .arg(ngay);
-}
-
-QString PrintHelper::taoTenFileBaoCao(const QString& loaiBaoCao) {
-    QString ngay = QDate::currentDate().toString("yyyyMMdd");
-    QString gio = QTime::currentTime().toString("HHmm");
-    return QString("BaoCao_%1_%2_%3.pdf")
-        .arg(loaiBaoCao)
-        .arg(ngay)
-        .arg(gio);
+    // New Logic: Use Code128 & High-Height Image
+    // Ignore fontSize arg for image generation height (use fixed high-res 150px)
+    // fontSize is used for CSS display height if desired, or we just rely on auto-scaling.
+    
+    QImage barcodeImg = generateBarcodeImage(maSo, 150);
+    
+    QByteArray byteArray;
+    QBuffer buffer(&byteArray);
+    buffer.open(QIODevice::WriteOnly);
+    barcodeImg.save(&buffer, "PNG");
+    QString base64 = byteArray.toBase64();
+    
+    // Use pixelated rendering style and max-height constraints
+    // Display height matches 'fontSize' roughly (e.g. 50px)
+    int displayHeight = (fontSize > 0) ? fontSize : 50;
+    
+    return QString("<img src='data:image/png;base64,%1' style='height:%2px; max-width:100%%;' />")
+            .arg(base64).arg(displayHeight);
 }
 
 QString PrintHelper::taoMaQRHTML(const QString& maSo, int size) {
-    // Tạo ảnh QR code
-    QImage qrImage = QrCodeGenerator::generateQrImage(maSo, size, 2);
-    if (qrImage.isNull()) {
-        return QString("<div style='color:red;'>Lỗi tạo QR code</div>");
-    }
-    // Lưu ảnh vào thư mục cấu hình (ưu tiên s_config.qrOutputDir nếu có)
-    PrintConfig cfg = getCauHinh();
-    QString qrDir;
-    if (!cfg.qrOutputDir.isEmpty()) {
-        // nếu người dùng cung cấp đường dẫn tương đối -> hiểu là relative với app dir
-        if (QDir(cfg.qrOutputDir).isAbsolute()) qrDir = cfg.qrOutputDir;
-        else qrDir = QApplication::applicationDirPath() + "/" + cfg.qrOutputDir;
-    } else {
-        QString base = QApplication::applicationDirPath() + "/" + cfg.duongDanThuMucIn;
-        qrDir = base + "/" + cfg.thuMucQR;
-    }
+    QImage qr = QrCodeGenerator::generateQrImage(maSo, size);
+    if (qr.isNull()) return "";
+    
+    QByteArray byteArray;
+    QBuffer buffer(&byteArray);
+    buffer.open(QIODevice::WriteOnly);
+    qr.save(&buffer, "PNG");
+    QString base64 = byteArray.toBase64();
+    
+    return QString("<img src='data:image/png;base64,%1' width='%2' height='%2' />")
+           .arg(base64).arg(size);
+}
 
-    if (!ensureDirExists(qrDir)) {
-        return QString("<div style='color:red;'>Lỗi tạo thư mục QR</div>");
-    }
-
-    // tạo tên file an toàn: qr_<maSo>_<timestamp>.png
-    QString safeMa = maSo;
-    safeMa.replace(QRegularExpression("[^A-Za-z0-9_-]"), "_");
-    QString timeStamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmsszzz");
-    QString qrPath = QDir(qrDir).filePath(QString("qr_%1_%2.png").arg(safeMa).arg(timeStamp));
-
-    if (!qrImage.save(qrPath)) {
-        return QString("<div style='color:red;'>Lỗi lưu QR code</div>");
-    }
-
-    // Trả về HTML tag với đường dẫn tuyệt đối
-    return QString("<img src='file:///%1' width='%2' height='%2' style='border:1px solid #ccc; padding:2px; background:white;'/>")
-               .arg(QDir::toNativeSeparators(qrPath))
-               .arg(size);
+// Helper to create file names
+QString PrintHelper::taoTenFilePhieuMuon(int maThe, const QString& maSach) {
+    return QString("PhieuMuon_%1_%2_%3.pdf").arg(maThe).arg(maSach).arg(QDateTime::currentDateTime().toString("yyyyMMdd_HHmm"));
+}
+QString PrintHelper::taoTenFilePhieuTra(int maThe, const QString& maSach) {
+    return QString("PhieuTra_%1_%2_%3.pdf").arg(maThe).arg(maSach).arg(QDateTime::currentDateTime().toString("yyyyMMdd_HHmm"));
+}
+QString PrintHelper::taoTenFileTheDocGia(int maThe) {
+    return QString("TheHocVien_%1.pdf").arg(maThe);
+}
+QString PrintHelper::taoTenFileTemSach(const QString& isbn, int soLuong) {
+    return QString("TemSach_%1_sl%2.pdf").arg(isbn).arg(soLuong);
+}
+QString PrintHelper::taoTenFileBaoCao(const QString& loaiBaoCao) {
+    return QString("BaoCao_%1_%2.pdf").arg(loaiBaoCao).arg(QDate::currentDate().toString("yyyyMMdd"));
 }
 
 bool PrintHelper::xuatPDF(QTextDocument* doc, const QString& tenFile, QWidget* parent) {
-    if (!doc || tenFile.isEmpty()) return false;
-    // Ensure target directory exists (if path relative to app dir and under files/pdf)
-    QString outPath = tenFile;
-    QFileInfo fi(outPath);
-    if (!fi.dir().exists()) {
-        if (!QDir().mkpath(fi.dir().absolutePath())) {
-            QMessageBox::warning(parent, "Lỗi", "Không thể tạo thư mục chứa file PDF.");
-            return false;
-        }
+    if (!doc) return false;
+    QPrinter printer(QPrinter::HighResolution);
+    printer.setOutputFormat(QPrinter::PdfFormat);
+    printer.setOutputFileName(tenFile);
+    
+    // Load Settings
+    // NOTE: Cần include "utils/SettingsManager.h" nếu chưa có, hoặc dùng QSettings trực tiếp
+    // Giả sử dùng QSettings để đơn giản hoá dependency nếu chưa include SettingsManager
+    QSettings settings("HVPGCT", "QuanLyThuVien_V2");
+    
+    // 1. Page Size
+    int paperId = settings.value("printer_paper_size", QPageSize::A4).toInt();
+    printer.setPageSize(QPageSize(static_cast<QPageSize::PageSizeId>(paperId)));
+    
+    // 2. Orientation
+    int orientId = settings.value("printer_orientation", QPageLayout::Portrait).toInt();
+    printer.setPageOrientation(static_cast<QPageLayout::Orientation>(orientId));
+    
+    // 3. Margins (mm)
+    qreal mL = settings.value("printer_margin_left", 10).toDouble();
+    qreal mR = settings.value("printer_margin_right", 10).toDouble();
+    qreal mT = settings.value("printer_margin_top", 10).toDouble();
+    qreal mB = settings.value("printer_margin_bottom", 10).toDouble();
+    
+    printer.setPageMargins(QMarginsF(mL, mT, mR, mB), QPageLayout::Millimeter);
+    
+    // 4. Color Mode
+    if (s_config.inMauSac) {
+        printer.setColorMode(QPrinter::Color);
+    } else {
+        printer.setColorMode(QPrinter::GrayScale);
     }
 
+    doc->print(&printer);
+    QMessageBox::information(parent, "Xuất PDF", "Đã lưu file thành công:\n" + tenFile);
+    return true;
+}
+
+void PrintHelper::setCauHinh(const PrintConfig& config) {
+    s_config = config;
+    s_configLoaded = true; // Mark as loaded when set manually
+}
+
+// Flag moved to top
+
+PrintHelper::PrintConfig PrintHelper::getCauHinh() {
+    if (!s_configLoaded) {
+        // Lazy Load from SettingsManager
+        PrintHelper::PrintConfig cfg;
+        cfg.tenThuVien = SettingsManager::instance().getString("Print/TenThuVien", "THƯ VIỆN");
+        cfg.tenVietTat = SettingsManager::instance().getString("Print/TenVietTat", "TV");
+        cfg.inMauSac = SettingsManager::instance().getBool("Print/Color", false);
+        cfg.hienThiLogo = SettingsManager::instance().getBool("Print/ShowLogo", false);
+        cfg.duongDanLogo = SettingsManager::instance().getString("Print/LogoPath", "");
+        cfg.qrOutputDir = SettingsManager::instance().getString("Print/QrPath", "");
+        cfg.pdfOutputDir = SettingsManager::instance().getString("Print/PdfPath", "");
+        cfg.silentPrint = SettingsManager::instance().getBool("Print/Silent", false);
+        cfg.printerReceipt = SettingsManager::instance().getString("Print/Receipt", "");
+        cfg.printerReport = SettingsManager::instance().getString("Print/Report", "");
+        
+        s_config = cfg;
+        s_configLoaded = true;
+    }
+    return s_config;
+}
+
+// ==================== MISSING IMPLEMENTATIONS (ADDED TO FIX LINKER ERRORS) ====================
+
+bool PrintHelper::inDocument(QTextDocument* doc, QWidget* parent, const QString& printerName) {
+    if (!doc) return false;
+    
     QPrinter printer(QPrinter::HighResolution);
-    // Respect color setting from configuration
+    
+    // Check Config for color
     if (s_config.inMauSac) {
         #if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
         printer.setColorMode(QPrinter::Color);
@@ -566,397 +492,391 @@ bool PrintHelper::xuatPDF(QTextDocument* doc, const QString& tenFile, QWidget* p
         printer.setColorMode(QPrinter::GrayScale);
         #endif
     }
-    printer.setOutputFormat(QPrinter::PdfFormat);
-    printer.setOutputFileName(outPath);
-    printer.setPageSize(QPageSize::A4);
-    printer.setPageMargins(QMarginsF(10, 10, 10, 10), QPageLayout::Millimeter);
-
+    
+    // Set Printer Name if specified (for Silent Print or Default Dialog)
+    if (!printerName.isEmpty()) {
+        printer.setPrinterName(printerName);
+    }
+    
+    // Check Silent Print OR if Printer Name is already explicitly provided (implies selection made)
+    if (s_config.silentPrint || !printerName.isEmpty()) {
+        // Silent print or Pre-selected print skips native QPrintDialog
+        doc->print(&printer);
+        return true;
+    } else {
+        QPrintDialog dialog(&printer, parent);
+        dialog.setWindowTitle("Chọn Máy In");
+        if (dialog.exec() != QDialog::Accepted) {
+            return false;
+        }
+    }
+    
     doc->print(&printer);
-
-    QMessageBox::information(parent, "Thành Công",
-        QString("Đã lưu file PDF:\n%1").arg(outPath));
-
     return true;
 }
 
-void PrintHelper::setCauHinh(const PrintConfig& config) {
-    s_config = config;
+QString PrintHelper::taoHTMLTemSach(const QString& maSach, const QString& tenSach) {
+    // Standard Label Size: 50mm x 30mm (Common for Library Barcodes)
+    // We use mm units for print consistency
     
-    QSettings settings("HVPG", "QuanLyThuVien");
-    settings.setValue("Print/TenThuVien", config.tenThuVien);
-    settings.setValue("Print/TenVietTat", config.tenVietTat);
-    settings.setValue("Print/InMauSac", config.inMauSac);
-    settings.setValue("Print/HienThiLogo", config.hienThiLogo);
-    settings.setValue("Print/DuongDanLogo", config.duongDanLogo);
-    settings.setValue("Print/ThuMucIn", config.duongDanThuMucIn);
-    settings.setValue("Print/ThuMucQR", config.thuMucQR);
-    settings.setValue("Print/ThuMucPDF", config.thuMucPdf);
-    settings.setValue("Print/QROutputDir", config.qrOutputDir);
-    settings.setValue("Print/PDFOutputDir", config.pdfOutputDir);
-    settings.setValue("Print/TempDir", config.tempDir);
-    settings.setValue("Print/HeaderText", config.headerText);
-    settings.setValue("Print/FooterText", config.footerText);
-    settings.setValue("Print/Author", config.author);
+    // Barcode: Code39 font needs * start/stop chars if using font.
+    // If using Image (QrCodeGenerator equivalent for Barcode?), current logic uses Code39 Font DIV.
+    
+    // Use the short name or abbreviated full name
+    // Use the short name or abbreviated full name
+    QString libName = SettingsManager::instance().getString("Print/TenVietTat", s_config.tenVietTat);
+    if (libName.isEmpty()) libName = SettingsManager::instance().getString("Print/TenThuVien", "THƯ VIỆN");
+    
+    // Ensure text fits
+    QString safeTen = tenSach;
+    if (safeTen.length() > 35) safeTen = safeTen.left(32) + "...";
+    
+    QString barcode = taoMaVachHTML(maSach, 40); // Height 40px
+    
+    return QString(
+        "<div style='"
+        " width: 50mm; height: 30mm;"
+        " border: 1px solid #000;" // Solid black border
+        " margin: 2mm;" // Gap between labels
+        " padding: 2px;"
+        " font-family: 'Segoe UI', 'Arial', sans-serif;"
+        " text-align: center;"
+        " background: #fff;"
+        " page-break-inside: avoid;"
+        " display: inline-block;"
+        " overflow: hidden;"
+        "'>"
+        
+        // Header (Library Name)
+        "  <div style='"
+        "    font-size: 8pt; font-weight: bold; text-transform: uppercase;"
+        "    border-bottom: 1px solid #000; padding-bottom: 1px; margin-bottom: 2px;"
+        "    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+        "  '>%1</div>"
+        
+        // Body (Book Title)
+        "  <div style='"
+        "    font-size: 9pt; font-weight: bold;"
+        "    height: 32px; overflow: hidden; line-height: 1.1;"
+        "    margin-bottom: 2px;"
+        "  '>%2</div>"
+        
+        // Barcode Container
+        "  <div style='margin: 0 auto;'>%3</div>"
+        
+        // Footer (Readable Code)
+        "  <div style='"
+        "    font-size: 8pt; letter-spacing: 2px; font-weight: bold;"
+        "  '>%4</div>"
+        
+        "</div>"
+    ).arg(libName).arg(safeTen).arg(barcode).arg(maSach);
 }
 
-PrintHelper::PrintConfig PrintHelper::getCauHinh() {
-    QSettings settings("HVPG", "QuanLyThuVien");
+QString PrintHelper::taoHTMLA4NhieuThe(const QList<PTRDG>& danhSach, int soCot) {
+    if (danhSach.isEmpty()) return "";
     
-    PrintConfig config;
-    config.tenThuVien = settings.value("Print/TenThuVien", config.tenThuVien).toString();
-    config.tenVietTat = settings.value("Print/TenVietTat", config.tenVietTat).toString();
-    config.inMauSac = settings.value("Print/InMauSac", config.inMauSac).toBool();
-    config.hienThiLogo = settings.value("Print/HienThiLogo", config.hienThiLogo).toBool();
-    config.duongDanLogo = settings.value("Print/DuongDanLogo", config.duongDanLogo).toString();
-    config.duongDanThuMucIn = settings.value("Print/ThuMucIn", config.duongDanThuMucIn).toString();
-    config.thuMucQR = settings.value("Print/ThuMucQR", config.thuMucQR).toString();
-    config.thuMucPdf = settings.value("Print/ThuMucPDF", config.thuMucPdf).toString();
-    config.qrOutputDir = settings.value("Print/QROutputDir", config.qrOutputDir).toString();
-    config.pdfOutputDir = settings.value("Print/PDFOutputDir", config.pdfOutputDir).toString();
-    config.tempDir = settings.value("Print/TempDir", config.tempDir).toString();
-    config.headerText = settings.value("Print/HeaderText", config.headerText).toString();
-    config.footerText = settings.value("Print/FooterText", config.footerText).toString();
-    config.author = settings.value("Print/Author", config.author).toString();
+    // Start Table
+    QString html = "<html><head><style>"
+                   "body { font-family: 'Siemreap', 'Khmer OS Siemreap', 'Segoe UI', sans-serif; }"
+                   "table { width: 100%; border-collapse: collapse; }"
+                   "td { padding: 5px; vertical-align: top; }"
+                   "</style></head><body>";
+                   
+    html += "<table>";
     
-    return config;
+    int count = 0;
+    for (int i = 0; i < danhSach.size(); ++i) {
+        if (count % soCot == 0) html += "<tr>"; // New row
+        
+        html += "<td>";
+        html += taoHTMLTheDocGia(danhSach[i]);
+        html += "</td>";
+        
+        if (count % soCot == soCot - 1) html += "</tr>"; // End row
+        count++;
+    }
+    
+    // Close last row if needed
+    if (count % soCot != 0) {
+        html += "</tr>";
+    }
+    
+    html += "</table></body></html>";
+    return html;
 }
 
-// ==================== PRIVATE HELPERS ====================
+QString PrintHelper::taoHTMLDanhSach(const QString& tieuDe, const QString& noiDungBang) {
+    return QString(
+        "<html><head><style>"
+        "body { font-family: 'Siemreap', 'Khmer OS Siemreap', 'Times New Roman', serif; font-size: 11pt; color: #000; margin: 20px; }"
+        ".page-header { text-align: center; margin-bottom: 20px; }"
+        ".org-name { font-weight: bold; font-size: 12pt; text-transform: uppercase; margin-bottom: 5px; }"
+        ".report-title { font-weight: 900; font-size: 16pt; margin-top: 15px; text-transform: uppercase; }"
+        "table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 10pt; }"
+        "th { background-color: #eee; border: 1px solid #000; padding: 8px; font-weight: bold; text-align: center; }"
+        "td { border: 1px solid #000; padding: 6px; }"
+        "tr:nth-child(even) { background-color: #f9f9f9; }" // Zebra Striping for readability
+        ".footer { margin-top: 30px; text-align: right; font-style: italic; font-size: 10pt; }"
+        ".signature-box { margin-top: 40px; display: flex; justify-content: space-between; text-align: center; }"
+        ".date-time { margin-bottom: 50px; }"
+        "</style></head><body>"
+        
+        "<div class='page-header'>"
+        "  <div class='org-name'>%1</div>"
+        "  <div style='font-size: 9pt;'>Thư Viện Học Viện</div>"
+        "  <div class='report-title'>%2</div>"
+        "  <div style='font-size: 10pt;'>Ngày xuất báo cáo: %3</div>"
+        "</div>"
+        
+        "%4" // Table Content
+        
+        "<div class='footer'>"
+        "  <div class='date-time'>Cần Thơ, ngày %5 tháng %6 năm %7</div>"
+        "  <div style='width: 200px; float: right; text-align: center;'>"
+        "    <b>Người Lập Biểu</b><br>"
+        "    <i>(Ký và ghi rõ họ tên)</i>"
+        "  </div>"
+        "  <div style='clear: both;'></div>"
+        "</div>"
+        
+        "</body></html>"
+    ).arg(SettingsManager::instance().getString("Print/TenThuVien", s_config.tenThuVien))
+     .arg(tieuDe)
+     .arg(QDate::currentDate().toString("dd/MM/yyyy HH:mm"))
+     .arg(noiDungBang)
+     .arg(QDate::currentDate().day())
+     .arg(QDate::currentDate().month())
+     .arg(QDate::currentDate().year());
+}
+
+bool PrintHelper::kiemTraFontMaVach() {
+    return true; 
+}
+
+bool PrintHelper::inBaoCaoTuyChinh(const QString& tieuDe, const QString& html, QWidget* parent) {
+    QTextDocument doc;
+    doc.setHtml(html);
+    QString safeTitle = tieuDe;
+    safeTitle.replace(" ", "");
+    // Use generic printer or report printer if defined
+    return xuLyYeuCauIn(&doc, tieuDe, QString("In báo cáo: %1").arg(tieuDe), taoTenFileBaoCao(safeTitle), parent, s_config.printerReport);
+}
+
+#include <QPrintPreviewDialog>
+#include <QPainter>
+#include <QMap>
+
+// Helper to generate Code39 Image
+/* static QImage generateCode39Image(const QString &text, int height = 50) {
+    // Code 39 Table (1 = Wide, 0 = Narrow). Pattern: B S B S B S B S B (Bar Space...)
+    static QMap<QChar, QString> code39Table = {
+        {'0', "000110100"}, {'1', "100100001"}, {'2', "001100001"}, {'3', "101100000"},
+        {'4', "000110001"}, {'5', "100110000"}, {'6', "001110000"}, {'7', "000100101"},
+        {'8', "100100100"}, {'9', "001100100"}, {'A', "100001001"}, {'B', "001001001"},
+        {'C', "101001000"}, {'D', "000011001"}, {'E', "100011000"}, {'F', "001011000"},
+        {'G', "000001101"}, {'H', "100001100"}, {'I', "001001100"}, {'J', "000011100"},
+        {'K', "100000011"}, {'L', "001000011"}, {'M', "101000010"}, {'N', "000010011"},
+        {'O', "100010010"}, {'P', "001010010"}, {'Q', "000000111"}, {'R', "100000110"},
+        {'S', "001000110"}, {'T', "000010110"}, {'U', "110000001"}, {'V', "011000001"},
+        {'W', "111000000"}, {'X', "010010001"}, {'Y', "110010000"}, {'Z', "011010000"},
+        {'-', "010000101"}, {'.', "110000100"}, {' ', "011000100"}, {'*', "010010100"},
+        {'$', "010101000"}, {'/', "010100010"}, {'+', "010001010"}, {'%', "000101010"}
+    };
+
+    QString safeText = "*" + text.toUpper() + "*"; // Add start/stop chars
+    
+    // Calculate width
+    int narrowW = 2; // px
+    int wideW = narrowW * 2.5; // ratio 2.5:1
+    int gap = narrowW; // char gap
+    
+    int totalWidth = 0;
+    for(QChar c : safeText) {
+        if (!code39Table.contains(c)) continue;
+        QString pattern = code39Table[c];
+        for(int i=0; i<9; i++) {
+            totalWidth += (pattern[i] == '1') ? wideW : narrowW;
+        }
+        totalWidth += gap;
+    }
+    
+    QImage image(totalWidth + 20, height, QImage::Format_ARGB32);
+    image.fill(Qt::white);
+    QPainter painter(&image);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(Qt::black);
+    
+    int x = 10;
+    for(QChar c : safeText) {
+        if (!code39Table.contains(c)) continue;
+        QString pattern = code39Table[c];
+        for(int i=0; i<9; i++) {
+            int w = (pattern[i] == '1') ? wideW : narrowW;
+            if (i % 2 == 0) { // Bar
+                painter.drawRect(x, 0, w, height);
+            }
+            // else Space (skip)
+            x += w;
+        }
+        x += gap;
+    }
+    
+    return image;
+} */
+
+bool PrintHelper::xuLyYeuCauIn(QTextDocument* doc, const QString& tieuDe, const QString& cauHoi, const QString& tenFilePdfMacDinh, QWidget* parent, const QString& printerName, bool forcePreview) {
+    Q_UNUSED(cauHoi); // Mark unused parameter
+    if (!doc) return false;
+
+    // 1. Silent Print (In tự động không hỏi) - ONLY if Not Forced Preview
+    if (s_config.silentPrint && !forcePreview) {
+        return inDocument(doc, parent, printerName);
+    }
+
+    // 2. Use Custom Print Dialog with meaningful filename
+    CustomPrintDialog dialog(doc, tieuDe, tenFilePdfMacDinh, printerName, parent);
+    int result = dialog.exec();
+    
+    if (result == CustomPrintDialog::PRINT_ACCEPTED) {
+        // Force printer selection from dialog
+        return inDocument(doc, parent, dialog.selectedPrinterName());
+    } else if (result == CustomPrintDialog::PDF_EXPORT) {
+        return xuatPDF(doc, dialog.exportPath(), parent);
+    }
+
+    return false;
+}
+
+bool PrintHelper::inPhieuMuonTuDong(PTRDG docGia, const QString& maSach, const QString& tenSach, const QString& ngayMuon, QWidget* parent, bool forcePreview) {
+    QString html = taoHTMLPhieuMuon(docGia, maSach, tenSach, ngayMuon);
+    QTextDocument doc;
+    doc.setHtml(html);
+    QString question = QString("In phiếu mượn cho: %1\nSách: %2").arg(QString::fromStdString(docGia->data.Ho + " " + docGia->data.Ten)).arg(tenSach);
+    return xuLyYeuCauIn(&doc, "In Phiếu Mượn", question, taoTenFilePhieuMuon(docGia->data.MaThe, maSach), parent, s_config.printerReceipt, forcePreview);
+}
+
+bool PrintHelper::inPhieuTraTuDong(PTRDG docGia, const QString& maSach, const QString& tenSach, const QString& ngayTra, QWidget* parent, bool forcePreview) {
+    QString html = taoHTMLPhieuMuon(docGia, maSach, tenSach, ngayTra);
+    QTextDocument doc;
+    doc.setHtml(html);
+    QString question = QString("In phiếu trả cho: %1\nSách: %2").arg(QString::fromStdString(docGia->data.Ho + " " + docGia->data.Ten)).arg(tenSach);
+    return xuLyYeuCauIn(&doc, "In Phiếu Trả", question, taoTenFilePhieuTra(docGia->data.MaThe, maSach), parent, s_config.printerReceipt, forcePreview);
+}
+
+// ===== PRIVATE HELPERS =====
 
 QString PrintHelper::taoHTMLTheDocGia(PTRDG docGia) {
     if (!docGia) return "";
     
-    QString hoTen = QString::fromStdString(docGia->data.Ho + " " + docGia->data.Ten);
-    QString maThe = QString::number(docGia->data.MaThe);
-    QString maQR = taoMaQRHTML(maThe, 60); // Sử dụng QR code thay vì barcode
+    QString qrCode = taoMaQRHTML(QString::number(docGia->data.MaThe), 100);
     
-    QString logoHtml;
-    if (s_config.hienThiLogo && !s_config.duongDanLogo.isEmpty() && QFile::exists(s_config.duongDanLogo)) {
-        QString logoPath = QDir::toNativeSeparators(s_config.duongDanLogo);
-        logoHtml = QString("<div style='text-align:center; margin-bottom:4px;'><img src='file:///%1' style='height:32px;'/></div>").arg(logoPath);
-    }
-
+    // Config: Validity Duration (Default 12 months)
+    int durationMonths = SettingsManager::instance().getInt("Print/HanTheMonths", 12);
+    QDate issueDate = QDate::currentDate();
+    QDate expiryDate = issueDate.addMonths(durationMonths);
+    
+    // Card Style: ID-1 (85.6mm x 53.98mm)
     return QString(
-        "<html><head>"
-        "<style>"
-        "body { margin: 0; padding: 0; }"
-        ".card { width: 85.6mm; height: 54mm; border: 1px solid black; "
-        "        padding: 5mm; box-sizing: border-box; font-family: Arial; }"
-        ".title { text-align: center; font-size: 14pt; font-weight: bold; margin-bottom: 3mm; }"
-        ".name { text-align: center; font-size: 18pt; font-weight: bold; margin: 2mm 0; }"
-        ".qrcode { text-align: center; margin: 3mm 0; }"
-        ".id { text-align: center; font-size: 12pt; }"
-        "</style>"
-        "</head><body>"
-        "<div class='card'>"
-        "%1"
-        "  <div class='title'>%2</div>"
-        "  <div class='name'>%3</div>"
-        "  <div class='qrcode'>%4</div>"
-        "  <div class='id'>Mã thẻ: %5</div>"
+        "<div style='"
+        " width: 85mm; height: 54mm; "
+        " border: 2px solid #000; " // Border for cutting
+        " box-sizing: border-box; "
+        " font-family: 'Siemreap', 'Khmer OS Siemreap', 'Times New Roman', serif; "
+        " position: relative; "
+        " overflow: hidden; "
+        " margin: 5px; " // Margin for separation if batch
+        " page-break-inside: avoid; "
+        " color: #000; "
+        " background: #fff; " // White background
+        " float: left;"
+        "'>"
+        
+        // Header
+        "  <div style='text-align: center; border-bottom: 2px solid #000; padding: 2px 0;'>"
+        "    <div style='font-size: 8pt; font-weight: bold; text-transform: uppercase;'>%1</div>"
+        "    <div style='font-size: 11pt; font-weight: 900; text-transform: uppercase; margin-top: 2px;'>THẺ HỌC VIÊN</div>"
+        "  </div>"
+        
+        // Body
+        "  <div style='padding: 5px; height: 35mm;'>"
+        "    <table style='width: 100%; height: 100%; border-collapse: collapse;'>"
+        "      <tr>"
+        "        <td style='width: 30mm; text-align: center; vertical-align: top; padding-top: 5px;'>"
+        "           %2" // QR Code
+        "           <div style='font-size: 8pt; font-weight: bold; margin-top: 2px;'>%3</div>" // Ma The text
+        "        </td>"
+        "        <td style='vertical-align: top; padding-left: 5px;'>"
+        "           <div style='font-size: 12pt; font-weight: bold; margin-bottom: 5px;'>%4 %5</div>" // Ten
+        "           <div style='font-size: 9pt;'>Giới tính: <b>%6</b></div>"
+        "           <div style='font-size: 9pt;'>Ngày cấp: %7</div>"
+        "           <div style='font-size: 9pt; color: #cc0000; margin-top: 5px;'><b>Hết hạn: %8</b></div>"
+        "        </td>"
+        "      </tr>"
+        "    </table>"
+        "  </div>"
+        
         "</div>"
-        "</body></html>"
-    ).arg(logoHtml).arg(s_config.tenVietTat).arg(hoTen).arg(maQR).arg(maThe);
+    ).arg(SettingsManager::instance().getString("Print/TenThuVien", s_config.tenThuVien))
+     .arg(qrCode)
+     .arg(docGia->data.MaThe)
+     .arg(QString::fromStdString(docGia->data.Ho))
+     .arg(QString::fromStdString(docGia->data.Ten))
+     .arg(docGia->data.Phai ? "Nữ" : "Nam")
+     .arg(issueDate.toString("dd/MM/yyyy"))
+     .arg(expiryDate.toString("dd/MM/yyyy"));
 }
 
-QString PrintHelper::taoHTMLA4NhieuThe(const QList<PTRDG>& danhSach, int soCot) {
-    QString html = QString(
-        "<html><head>"
-        "<style>"
-        "body { margin: 10mm; padding: 0; font-family: Arial; }"
-        "table { width: 100%%; border-collapse: collapse; }"
-        "td { padding: 3mm; vertical-align: top; }"
-        ".card { width: 85.6mm; height: 54mm; border: 2px solid black; "
-        "        padding: 4mm; box-sizing: border-box; background: white; }"
-        ".title { text-align: center; font-size: 11pt; font-weight: bold; margin-bottom: 2mm; }"
-        ".name { text-align: center; font-size: 14pt; font-weight: bold; margin: 2mm 0; }"
-        ".qrcode { text-align: center; margin: 2mm 0; }"
-        ".id { text-align: center; font-size: 10pt; }"
-        "@media print {"
-        "  .page-break { page-break-after: always; }"
-        "}"
-        "</style>"
-        "</head><body>"
-    );
+QString PrintHelper::taoHTMLPhieuMuon(PTRDG docGia, const QString& maSach, const QString& tenSach, const QString& ngayGiaoDich) {
+    if (!docGia) return "";
     
-    int thePerPage = soCot * 5; // 2 cột x 5 hàng = 10 thẻ/trang
+    QString qrCode = taoMaQRHTML(maSach, 80);
     
-    QString logoHtml;
-    if (s_config.hienThiLogo && !s_config.duongDanLogo.isEmpty() && QFile::exists(s_config.duongDanLogo)) {
-        QString logoPath = QDir::toNativeSeparators(s_config.duongDanLogo);
-        logoHtml = QString("<div style='text-align:center; margin-bottom:6px;'><img src='file:///%1' style='height:28px;'/></div>").arg(logoPath);
-    }
-
-    for (int page = 0; page < (danhSach.size() + thePerPage - 1) / thePerPage; ++page) {
-        if (page > 0) {
-            html += "<div class='page-break'></div>";
-        }
-        
-        html += "<table>";
-        
-        for (int row = 0; row < 5; ++row) {
-            html += "<tr>";
-            for (int col = 0; col < soCot; ++col) {
-                int index = page * thePerPage + row * soCot + col;
-                
-                if (index < danhSach.size()) {
-                    PTRDG docGia = danhSach[index];
-                    QString hoTen = QString::fromStdString(docGia->data.Ho + " " + docGia->data.Ten);
-                    QString maThe = QString::number(docGia->data.MaThe);
-                    QString maQR = taoMaQRHTML(maThe, 55);
-                    
-                    html += QString(
-                        "<td>"
-                        "<div class='card'>"
-                        "  %6"
-                        "  <div class='title'>%1</div>"
-                        "  <div class='name'>%2</div>"
-                        "  <div class='qrcode'>%3</div>"
-                        "  <div class='id'>Mã: %4</div>"
-                        "</div>"
-                        "</td>"
-                    ).arg(s_config.tenVietTat).arg(hoTen).arg(maQR).arg(maThe).arg(logoHtml);
-                } else {
-                    html += "<td></td>"; // Ô trống
-                }
-            }
-            html += "</tr>";
-        }
-        
-        html += "</table>";
-    }
-    
-    html += "</body></html>";
-    return html;
-}
-
-QString PrintHelper::taoHTMLTemSach(const QString& maSach, const QString& tenSach) {
-    QString maQR = taoMaQRHTML(maSach, 50); // Sử dụng QR code
-    QString logoHtml;
-    if (s_config.hienThiLogo && !s_config.duongDanLogo.isEmpty() && QFile::exists(s_config.duongDanLogo)) {
-        QString logoPath = QDir::toNativeSeparators(s_config.duongDanLogo);
-        logoHtml = QString("<div style='text-align:center; margin-bottom:4px;'><img src='file:///%1' style='height:20px;'/></div>").arg(logoPath);
-    }
-
+    // Receipt Style (K80 / A6) - Minimalist Black & White
+    // Width ~70-80mm for K80 printers.
     return QString(
-        "<html><head>"
-        "<style>"
-        "body { margin: 0; padding: 0; }"
-        ".label { width: 50mm; height: 30mm; border: 1px solid black; "
-        "         padding: 2mm; box-sizing: border-box; font-family: Arial; }"
-        ".title { font-size: 10pt; font-weight: bold; text-align: center; margin-bottom: 2mm; }"
-        ".qrcode { text-align: center; margin: 2mm 0; }"
-        ".code { text-align: center; font-size: 9pt; }"
-        "</style>"
-        "</head><body>"
-        "<div class='label'>"
-        "%1"
-        "  <div class='title'>%2</div>"
-        "  <div class='qrcode'>%3</div>"
-        "  <div class='code'>%4</div>"
+        "<html><head><style>"
+        "body { font-family: 'Courier New', monospace; font-size: 10pt; margin: 0; padding: 5px; width: 72mm; color: #000; background: #fff; }"
+        ".header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 10px; }"
+        ".title { font-size: 14pt; font-weight: 900; margin: 5px 0; text-transform: uppercase; }"
+        ".row { margin-bottom: 5px; clear: both; overflow: hidden; }"
+        ".label { float: left; width: 35%; font-weight: bold; }"
+        ".value { float: right; width: 65%; text-align: right; }"
+        ".divider { border-top: 1px dashed #000; margin: 10px 0; }"
+        ".footer { text-align: center; font-size: 8pt; font-style: italic; margin-top: 10px; }"
+        ".qr { text-align: center; margin-top: 10px; }"
+        "</style></head><body>"
+        
+        "<div class='header'>"
+        "  <div style='font-weight:bold; font-size:9pt;'>%1</div>"
+        "  <div class='title'>PHIẾU MƯỢN/TRẢ</div>"
+        "  <div style='font-size:8pt;'>GD: %2</div>"
         "</div>"
-        "</body></html>"
-    ).arg(logoHtml).arg(tenSach.left(20)).arg(maQR).arg(maSach);
-}
-
-QString PrintHelper::taoHTMLDanhSach(const QString& tieuDe, const QString& noiDungBang) {
-    QString logoHtml;
-    if (s_config.hienThiLogo && !s_config.duongDanLogo.isEmpty() && QFile::exists(s_config.duongDanLogo)) {
-        QString logoPath = QDir::toNativeSeparators(s_config.duongDanLogo);
-        logoHtml = QString("<div style='text-align:center; margin-bottom:8px;'><img src='file:///%1' style='height:36px;'/></div>").arg(logoPath);
-    }
-
-    return QString(
-        "<html><head>"
-        "<style>"
-        "body { font-family: 'Times New Roman', serif; margin: 20px; }"
-        ".header { text-align: center; font-size: 18pt; font-weight: bold; margin-bottom: 10px; }"
-        "table { width: 100%%; border-collapse: collapse; }"
-        "th { background: #f0f0f0; font-weight: bold; }"
-        "td, th { padding: 8px; border: 1px solid black; }"
-        "</style>"
-        "</head><body>"
-        "%1"
-        "<div class='header'>%2</div>"
-        "%3"
-        "</body></html>"
-    ).arg(logoHtml).arg(tieuDe).arg(noiDungBang);
-}
-
-bool PrintHelper::inDocument(QTextDocument* doc, QWidget* parent) {
-    if (!doc) return false;
-    
-    QPrinter printer(QPrinter::HighResolution);
-    QPrintDialog dialog(&printer, parent);
-    
-    if (dialog.exec() == QDialog::Accepted) {
-        doc->print(&printer);
-        return true;
-    }
-    
-    return false;
-}
-
-bool PrintHelper::kiemTraFontMaVach() {
-    QStringList fonts = QFontDatabase::families();
-    return fonts.contains("Libre Barcode 128") || fonts.contains("Code 128");
-}
-
-// ===== TỰ ĐỘNG IN (AUTO-PRINT) =====
-
-bool PrintHelper::inTheDocGiaTuDong(PTRDG docGia, QWidget* parent) {
-    if (!docGia) return false;
-    
-    QString html = taoHTMLTheDocGia(docGia);
-    QTextDocument doc;
-    doc.setHtml(html);
-    
-    // Dialog chọn In/Lưu/Hủy
-    QMessageBox msgBox(parent);
-    msgBox.setWindowTitle("In Thẻ Độc Giả");
-    msgBox.setText(QString("In thẻ cho: %1 %2 (Mã: %3)")
-        .arg(QString::fromStdString(docGia->data.Ho))
-        .arg(QString::fromStdString(docGia->data.Ten))
-        .arg(docGia->data.MaThe));
-    QPushButton* btnIn = msgBox.addButton("🖨️ In Ngay", QMessageBox::AcceptRole);
-    QPushButton* btnPDF = msgBox.addButton("💾 Lưu PDF", QMessageBox::ActionRole);
-    msgBox.addButton("❌ Hủy", QMessageBox::RejectRole);
-    msgBox.exec();
-    
-    QAbstractButton* clicked = msgBox.clickedButton();
-    if (clicked == btnIn) {
-        return inDocument(&doc, parent);
-    } else if (clicked == btnPDF) {
-        QString tenFileMacDinh = taoTenFileTheDocGia(docGia->data.MaThe);
-        return xuatPDF(&doc, tenFileMacDinh, parent);
-    }
-    return false;
-}
-
-bool PrintHelper::inHangLoatTheDocGia(PTRDG root, QWidget* parent) {
-    if (!root) return false;
-    
-    // Đếm số độc giả
-    int soLuong = 0;
-    std::function<void(PTRDG)> dem = [&](PTRDG p) {
-        if (!p) return;
-        dem(p->left);
-        soLuong++;
-        dem(p->right);
-    };
-    dem(root);
-    
-    if (soLuong == 0) {
-        QMessageBox::information(parent, "Thông Báo", "Không có độc giả nào!");
-        return false;
-    }
-    
-    // Hỏi xác nhận
-    QMessageBox::StandardButton reply = QMessageBox::question(
-        parent,
-        "Xác Nhận",
-        QString("In %1 thẻ độc giả?\n\nQuá trình này có thể mất vài phút.").arg(soLuong),
-        QMessageBox::Yes | QMessageBox::No
-    );
-    
-    if (reply != QMessageBox::Yes) return false;
-    
-    // Thu thập danh sách
-    QList<PTRDG> danhSach;
-    std::function<void(PTRDG)> duyet = [&](PTRDG p) {
-        if (!p) return;
-        duyet(p->left);
-        danhSach.append(p);
-        duyet(p->right);
-    };
-    duyet(root);
-    
-    // In theo batch (10 thẻ/trang)
-    return inA4NhieuThe(danhSach, 2, parent);
-}
-
-bool PrintHelper::inTemSachTuDong(PTRDS dauSach, QWidget* parent) {
-    if (!dauSach) return false;
-    
-    QString isbn = QString::fromStdString(dauSach->ISBN);
-    QString tenSach = QString::fromStdString(dauSach->tenSach);
-    
-    QString html = taoHTMLTemSach(isbn, tenSach);
-    QTextDocument doc;
-    doc.setHtml(html);
-    
-    // Dialog chọn
-    QMessageBox msgBox(parent);
-    msgBox.setWindowTitle("In Tem Sách");
-    msgBox.setText(QString("In tem cho: %1").arg(tenSach));
-    QPushButton* btnIn = msgBox.addButton("🖨️ In Ngay", QMessageBox::AcceptRole);
-    QPushButton* btnPDF = msgBox.addButton("💾 Lưu PDF", QMessageBox::ActionRole);
-    msgBox.addButton("❌ Hủy", QMessageBox::RejectRole);
-    msgBox.exec();
-    
-    QAbstractButton* clicked = msgBox.clickedButton();
-    if (clicked == btnIn) {
-        return inDocument(&doc, parent);
-    } else if (clicked == btnPDF) {
-        QString tenFileMacDinh = taoTenFileTemSach(isbn, 1);
-        return xuatPDF(&doc, tenFileMacDinh, parent);
-    }
-    return false;
-}
-
-bool PrintHelper::inDanhMucSach(PTRDS* dsDauSach, int soLuong, QWidget* parent) {
-    if (!dsDauSach || soLuong == 0) return false;
-    
-    // Tạo bảng HTML
-    QString bangHTML = "<table><tr>"
-                       "<th>STT</th><th>ISBN</th><th>Tên Sách</th>"
-                       "<th>Tác Giả</th><th>Thể Loại</th><th>Số Bản</th>"
-                       "</tr>";
-    
-    for (int i = 0; i < soLuong; i++) {
-        if (!dsDauSach[i]) continue;
         
-        // Đếm số bản sao
-        int soBan = 0;
-        PTRDMS p = dsDauSach[i]->dms;
-        while (p) {
-            soBan++;
-            p = p->next;
-        }
+        "<div class='content'>"
+        "  <div class='row'><span class='label'>Độc giả:</span><span class='value'>%3 %4</span></div>"
+        "  <div class='row'><span class='label'>Mã thẻ:</span><span class='value'>%5</span></div>" 
+        "  <div class='divider'></div>"
+        "  <div class='row'><span class='label'>Tên sách:</span><span class='value'>%6</span></div>"
+        "  <div class='row'><span class='label'>Mã sách:</span><span class='value'>%7</span></div>"
+        "</div>"
         
-        bangHTML += QString("<tr>"
-                           "<td>%1</td><td>%2</td><td>%3</td>"
-                           "<td>%4</td><td>%5</td><td>%6</td>"
-                           "</tr>")
-            .arg(i + 1)
-            .arg(QString::fromStdString(dsDauSach[i]->ISBN))
-            .arg(QString::fromStdString(dsDauSach[i]->tenSach))
-            .arg(QString::fromStdString(dsDauSach[i]->tacGia))
-            .arg(QString::fromStdString(dsDauSach[i]->theLoai))
-            .arg(soBan);
-    }
-    bangHTML += "</table>";
-    
-    QString html = taoHTMLDanhSach("DANH MỤC SÁCH THƯ VIỆN", bangHTML);
-    QTextDocument doc;
-    doc.setHtml(html);
-    
-    // Dialog chọn
-    QMessageBox msgBox(parent);
-    msgBox.setWindowTitle("In Danh Mục Sách");
-    msgBox.setText(QString("In danh mục %1 đầu sách").arg(soLuong));
-    QPushButton* btnIn = msgBox.addButton("🖨️ In Ngay", QMessageBox::AcceptRole);
-    QPushButton* btnPDF = msgBox.addButton("💾 Lưu PDF", QMessageBox::ActionRole);
-    msgBox.addButton("❌ Hủy", QMessageBox::RejectRole);
-    msgBox.exec();
-    
-    QAbstractButton* clicked = msgBox.clickedButton();
-    if (clicked == btnIn) {
-        return inDocument(&doc, parent);
-    } else if (clicked == btnPDF) {
-        QString tenFileMacDinh = taoTenFileBaoCao("DanhMucSach");
-        return xuatPDF(&doc, tenFileMacDinh, parent);
-    }
-    return false;
+        "<div class='qr'>"
+        "  %8"
+        "  <div><small>%7</small></div>"
+        "</div>"
+        
+        "<div class='footer'>%9<br>%10</div>"
+        "</body></html>"
+    ).arg(SettingsManager::instance().getString("Print/TenThuVien", s_config.tenThuVien))
+     .arg(ngayGiaoDich)
+     .arg(QString::fromStdString(docGia->data.Ho))
+     .arg(QString::fromStdString(docGia->data.Ten))
+     .arg(docGia->data.MaThe)
+     .arg(tenSach)
+     .arg(maSach)
+     .arg(qrCode)
+     .arg(SettingsManager::instance().getString("Print/TenThuVien", s_config.tenThuVien))
+     .arg(SettingsManager::instance().getString("Print/LoiChao", "Xin cảm ơn!"));
 }
 

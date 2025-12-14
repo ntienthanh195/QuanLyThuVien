@@ -22,10 +22,18 @@ signals:
     void dauSachUpdated(const QString& isbn);
     void dauSachRemoved(const QString& isbn);
 
+    // Người dùng (Nhân viên/Admin)
+    void nguoiDungAdded(const QString& username);
+    void nguoiDungUpdated(const QString& username);
+    void nguoiDungRemoved(const QString& username);
+
     // Mượn - trả
     void muonTraAdded(int maThe, const QString& maSach);
     void muonTraUpdated(int maThe, const QString& maSach);
     void muonTraRemoved(int maThe, const QString& maSach);
+
+    // System Log
+    void newSystemLog(const QString& action, const QString& details);
 
     // General: any data file or DB changed externally
     void dataChanged();

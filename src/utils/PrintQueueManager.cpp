@@ -1,7 +1,5 @@
 #include "utils/PrintQueueManager.h"
 #include <QDebug>
-#include <QPrinter>
-#include <QPrintDialog>
 #include <QTextDocument>
 #include <QTextCursor>
 #include <QFile>
@@ -10,10 +8,14 @@
 #include <QDir>
 #include "utils/PrintHelper.h"
 
+// ... (code omitted)
+
+
+
 PrintQueueManager* PrintQueueManager::s_instance = nullptr;
 
-PrintQueueManager::PrintQueueManager(QObject *parent)
-    : QObject(parent)
+PrintQueueManager::PrintQueueManager(QObject *parent) 
+    : QObject(parent) 
 {
 }
 
@@ -81,7 +83,10 @@ bool PrintQueueManager::daTonTai(int maThe) const {
 }
 
 // Helper: build HTML string for the current queue
-static QString buildHtmlForQueue(const QList<PTRDG> &list, const QString &title) {
+QString PrintQueueManager::taoHTMLHangDoi() {
+    const QList<PTRDG> &list = m_danhSach;
+    const QString title = "Danh sách hàng đợi in thẻ";
+
     QString html;
     html += "<!DOCTYPE html><html><head><meta charset=\"utf-8\">";
     html += "<style> body { font-family: 'Segoe UI', Tahoma, Arial; color: #222; margin: 20px; } ";
@@ -152,38 +157,24 @@ void PrintQueueManager::inHangDoi(QWidget *parent) {
         return;
     }
 
-    QPrinter printer(QPrinter::HighResolution);
-    QPrintDialog dlg(&printer, parent);
-    dlg.setWindowTitle("In danh sách độc giả");
-    if (dlg.exec() != QDialog::Accepted) return;
-
-    QString html = buildHtmlForQueue(m_danhSach, "Danh sách độc giả cần in");
-
     QTextDocument doc;
+    QString html = taoHTMLHangDoi(); // Generate HTML content
     doc.setHtml(html);
-    doc.setPageSize(printer.pageRect(QPrinter::Point).size());
-    doc.print(&printer);
+    // Use PrintHelper to ensure consistent config (color, silent mode)
+    PrintHelper::inDocument(&doc, parent);
+
 }
 
-bool PrintQueueManager::xuatHangDoiThanhPdf(const QString &filePath, const QString &title) {
+bool PrintQueueManager::xuatHangDoiThanhPdf(const QString &filePath, const QString &/*title*/) {
     if (m_danhSach.isEmpty()) return false;
     if (filePath.isEmpty()) return false;
 
-    QPrinter printer(QPrinter::PrinterResolution);
-    printer.setOutputFormat(QPrinter::PdfFormat);
-    printer.setOutputFileName(filePath);
-    printer.setPageSize(QPageSize(QPageSize::A4));
-    printer.setFullPage(false);
-    printer.setResolution(300);
-
-    QString html = buildHtmlForQueue(m_danhSach, title);
+    QString html = taoHTMLHangDoi();
     QTextDocument doc;
     doc.setHtml(html);
-    doc.setPageSize(printer.pageRect(QPrinter::Point).size());
 
-    // Attempt to write PDF
-    doc.print(&printer);
-    return QFile::exists(filePath);
+    // Use PrintHelper to export PDF consistently
+    return PrintHelper::xuatPDF(&doc, filePath, nullptr);
 }
 
 bool PrintQueueManager::xuatSamplePdf(ExportLayout layout) {
@@ -212,8 +203,8 @@ bool PrintQueueManager::xuatSamplePdf(ExportLayout layout) {
         QString html = QString("<html><head><meta charset='utf-8'><style>body{font-family:Arial;}th{background:#f0f0f0;}</style></head><body><h2>Sample Report</h2>%1</body></html>").arg(bang);
         doc.setHtml(html);
     } else {
-        // CardSize layout: reuse buildHtmlForQueue with a compact title
-        QString html = buildHtmlForQueue(m_danhSach, "Sample Cards");
+        // CardSize layout: reuse taoHTMLHangDoi with a compact title
+        QString html = taoHTMLHangDoi();
         doc.setHtml(html);
     }
 

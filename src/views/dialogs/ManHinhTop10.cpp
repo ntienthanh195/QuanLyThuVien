@@ -9,11 +9,10 @@
 #include <QFont>
 #include <QGroupBox>
 #include <QMessageBox>
-#include <QTextDocument>
-#include <QPrinter>
-#include <QPrintDialog>
+#include "utils/PrintHelper.h"
 #include <algorithm>
 #include <vector>
+#include "utils/LanguageManager.h"
 
 // Lightweight model for Top10 table
 class Top10TableModel : public QAbstractTableModel {
@@ -83,13 +82,13 @@ public:
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override {
         if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
             switch (section) {
-            case 0: return QStringLiteral("Hạng");
-            case 1: return QStringLiteral("ISBN");
-            case 2: return QStringLiteral("Tên Sách");
-            case 3: return QStringLiteral("Tác Giả");
-            case 4: return QStringLiteral("Số Lượt");
-            case 5: return QStringLiteral("Tỷ Lệ");
-            case 6: return QStringLiteral("Xu Hướng");
+            case 0: return LanguageManager::instance().getText("TABLE_HEADER_RANK");
+            case 1: return LanguageManager::instance().getText("TABLE_HEADER_ISBN");
+            case 2: return LanguageManager::instance().getText("TABLE_HEADER_TITLE");
+            case 3: return LanguageManager::instance().getText("TABLE_HEADER_AUTHOR");
+            case 4: return LanguageManager::instance().getText("TABLE_HEADER_LOANS");
+            case 5: return LanguageManager::instance().getText("TABLE_HEADER_RATE");
+            case 6: return LanguageManager::instance().getText("TABLE_HEADER_TREND");
             }
         }
         return QAbstractTableModel::headerData(section, orientation, role);
@@ -103,7 +102,7 @@ private:
 
 ManHinhTop10::ManHinhTop10(PTRDS dsDauSach[], int soLuongDauSach, QWidget *parent)
     : QDialog(parent), danhSachDauSach(dsDauSach), soLuong(soLuongDauSach) {
-    setWindowTitle("Top 10 Sách Được Mượn Nhiều Nhất");
+    setWindowTitle(LanguageManager::instance().getText("TITLE_TOP10"));
     setMinimumSize(1100, 750);
     setModal(true);
     
@@ -121,7 +120,7 @@ void ManHinhTop10::thietLapGiaoDien() {
     mainLayout->setContentsMargins(25, 25, 25, 25);
     
     // Tiêu đề
-    nhanTieuDe = new QLabel("TOP 10 SÁCH PHỔ BIẾN NHẤT");
+    nhanTieuDe = new QLabel(LanguageManager::instance().getText("HEADER_TOP10"));
     nhanTieuDe->setStyleSheet(
         "font-size: 24px; "
         "font-weight: bold; "
@@ -134,7 +133,7 @@ void ManHinhTop10::thietLapGiaoDien() {
     mainLayout->addWidget(nhanTieuDe);
     
     // ========== BỘ LỌC MỚI ==========
-    QGroupBox *boxFilter = new QGroupBox("Bộ Lọc Thời Gian");
+    QGroupBox *boxFilter = new QGroupBox(LanguageManager::instance().getText("GROUP_FILTER_TIME"));
     boxFilter->setStyleSheet(
         "QGroupBox { "
         "    font-weight: bold; "
@@ -155,13 +154,13 @@ void ManHinhTop10::thietLapGiaoDien() {
     QHBoxLayout *filterLayout = new QHBoxLayout();
     
     // ComboBox chọn khoảng thời gian
-    filterLayout->addWidget(new QLabel("Khoảng:"));
+    filterLayout->addWidget(new QLabel(LanguageManager::instance().getText("LBL_RANGE")));
     comboBoLoc = new QComboBox();
     comboBoLoc->addItems({
-        "Tất cả thời gian",
-        "Tháng này",
-        "Tháng trước",
-        "Tùy chỉnh"
+        LanguageManager::instance().getText("CB_TIME_ALL"),
+        LanguageManager::instance().getText("CB_TIME_THIS_MONTH"),
+        LanguageManager::instance().getText("CB_TIME_LAST_MONTH"),
+        LanguageManager::instance().getText("CB_TIME_CUSTOM")
     });
     comboBoLoc->setMinimumWidth(180);
     filterLayout->addWidget(comboBoLoc);
@@ -169,14 +168,14 @@ void ManHinhTop10::thietLapGiaoDien() {
     filterLayout->addSpacing(20);
     
     // Date range pickers
-    filterLayout->addWidget(new QLabel("Từ ngày:"));
+    filterLayout->addWidget(new QLabel(LanguageManager::instance().getText("LBL_FROM_DATE")));
     dateFrom = new QDateEdit(QDate::currentDate().addMonths(-1));
     dateFrom->setCalendarPopup(true);
     dateFrom->setDisplayFormat("dd/MM/yyyy");
     dateFrom->setEnabled(false);
     filterLayout->addWidget(dateFrom);
     
-    filterLayout->addWidget(new QLabel("Đến:"));
+    filterLayout->addWidget(new QLabel(LanguageManager::instance().getText("LBL_TO_DATE")));
     dateTo = new QDateEdit(QDate::currentDate());
     dateTo->setCalendarPopup(true);
     dateTo->setDisplayFormat("dd/MM/yyyy");
@@ -186,7 +185,7 @@ void ManHinhTop10::thietLapGiaoDien() {
     filterLayout->addSpacing(20);
     
     // Checkbox so sánh
-    checkSoSanh = new QCheckBox("Hiển thị xu hướng");
+    checkSoSanh = new QCheckBox(LanguageManager::instance().getText("CHECK_SHOW_TREND"));
     checkSoSanh->setChecked(true);
     checkSoSanh->setToolTip("So sánh với kỳ trước đó");
     filterLayout->addWidget(checkSoSanh);
@@ -197,8 +196,7 @@ void ManHinhTop10::thietLapGiaoDien() {
     
     // Panel thông tin
     nhanThongTin = new QLabel(
-        "<b>Thống kê:</b> Xếp hạng dựa trên tổng số lượt sách đã được mượn. "
-        "Bao gồm cả sách đang mượn và đã trả."
+        LanguageManager::instance().getText("MSG_TOP10_NOTE")
     );
     nhanThongTin->setStyleSheet(
         "color: #065f46; "
@@ -244,17 +242,17 @@ void ManHinhTop10::thietLapGiaoDien() {
     QHBoxLayout *buttonLayout = new QHBoxLayout();
     buttonLayout->addStretch();
     
-    nutXuatBaoCao = new QPushButton("Xuất Báo Cáo", this);
+    nutXuatBaoCao = new QPushButton(LanguageManager::instance().getText("BTN_EXPORT_REPORT"), this);
     nutXuatBaoCao->setMinimumSize(140, 40);
     nutXuatBaoCao->setToolTip("In hoặc xuất báo cáo (Ctrl+P)");
     nutXuatBaoCao->setShortcut(QKeySequence("Ctrl+P"));
     
-    nutLamMoi = new QPushButton("Làm Mới", this);
+    nutLamMoi = new QPushButton(LanguageManager::instance().getText("BTN_REFRESH"), this);
     nutLamMoi->setMinimumSize(120, 40);
     nutLamMoi->setToolTip("Cập nhật lại bảng xếp hạng (F5)");
     nutLamMoi->setShortcut(QKeySequence("F5"));
     
-    nutDong = new QPushButton("Đóng", this);
+    nutDong = new QPushButton(LanguageManager::instance().getText("BTN_CLOSE"), this);
     nutDong->setMinimumSize(120, 40);
     nutDong->setToolTip("Đóng cửa sổ (Esc)");
     nutDong->setShortcut(QKeySequence(Qt::Key_Escape));
@@ -342,7 +340,7 @@ void ManHinhTop10::capNhatBangTop10() {
     // No direct setRowCount on QTableView.
     
     if (soLuong == 0) {
-        nhanThongTin->setText("Chưa có dữ liệu sách trong hệ thống");
+        nhanThongTin->setText(LanguageManager::instance().getText("MSG_NO_DATA_TOP10"));
         nhanThongTin->setStyleSheet(
             "color: #dc2626; font-weight: bold; padding: 12px; "
             "background-color: #fee2e2; border-radius: 6px; border-left: 4px solid #dc2626;"
@@ -406,7 +404,7 @@ void ManHinhTop10::capNhatBangTop10() {
     }
 
     if (danhSachTop.empty()) {
-        nhanThongTin->setText("Chưa có sách nào được mượn trong khoảng thời gian này");
+        nhanThongTin->setText(LanguageManager::instance().getText("MSG_NO_DATA_PERIOD"));
         nhanThongTin->setStyleSheet(
             "color: #64748b; font-weight: bold; padding: 12px; "
             "background-color: #f1f5f9; border-radius: 6px; border-left: 4px solid #94a3b8;"
@@ -447,7 +445,7 @@ void ManHinhTop10::capNhatBangTop10() {
         "tất cả thời gian";
     
     nhanThongTin->setText(
-        QString("Khoảng: <b>%1</b> | %2 đầu sách | Tổng lượt: %3 | Hiển thị top %4")
+        LanguageManager::instance().getText("MSG_STATS_SUMMARY_HTML")
             .arg(khoangTG)
             .arg(danhSachTop.size())
             .arg(tongLuotMuon)
@@ -498,7 +496,7 @@ int ManHinhTop10::demLuotMuonTheoKhoangThoiGian(PTRDS dauSach, QDate tuNgay, QDa
     int count = 0;
     extern PTRDG rootDocGia;
     
-    // Duyệt tất cả độc giả để đếm lượt mượn
+    // Duyệt tất cả học viên để đếm lượt mượn
     std::function<void(PTRDG)> duyetAVL = [&](PTRDG node) {
         if (!node) return;
         
@@ -553,17 +551,17 @@ void ManHinhTop10::hienThiSoSanhXuHuong() {
     QString mauNen, mauVien;
     
     if (tongTang > tongGiam) {
-        thongBao = QString("<b>Xu hướng tích cực:</b> Có %1 sách tăng, %2 sách giảm, %3 sách không đổi so với kỳ trước")
+        thongBao = LanguageManager::instance().getText("MSG_TREND_POSITIVE")
                    .arg(tongTang).arg(tongGiam).arg(tongKhongDoi);
         mauNen = "#d1fae5";
         mauVien = "#059669";
     } else if (tongGiam > tongTang) {
-        thongBao = QString("<b>Xu hướng giảm:</b> Có %1 sách giảm, %2 sách tăng, %3 sách không đổi so với kỳ trước")
+        thongBao = LanguageManager::instance().getText("MSG_TREND_NEGATIVE")
                    .arg(tongGiam).arg(tongTang).arg(tongKhongDoi);
         mauNen = "#fee2e2";
         mauVien = "#dc2626";
     } else {
-        thongBao = QString("<b>Xu hướng ổn định:</b> Có %1 sách tăng, %2 sách giảm, %3 sách không đổi")
+        thongBao = LanguageManager::instance().getText("MSG_TREND_STABLE")
                    .arg(tongTang).arg(tongGiam).arg(tongKhongDoi);
         mauNen = "#fef3c7";
         mauVien = "#f59e0b";
@@ -578,14 +576,6 @@ void ManHinhTop10::hienThiSoSanhXuHuong() {
 }
 
 void ManHinhTop10::onExportReport() {
-    QPrinter printer(QPrinter::HighResolution);
-    printer.setPageSize(QPageSize::A4);
-    
-    QPrintDialog printDialog(&printer, this);
-    if (printDialog.exec() != QDialog::Accepted) {
-        return;
-    }
-    
     QString html = "<html><head><style>"
                    "body { font-family: Arial, sans-serif; margin: 30px; }"
                    ".header { text-align: center; border-bottom: 3px solid #f39c12; padding-bottom: 15px; margin-bottom: 25px; }"
@@ -602,7 +592,7 @@ void ManHinhTop10::onExportReport() {
                    "</style></head><body>";
     
     html += "<div class='header'>";
-    html += "<h1>TOP 10 SÁCH PHỔ BIẾN NHẤT</h1>";
+    html += "<h1>" + LanguageManager::instance().getText("HEADER_TOP10") + "</h1>";
     html += "<p>Báo Cáo Thống Kê Hệ Thống Quản Lý Thư Viện</p>";
     html += "</div>";
     
@@ -615,7 +605,13 @@ void ManHinhTop10::onExportReport() {
     html += "</div>";
     
     html += "<table>";
-    html += "<tr><th>Hạng</th><th>ISBN</th><th>Tên Sách</th><th>Tác Giả</th><th>Số Lượt</th><th>Tỷ Lệ</th><th>Xu Hướng</th></tr>";
+    html += "<tr><th>" + LanguageManager::instance().getText("TABLE_HEADER_RANK") + 
+                   "</th><th>" + LanguageManager::instance().getText("TABLE_HEADER_ISBN") + 
+                   "</th><th>" + LanguageManager::instance().getText("TABLE_HEADER_TITLE") + 
+                   "</th><th>" + LanguageManager::instance().getText("TABLE_HEADER_AUTHOR") + 
+                   "</th><th>" + LanguageManager::instance().getText("TABLE_HEADER_LOANS") + 
+                   "</th><th>" + LanguageManager::instance().getText("TABLE_HEADER_RATE") + 
+                   "</th><th>" + LanguageManager::instance().getText("TABLE_HEADER_TREND") + "</th></tr>";
     
     QAbstractItemModel *m = modelTop10;
     int rows = m ? m->rowCount() : 0;
@@ -639,9 +635,6 @@ void ManHinhTop10::onExportReport() {
     
     html += "</body></html>";
     
-    QTextDocument document;
-    document.setHtml(html);
-    document.print(&printer);
-    
-    QMessageBox::information(this, "Xuất Báo Cáo", "Đã in báo cáo Top 10 thành công!");
+    // Use Centralized PrintHelper
+    PrintHelper::inBaoCaoTuyChinh("Top 10 Sách", html, this);
 }

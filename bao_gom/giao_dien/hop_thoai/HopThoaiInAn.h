@@ -11,6 +11,7 @@
 #include <QGraphicsDropShadowEffect>
 #include <QLineEdit>
 #include <QComboBox>
+#include <QMouseEvent>
 #include "models/DocGia.h"
 #include "models/QuanLySach.h"
 
@@ -65,9 +66,19 @@ private:
     bool kiemTraDocGiaHopLe();                       // Validate độc giả trước khi in
 
     // ========== DỮ LIỆU ==========
+    // ========== DỮ LIỆU ==========
     PTRDG docGiaHienTai;                 // Độc giả được truyền vào
     PTRDS* dsDauSach;                    // Danh sách đầu sách toàn hệ thống
     int soLuongDauSach;
+
+protected:
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
+
+private:
+    bool m_dragging = false;
+    QPoint m_dragPosition;
 };
 
 #endif // HOPTHOAIINAN_H

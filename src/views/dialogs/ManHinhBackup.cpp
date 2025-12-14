@@ -4,10 +4,11 @@
 #include <QMessageBox>
 #include <QInputDialog>
 #include <QDateTime>
+#include "utils/LanguageManager.h"
 
 ManHinhBackup::ManHinhBackup(QWidget *parent)
     : QDialog(parent) {
-    setWindowTitle("Quản Lý Sao Lưu");
+    setWindowTitle(LanguageManager::instance().getText("TITLE_BACKUP_MANAGER"));
     setMinimumSize(700, 500);
     setModal(true);
     
@@ -22,7 +23,7 @@ void ManHinhBackup::thietLapGiaoDien() {
     mainLayout->setContentsMargins(20, 20, 20, 20);
     
     // Title
-    QLabel* titleLabel = new QLabel("QUẢN LÝ SAO LƯU DỮ LIỆU");
+    QLabel* titleLabel = new QLabel(LanguageManager::instance().getText("HEADER_BACKUP"));
     titleLabel->setStyleSheet(
         "font-size: 20px; "
         "font-weight: bold; "
@@ -36,11 +37,7 @@ void ManHinhBackup::thietLapGiaoDien() {
     
     // Info label
     QLabel* infoLabel = new QLabel(
-        "<b>Hướng dẫn:</b><br>"
-        "• <b>Tạo Backup:</b> Sao lưu toàn bộ dữ liệu hiện tại<br>"
-        "• <b>Phục hồi:</b> Khôi phục dữ liệu từ bản sao lưu đã chọn<br>"
-        "• <b>Xóa:</b> Xóa bản sao lưu đã chọn<br>"
-        "• <b>Xóa cũ:</b> Xóa các bản sao lưu cũ, giữ lại n bản mới nhất"
+        LanguageManager::instance().getText("MSG_BACKUP_GUIDE_HTML")
     );
     infoLabel->setWordWrap(true);
     infoLabel->setStyleSheet(
@@ -84,24 +81,24 @@ void ManHinhBackup::thietLapGiaoDien() {
     // Buttons
     QHBoxLayout* buttonLayout = new QHBoxLayout();
     
-    nutTaoBackup = new QPushButton("Tạo Backup");
+    nutTaoBackup = new QPushButton(LanguageManager::instance().getText("BTN_CREATE_BACKUP"));
     nutTaoBackup->setObjectName("btnCreate");
     
-    nutPhucHoi = new QPushButton("Phục Hồi");
+    nutPhucHoi = new QPushButton(LanguageManager::instance().getText("BTN_RESTORE_BACKUP"));
     nutPhucHoi->setObjectName("btnRestore");
     nutPhucHoi->setEnabled(false);
     
-    nutXoa = new QPushButton("Xóa");
+    nutXoa = new QPushButton(LanguageManager::instance().getText("BTN_DELETE_BACKUP"));
     nutXoa->setObjectName("btnDelete");
     nutXoa->setEnabled(false);
     
-    nutXoaCu = new QPushButton("Xóa Cũ");
+    nutXoaCu = new QPushButton(LanguageManager::instance().getText("BTN_CLEANUP_BACKUP"));
     nutXoaCu->setObjectName("btnCleanup");
     
-    nutLamMoi = new QPushButton("Làm Mới");
+    nutLamMoi = new QPushButton(LanguageManager::instance().getText("BTN_REFRESH"));
     nutLamMoi->setObjectName("btnRefresh");
     
-    nutDong = new QPushButton("✖️ Đóng");
+    nutDong = new QPushButton(LanguageManager::instance().getText("BTN_CLOSE"));
     nutDong->setObjectName("btnClose");
     
     buttonLayout->addWidget(nutTaoBackup);
@@ -202,7 +199,7 @@ void ManHinhBackup::capNhatDanhSachBackup() {
     }
     
     if (cacBackup.empty()) {
-        nhanThongTin->setText("📭 Chưa có bản sao lưu nào");
+        nhanThongTin->setText(LanguageManager::instance().getText("MSG_NO_BACKUP"));
         nhanThongTin->setStyleSheet("color: #95a5a6; font-weight: bold;");
         return;
     }
@@ -216,7 +213,7 @@ void ManHinhBackup::capNhatDanhSachBackup() {
             sizeStr = QString::number(sizeKB, 'f', 1) + " KB";
         }
         
-        QString item = QString("📁 %1 | 📅 %2 | 💾 %3")
+        QString item = QString("%1 | %2 | %3")
             .arg(QString::fromStdString(backup.tenFile))
             .arg(QString::fromStdString(backup.ngayTao))
             .arg(sizeStr);
@@ -224,7 +221,7 @@ void ManHinhBackup::capNhatDanhSachBackup() {
         danhSachBackup->addItem(item);
     }
     
-    nhanThongTin->setText(QString("✅ Tìm thấy %1 bản sao lưu").arg(cacBackup.size()));
+    nhanThongTin->setText(LanguageManager::instance().getText("MSG_BACKUP_FOUND").arg(cacBackup.size()));
     nhanThongTin->setStyleSheet("color: #27ae60; font-weight: bold;");
 }
 
@@ -232,13 +229,12 @@ void ManHinhBackup::onTaoBackupClicked() {
     std::string loi = TaoBackup();
     
     if (loi.empty()) {
-        QMessageBox::information(this, "Thành công 🎉",
-            "✅ Đã tạo bản sao lưu thành công!\n\n"
-            "💾 Dữ liệu đã được sao lưu an toàn.");
+        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_BACKUP_SUCCESS"),
+            LanguageManager::instance().getText("MSG_BACKUP_SUCCESS"));
         capNhatDanhSachBackup();
     } else {
-        QMessageBox::critical(this, "Lỗi ❌",
-            QString("Không thể tạo backup:\n%1").arg(QString::fromStdString(loi)));
+        QMessageBox::critical(this, LanguageManager::instance().getText("TITLE_ERROR"),
+            LanguageManager::instance().getText("MSG_ERROR_CREATE_BACKUP_FAILED").arg(QString::fromStdString(loi)));
     }
 }
 
@@ -249,11 +245,8 @@ void ManHinhBackup::onPhucHoiClicked() {
     const ThongTinBackup& backup = cacBackup[row];
     
     QMessageBox::StandardButton reply = QMessageBox::question(this,
-        "Xác nhận phục hồi ⚠️",
-        QString("Bạn có chắc muốn phục hồi từ:\n\n"
-               "📁 %1\n"
-               "📅 %2\n\n"
-               "⚠️ Dữ liệu hiện tại sẽ bị ghi đè!")
+        LanguageManager::instance().getText("BTN_RESTORE_BACKUP"), // Using Button Title as Window Title or generic "Confirm"
+        LanguageManager::instance().getText("MSG_CONFIRM_RESTORE")
             .arg(QString::fromStdString(backup.tenFile))
             .arg(QString::fromStdString(backup.ngayTao)),
         QMessageBox::Yes | QMessageBox::No);
@@ -262,12 +255,11 @@ void ManHinhBackup::onPhucHoiClicked() {
         std::string loi = PhucHoiBackup(backup.duongDanDayDu);
         
         if (loi.empty()) {
-            QMessageBox::information(this, "Thành công 🎉",
-                "✅ Đã phục hồi dữ liệu thành công!\n\n"
-                "🔄 Vui lòng tải lại chương trình để áp dụng thay đổi.");
+            QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"),
+                LanguageManager::instance().getText("MSG_RESTORE_SUCCESS"));
         } else {
-            QMessageBox::critical(this, "Lỗi ❌",
-                QString("Không thể phục hồi:\n%1").arg(QString::fromStdString(loi)));
+            QMessageBox::critical(this, LanguageManager::instance().getText("TITLE_ERROR"),
+                LanguageManager::instance().getText("MSG_ERROR_RESTORE_FAILED").arg(QString::fromStdString(loi)));
         }
     }
 }
@@ -279,10 +271,8 @@ void ManHinhBackup::onXoaClicked() {
     const ThongTinBackup& backup = cacBackup[row];
     
     QMessageBox::StandardButton reply = QMessageBox::question(this,
-        "Xác nhận xóa ⚠️",
-        QString("Bạn có chắc muốn xóa bản sao lưu:\n\n"
-               "📁 %1\n"
-               "📅 %2")
+        LanguageManager::instance().getText("BTN_DELETE_BACKUP"),
+        LanguageManager::instance().getText("MSG_CONFIRM_DELETE_BACKUP")
             .arg(QString::fromStdString(backup.tenFile))
             .arg(QString::fromStdString(backup.ngayTao)),
         QMessageBox::Yes | QMessageBox::No);
@@ -291,12 +281,12 @@ void ManHinhBackup::onXoaClicked() {
         std::string loi = XoaBackup(backup.duongDanDayDu);
         
         if (loi.empty()) {
-            nhanThongTin->setText("✅ Đã xóa bản sao lưu");
+            nhanThongTin->setText(LanguageManager::instance().getText("MSG_DELETE_SUCCESS"));
             nhanThongTin->setStyleSheet("color: #27ae60; font-weight: bold;");
             capNhatDanhSachBackup();
         } else {
-            QMessageBox::critical(this, "Lỗi ❌",
-                QString("Không thể xóa:\n%1").arg(QString::fromStdString(loi)));
+            QMessageBox::critical(this, LanguageManager::instance().getText("TITLE_ERROR"),
+                LanguageManager::instance().getText("MSG_ERROR_DELETE_FAILED").arg(QString::fromStdString(loi)));
         }
     }
 }
@@ -304,20 +294,19 @@ void ManHinhBackup::onXoaClicked() {
 void ManHinhBackup::onXoaCuClicked() {
     bool ok;
     int soGiuLai = QInputDialog::getInt(this,
-        "Xóa backup cũ 🧹",
-        "Nhập số bản sao lưu muốn giữ lại (mới nhất):",
+        LanguageManager::instance().getText("TITLE_CLEANUP"),
+        LanguageManager::instance().getText("MSG_CLEANUP_PROMPT"),
         5, 1, 100, 1, &ok);
     
     if (ok) {
         int soDaXoa = XoaBackupCu(soGiuLai);
         
         if (soDaXoa >= 0) {
-            QMessageBox::information(this, "Thành công 🎉",
-                QString("✅ Đã xóa %1 bản cũ!\n\n"
-                       "📦 Giữ lại %2 bản mới nhất.").arg(soDaXoa).arg(soGiuLai));
+            QMessageBox::information(this, LanguageManager::instance().getText("TITLE_CLEANUP"),
+                LanguageManager::instance().getText("MSG_CLEANUP_SUCCESS").arg(soDaXoa).arg(soGiuLai));
             capNhatDanhSachBackup();
         } else {
-            QMessageBox::critical(this, "Lỗi ❌", "Không thể xóa các bản cũ!");
+            QMessageBox::critical(this, LanguageManager::instance().getText("TITLE_ERROR"), LanguageManager::instance().getText("MSG_ERROR_CLEANUP_FAILED"));
         }
     }
 }

@@ -29,7 +29,11 @@ private:
     QLineEdit *oNhapHo;
     QLineEdit *oNhapTen;
     QLabel *nhanPreviewHoTen;
+
     QComboBox *hopChonGioiTinh;
+    // Feature 5 Dates
+    class QDateEdit *inputNgayLap;
+    class QDateEdit *inputNgayHetHan;
     QPushButton *nutLuu;
     QPushButton *nutHuy;
     QPushButton *nutXoaForm;

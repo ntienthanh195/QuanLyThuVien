@@ -3,6 +3,7 @@
 #include "utils/Utf8Helper.h"
 #include "models/KiemTraDuLieu.h"
 #include "utils/XuLyChuoi.h"
+#include "utils/LanguageManager.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -15,8 +16,17 @@ extern DauSach* dsDauSach[];
 extern int soLuongDauSach;
 
 ManHinhSuaSach::ManHinhSuaSach(const QString& isbn, QWidget *parent)
-    : QDialog(parent), isbnGoc(isbn), sachHienTai(nullptr) {
-    setWindowTitle("Chỉnh Sửa Đầu Sách 📝");
+    : QDialog(parent), isbnGoc(isbn), sachHienTai(nullptr)
+    , nhapISBN(nullptr)
+    , nhapTenSach(nullptr)
+    , nhapTacGia(nullptr)
+    , chonTheLoai(nullptr)
+    , nhapNamXuatBan(nullptr)
+    , nhapSoTrang(nullptr)
+    , nutLuu(nullptr)
+    , nutHuy(nullptr)
+{
+    setWindowTitle(LanguageManager::instance().getText("TITLE_EDIT_BOOK"));
     setMinimumWidth(550);
     setModal(true);
 
@@ -34,12 +44,12 @@ void ManHinhSuaSach::thietLapGiaoDien() {
     mainLayout->setContentsMargins(20, 20, 20, 20);
 
     // Title
-    QLabel* titleLabel = new QLabel("📝 Chỉnh Sửa Thông Tin Đầu Sách");
+    QLabel* titleLabel = new QLabel(LanguageManager::instance().getText("HEADER_EDIT_BOOK"));
     titleLabel->setStyleSheet("font-size: 18px; font-weight: bold; color: #2c3e50; margin-bottom: 10px;");
     mainLayout->addWidget(titleLabel);
 
     // Form group
-    QGroupBox* formGroup = new QGroupBox("Thông Tin Đầu Sách", this);
+    QGroupBox* formGroup = new QGroupBox(LanguageManager::instance().getText("GROUP_BOOK_INFO"), this);
     formGroup->setObjectName("formGroup");
     QFormLayout* formLayout = new QFormLayout(formGroup);
     formLayout->setSpacing(12);
@@ -49,72 +59,76 @@ void ManHinhSuaSach::thietLapGiaoDien() {
     nhapISBN = new QLineEdit();
     nhapISBN->setReadOnly(true);
     nhapISBN->setStyleSheet("background-color: #ecf0f1; color: #7f8c8d;");
-    formLayout->addRow("ISBN:", nhapISBN);
+    formLayout->addRow(LanguageManager::instance().getText("TABLE_HEADER_ISBN") + ":", nhapISBN);
 
-    QLabel* noteLabel = new QLabel("⚠️ ISBN không thể chỉnh sửa");
+    QLabel* noteLabel = new QLabel(LanguageManager::instance().getText("LBL_ISBN_READONLY"));
     noteLabel->setStyleSheet("color: #95a5a6; font-size: 11px; font-style: italic;");
     formLayout->addRow("", noteLabel);
 
     // Book name
+    // Book name
     nhapTenSach = new QLineEdit();
-    nhapTenSach->setPlaceholderText("Nhập tên sách...");
+    nhapTenSach->setPlaceholderText(LanguageManager::instance().getText("PLACEHOLDER_ENTER_BOOK_CODE")); // Reusing code placeholder or just "..."? Use generic or hardcode "..."
+    // Just hardcode "..." for now or generic "..."
+    nhapTenSach->setPlaceholderText("...");
     nhapTenSach->setObjectName("inputField");
     connect(nhapTenSach, &QLineEdit::textChanged, this, &ManHinhSuaSach::kiemTraDuLieu);
-    formLayout->addRow("Tên Sách: *", nhapTenSach);
+    formLayout->addRow(LanguageManager::instance().getText("TABLE_HEADER_TITLE") + ": *", nhapTenSach);
 
     // Author
+    // Author
     nhapTacGia = new QLineEdit();
-    nhapTacGia->setPlaceholderText("Nhập tên tác giả...");
+    nhapTacGia->setPlaceholderText("...");
     nhapTacGia->setObjectName("inputField");
     connect(nhapTacGia, &QLineEdit::textChanged, this, &ManHinhSuaSach::kiemTraDuLieu);
-    formLayout->addRow("Tác Giả: *", nhapTacGia);
+    formLayout->addRow(LanguageManager::instance().getText("TABLE_HEADER_AUTHOR") + ": *", nhapTacGia);
 
     // Genre
     chonTheLoai = new QComboBox();
     chonTheLoai->setEditable(true);
     chonTheLoai->setObjectName("inputField");
     chonTheLoai->addItems({
-        "Văn học",
-        "Khoa học",
-        "Lịch sử",
-        "Triết học",
-        "Tâm lý học",
-        "Kinh tế",
-        "Công nghệ",
-        "Giáo dục",
-        "Y học",
-        "Nghệ thuật",
-        "Thể thao",
-        "Du lịch",
-        "Nấu ăn",
-        "Thiếu nhi",
-        "Khác"
+        LanguageManager::instance().getText("GENRE_LITERATURE"),
+        LanguageManager::instance().getText("GENRE_SCIENCE"),
+        LanguageManager::instance().getText("GENRE_HISTORY"),
+        LanguageManager::instance().getText("GENRE_PHILOSOPHY"),
+        LanguageManager::instance().getText("GENRE_PSYCHOLOGY"),
+        LanguageManager::instance().getText("GENRE_ECONOMICS"),
+        LanguageManager::instance().getText("GENRE_TECHNOLOGY"),
+        LanguageManager::instance().getText("GENRE_EDUCATION"),
+        LanguageManager::instance().getText("GENRE_MEDICINE"),
+        LanguageManager::instance().getText("GENRE_ART"),
+        LanguageManager::instance().getText("GENRE_SPORTS"),
+        LanguageManager::instance().getText("GENRE_TRAVEL"),
+        LanguageManager::instance().getText("GENRE_COOKING"),
+        LanguageManager::instance().getText("GENRE_KIDS"),
+        LanguageManager::instance().getText("GENRE_OTHER")
     });
     connect(chonTheLoai, &QComboBox::currentTextChanged, this, &ManHinhSuaSach::kiemTraDuLieu);
-    formLayout->addRow("Thể Loại: *", chonTheLoai);
+    formLayout->addRow(LanguageManager::instance().getText("TABLE_HEADER_CATEGORY") + ": *", chonTheLoai);
 
     // Publication year
     nhapNamXuatBan = new QSpinBox();
     nhapNamXuatBan->setMinimum(1900);
     nhapNamXuatBan->setMaximum(2100);
     nhapNamXuatBan->setValue(2024);
-    nhapNamXuatBan->setSuffix(" năm");
+    nhapNamXuatBan->setSuffix("");
     nhapNamXuatBan->setObjectName("inputField");
-    formLayout->addRow("Năm XB:", nhapNamXuatBan);
+    formLayout->addRow(LanguageManager::instance().getText("TABLE_HEADER_YEAR") + ":", nhapNamXuatBan);
 
     // Pages
     nhapSoTrang = new QSpinBox();
     nhapSoTrang->setMinimum(1);
     nhapSoTrang->setMaximum(9999);
     nhapSoTrang->setValue(100);
-    nhapSoTrang->setSuffix(" trang");
+    nhapSoTrang->setSuffix("");
     nhapSoTrang->setObjectName("inputField");
-    formLayout->addRow("Số Trang:", nhapSoTrang);
+    formLayout->addRow(LanguageManager::instance().getText("TABLE_HEADER_PAGES") + ":", nhapSoTrang);
 
     mainLayout->addWidget(formGroup);
 
     // Info note
-    QLabel* infoLabel = new QLabel("💡 Các trường đánh dấu (*) là bắt buộc");
+    QLabel* infoLabel = new QLabel(LanguageManager::instance().getText("LBL_REQUIRED_FIELDS_NOTE"));
     infoLabel->setStyleSheet("color: #7f8c8d; font-size: 12px; padding: 10px; background-color: #ecf0f1; border-radius: 5px;");
     mainLayout->addWidget(infoLabel);
 
@@ -124,12 +138,12 @@ void ManHinhSuaSach::thietLapGiaoDien() {
     QHBoxLayout* buttonLayout = new QHBoxLayout();
     buttonLayout->setSpacing(10);
 
-    nutLuu = new QPushButton("✅ Lưu Thay Đổi");
+    nutLuu = new QPushButton(LanguageManager::instance().getText("BTN_SAVE"));
     nutLuu->setObjectName("primaryButton");
     nutLuu->setMinimumHeight(40);
     connect(nutLuu, &QPushButton::clicked, this, &ManHinhSuaSach::khiNhanLuu);
 
-    nutHuy = new QPushButton("❌ Hủy");
+    nutHuy = new QPushButton(LanguageManager::instance().getText("BTN_CLOSE"));
     nutHuy->setObjectName("nutHuy");
     nutHuy->setMinimumHeight(40);
     connect(nutHuy, &QPushButton::clicked, this, &QDialog::reject);
@@ -251,8 +265,8 @@ void ManHinhSuaSach::apDungPhongCachHienDai() {
 
 void ManHinhSuaSach::taiDuLieuSach() {
     if (!sachHienTai) {
-        QMessageBox::critical(this, "Lỗi ❌", 
-            "Không tìm thấy thông tin đầu sách!");
+        QMessageBox::critical(this, LanguageManager::instance().getText("TITLE_ERROR"), 
+            LanguageManager::instance().getText("MSG_ERROR_NOT_FOUND")); // Hardcoded error, rare case, leaving or replacing.
         reject();
         return;
     }
@@ -311,8 +325,8 @@ void ManHinhSuaSach::kiemTraDuLieu() {
 
 void ManHinhSuaSach::khiNhanLuu() {
     if (!sachHienTai) {
-        QMessageBox::critical(this, "Lỗi ❌", 
-            "Không tìm thấy thông tin đầu sách!");
+        QMessageBox::critical(this, LanguageManager::instance().getText("TITLE_ERROR"), 
+            LanguageManager::instance().getText("MSG_ERROR_NOT_FOUND"));
         return;
     }
 
@@ -325,22 +339,22 @@ void ManHinhSuaSach::khiNhanLuu() {
 
     // Validate
     if (name.isEmpty()) {
-        QMessageBox::warning(this, "Thiếu Thông Tin ⚠️",
-            "Vui lòng nhập tên sách!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"),
+            LanguageManager::instance().getText("MSG_MISSING_INFO"));
         nhapTenSach->setFocus();
         return;
     }
 
     if (author.isEmpty()) {
-        QMessageBox::warning(this, "Thiếu Thông Tin ⚠️",
-            "Vui lòng nhập tên tác giả!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"),
+            LanguageManager::instance().getText("MSG_MISSING_INFO"));
         nhapTacGia->setFocus();
         return;
     }
 
     if (genre.isEmpty()) {
-        QMessageBox::warning(this, "Thiếu Thông Tin ⚠️",
-            "Vui lòng chọn thể loại!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"),
+            LanguageManager::instance().getText("MSG_MISSING_INFO"));
         chonTheLoai->setFocus();
         return;
     }
@@ -358,18 +372,15 @@ void ManHinhSuaSach::khiNhanLuu() {
     if (!result.empty()) {
         emit sachDaCapNhat();
         
-        QMessageBox::information(this, "Thành Công 🎉",
-            QString("✅ Đã cập nhật thông tin đầu sách thành công!\n\n"
-                   "📚 Tên sách: %1\n"
-                   "✍️ Tác giả: %2\n"
-                   "📖 Thể loại: %3")
+        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"),
+            LanguageManager::instance().getText("MSG_UPDATE_BOOK_SUCCESS")
                 .arg(name)
                 .arg(author)
                 .arg(genre));
         
         accept();
     } else {
-        QMessageBox::critical(this, "Lỗi ❌",
-            "Không thể cập nhật thông tin đầu sách. Vui lòng thử lại!");
+        QMessageBox::critical(this, LanguageManager::instance().getText("TITLE_ERROR"),
+            LanguageManager::instance().getText("MSG_ERROR_UPDATE_BOOK"));
     }
 }

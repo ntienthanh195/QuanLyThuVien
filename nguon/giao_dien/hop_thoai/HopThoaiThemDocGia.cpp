@@ -3,6 +3,8 @@
 #include "utils/ResponsiveHelper.h"
 #include "utils/XuLyChuoi.h"
 #include "utils/EventBus.h"
+#include "utils/ToastNotification.h"
+#include "utils/PrintHelper.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -17,6 +19,9 @@ HopThoaiThemDocGia::HopThoaiThemDocGia(QWidget *cha) : QDialog(cha), maDuocTao(0
     ResponsiveHelper::ScreenSize screenSize = ResponsiveHelper::detectScreenSize();
     setMinimumWidth(ResponsiveHelper::getScaledWidth(550, screenSize));
     
+    // Apply Deep Night Premium Theme
+    this->setStyleSheet("QDialog { background-color: #1e1e2d; color: #ffffff; }");
+
     thieLapGiaoDien();
     taoMaDocGia();
 }
@@ -41,32 +46,33 @@ void HopThoaiThemDocGia::thieLapGiaoDien() {
     int fontSize = ResponsiveHelper::getScaledFontSize(14, screenSize);
     nhomMa->setStyleSheet(QString(
         "QGroupBox {"
-        "   background-color: #1E1E2D;"
-        "   border: 2px solid #3699FF;"
-        "   border-radius: 12px;"
+        "   background-color: #1e1e2d;"
+        "   border: 1px solid #323248;"
+        "   border-radius: 6px;"
         "   margin-top: 12px;"
         "   padding-top: 18px;"
         "   font-weight: bold;"
         "   font-size: %1px;"
-        "   color: #FFFFFF;"
+        "   color: #ffffff;"
         "}"
         "QGroupBox::title {"
         "   subcontrol-origin: margin;"
         "   subcontrol-position: top left;"
-        "   left: 12px;"
-        "   top: -12px;"
-        "   padding: 0 8px;"
-        "   color: #3699FF;"
-        "   background-color: #1E1E2D;"
+        "   left: 10px;"
+        "   top: -10px;"
+        "   padding: 0 5px;"
+        "   color: #5D9CEC;"
+        "   background-color: #1e1e2d;"
         "   font-size: 12px;"
         "}"
     ).arg(fontSize));
     QVBoxLayout *boTriMa = new QVBoxLayout(nhomMa);
     
-    nhanMaThe = new QLabel();
+    // Initialize nhanMaThe (Fix crash)
+    nhanMaThe = new QLabel("-");
     nhanMaThe->setAlignment(Qt::AlignCenter);
     int maSize = ResponsiveHelper::getScaledFontSize(28, screenSize);
-    nhanMaThe->setStyleSheet(QString("font-size: %1px; font-weight: bold; color: #1BC5BD; padding: 15px; background-color: #252534; border-radius: 8px;").arg(maSize));
+    nhanMaThe->setStyleSheet(QString("font-size: %1px; font-weight: bold; color: #5D9CEC; padding: 15px; background-color: #1b1b29; border-radius: 8px; border: 1px dashed #323248;").arg(maSize));
     boTriMa->addWidget(nhanMaThe);
     
     QLabel *chuThich = new QLabel("* Mã thẻ được tạo tự động");
@@ -79,23 +85,23 @@ void HopThoaiThemDocGia::thieLapGiaoDien() {
     QGroupBox *nhomForm = new QGroupBox("Thông Tin Độc Giả", this);
     nhomForm->setStyleSheet(QString(
         "QGroupBox {"
-        "   background-color: #1E1E2D;"
-        "   border: 2px solid #3699FF;"
-        "   border-radius: 12px;"
+        "   background-color: #1e1e2d;"
+        "   border: 1px solid #323248;"
+        "   border-radius: 6px;"
         "   margin-top: 12px;"
         "   padding-top: 18px;"
         "   font-weight: bold;"
         "   font-size: %1px;"
-        "   color: #FFFFFF;"
+        "   color: #ffffff;"
         "}"
         "QGroupBox::title {"
         "   subcontrol-origin: margin;"
         "   subcontrol-position: top left;"
-        "   left: 12px;"
-        "   top: -12px;"
-        "   padding: 0 8px;"
-        "   color: #3699FF;"
-        "   background-color: #1E1E2D;"
+        "   left: 10px;"
+        "   top: -10px;"
+        "   padding: 0 5px;"
+        "   color: #5D9CEC;"
+        "   background-color: #1e1e2d;"
         "   font-size: 12px;"
         "}"
     ).arg(fontSize));
@@ -105,7 +111,22 @@ void HopThoaiThemDocGia::thieLapGiaoDien() {
     boTriForm->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
     
     int fieldHeight = ResponsiveHelper::getScaledHeight(40, screenSize);
-    QString kieuTruong = QString("padding: 8px; border: 2px solid #2B2B40; border-radius: 8px; font-size: %1px; background-color: #252534; color: #FFFFFF; min-height: %2px;").arg(fontSize).arg(fieldHeight);
+    QString kieuTruong = QString(
+        "QLineEdit, QComboBox {"
+        "   padding: 0 10px;"
+        "   border: 1px solid #323248;"
+        "   border-radius: 6px;"
+        "   font-size: %1px;"
+        "   background-color: #1b1b29;"
+        "   color: #ffffff;"
+        "   min-height: %2px;"
+        "   selection-background-color: #5D9CEC;"
+        "}"
+        "QLineEdit:focus, QComboBox:focus {"
+        "   border: 1px solid #5D9CEC;"
+        "   background-color: #1b1b29;"
+        "}"
+    ).arg(fontSize).arg(fieldHeight);
     
     oNhapHo = new QLineEdit();
     oNhapHo->setPlaceholderText("Nhập họ đệm...");
@@ -155,19 +176,56 @@ void HopThoaiThemDocGia::thieLapGiaoDien() {
     
     QHBoxLayout *boTriNut = new QHBoxLayout();
     
-    nutXoaForm = new QPushButton("↺ Làm Mới");
+    nutXoaForm = new QPushButton("Làm Mới");
     nutXoaForm->setMinimumSize(buttonWidth, buttonHeight);
-    nutXoaForm->setStyleSheet(QString("QPushButton { background-color: #6C6C80; color: white; border: none; border-radius: 8px; font-size: %1px; font-weight: bold; } QPushButton:hover { background-color: #5A5A70; }").arg(buttonFont));
+    nutXoaForm->setCursor(Qt::PointingHandCursor);
+    nutXoaForm->setStyleSheet(QString(
+        "QPushButton {"
+        "   background-color: #2b2b40;"
+        "   color: #ffffff;"
+        "   border: 1px solid #323248;"
+        "   border-radius: 6px;"
+        "   font-size: %1px;"
+        "   font-weight: 600;"
+        "}"
+        "QPushButton:hover { background-color: #323248; border-color: #5D9CEC; }"
+        "QPushButton:pressed { background-color: #1b1b29; }"
+    ).arg(buttonFont));
     connect(nutXoaForm, &QPushButton::clicked, this, &HopThoaiThemDocGia::xoaTatCaTruong);
     
-    nutLuu = new QPushButton("Lưu");
+    nutLuu = new QPushButton("Thêm Độc Giả");
     nutLuu->setMinimumSize(buttonWidth, buttonHeight);
-    nutLuu->setStyleSheet(QString("QPushButton { background-color: #1BC5BD; color: white; border: none; border-radius: 8px; font-size: %1px; font-weight: bold; } QPushButton:hover { background-color: #0F9A94; } QPushButton:disabled { background-color: #2B2B40; color: #6C6C80; }").arg(buttonFont));
+    nutLuu->setCursor(Qt::PointingHandCursor);
+    nutLuu->setStyleSheet(QString(
+        "QPushButton {"
+        "   background-color: #5D9CEC;"
+        "   color: #ffffff;"
+        "   border: none;"
+        "   border-radius: 6px;"
+        "   font-size: %1px;"
+        "   font-weight: 700;"
+        "}"
+        "QPushButton:hover { background-color: #4A89DC; }"
+        "QPushButton:pressed { background-color: #3b6bbf; }"
+        "QPushButton:disabled { background-color: #2b2b40; color: #565674; }"
+    ).arg(buttonFont));
     connect(nutLuu, &QPushButton::clicked, this, &HopThoaiThemDocGia::xuLyNutLuu);
     
     nutHuy = new QPushButton("Hủy");
     nutHuy->setMinimumSize(buttonWidth, buttonHeight);
-    nutHuy->setStyleSheet(QString("QPushButton { background-color: #F64E60; color: white; border: none; border-radius: 8px; font-size: %1px; font-weight: bold; } QPushButton:hover { background-color: #D63447; }").arg(buttonFont));
+    nutHuy->setCursor(Qt::PointingHandCursor);
+    nutHuy->setStyleSheet(QString(
+        "QPushButton {"
+        "   background-color: #2b2b40;"
+        "   color: #ffffff;"
+        "   border: 1px solid #323248;"
+        "   border-radius: 6px;"
+        "   font-size: %1px;"
+        "   font-weight: 600;"
+        "}"
+        "QPushButton:hover { background-color: #323248; border-color: #f64e60; }"
+        "QPushButton:pressed { background-color: #1b1b29; }"
+    ).arg(buttonFont));
     connect(nutHuy, &QPushButton::clicked, this, &QDialog::reject);
     
     boTriNut->addWidget(nutXoaForm);
@@ -202,14 +260,14 @@ void HopThoaiThemDocGia::kiemTraDuLieu() {
     nutLuu->setEnabled(hopLe);
     if (hopLe) {
         nhanTrangThai->setText("✓ Sẵn sàng lưu");
-        nhanTrangThai->setStyleSheet("color: #1BC5BD; font-size: 13px;");
+        nhanTrangThai->setStyleSheet("color: #78C2AD; font-size: 13px;");
     }
 }
 
 void HopThoaiThemDocGia::xuLyNutLuu() {
     if (oNhapHo->text().trimmed().isEmpty() || oNhapTen->text().trimmed().isEmpty()) {
         nhanTrangThai->setText("✕ Vui lòng điền đầy đủ thông tin!");
-        nhanTrangThai->setStyleSheet("color: #F64E60; font-weight: bold;");
+        nhanTrangThai->setStyleSheet("color: #E06D6D; font-weight: bold;");
         return;
     }
     
@@ -234,7 +292,7 @@ void HopThoaiThemDocGia::xuLyNutLuu() {
     std::string loiHo = ChuanHoaTenUnicode(ho, 1, 50, hoChuan);
     if (!loiHo.empty()) {
         nhanTrangThai->setText("✕ " + QString::fromStdString(loiHo));
-        nhanTrangThai->setStyleSheet("color: #F64E60; font-weight: bold; font-size: 13px;");
+        nhanTrangThai->setStyleSheet("color: #E06D6D; font-weight: bold; font-size: 13px;");
         oNhapHo->setFocus();
         nutLuu->setEnabled(true);
         nutHuy->setEnabled(true);
@@ -246,7 +304,7 @@ void HopThoaiThemDocGia::xuLyNutLuu() {
     std::string loiTen = ChuanHoaTenUnicode(ten, 1, 20, tenChuan);
     if (!loiTen.empty()) {
         nhanTrangThai->setText("✕ " + QString::fromStdString(loiTen));
-        nhanTrangThai->setStyleSheet("color: #F64E60; font-weight: bold; font-size: 13px;");
+        nhanTrangThai->setStyleSheet("color: #E06D6D; font-weight: bold; font-size: 13px;");
         oNhapTen->setFocus();
         nutLuu->setEnabled(true);
         nutHuy->setEnabled(true);
@@ -266,15 +324,25 @@ void HopThoaiThemDocGia::xuLyNutLuu() {
         saveDocGia(rootDocGia);
         // Global notification
         EventBus::instance().docGiaAdded(newReader->data.MaThe);
+        
+        // Auto-Print Card (Silent or Prompt)
+        PrintHelper::inTheDocGiaTuDong(newReader, this);
     }
     
     nhanTrangThai->setText(QString("✓ Đã thêm độc giả: %1 %2")
                           .arg(QString::fromStdString(hoChuan))
                           .arg(QString::fromStdString(tenChuan)));
-    nhanTrangThai->setStyleSheet("color: #1BC5BD; font-weight: bold; font-size: 13px;");
+    nhanTrangThai->setStyleSheet("color: #78C2AD; font-weight: bold; font-size: 13px;");
     
     emit docGiaDaThem();
-    QTimer::singleShot(1000, this, &HopThoaiThemDocGia::accept);
+    
+    // Show Toast
+    ToastNotification::show(QString("Đã thêm độc giả '%1 %2' thành công!")
+                           .arg(QString::fromStdString(hoChuan))
+                           .arg(QString::fromStdString(tenChuan)), ToastNotification::SUCCESS);
+    
+    accept(); // Exit immediately
+    // QTimer removed
 }
 
 void HopThoaiThemDocGia::capNhatPreviewHoTen() {

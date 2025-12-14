@@ -10,7 +10,15 @@
 #include <ctime>
 #include <stdexcept>
 #include <sstream>
+#include <sstream>
 #include "utils/EventBus.h"
+#include <algorithm> // For std::sort
+
+#include "utils/DatabaseManager.h"
+#include <QSqlQuery>
+#include <QSqlError>
+#include "utils/AuditLogger.h"
+
 
 
 //  BIEN TOAN CUC 
@@ -229,8 +237,9 @@ PTRDMS timDanhMucTheoMaSach(const std::string &ma, PTRDS ds[], int n, std::ostre
     
     // Chi duyet DSLK cua dau sach nay (thay vi duyet N dau sach)
     PTRDMS p = dauSach->dms;
+    std::string maUpper = ChuyenInHoa(ma);
     while (p) {                                                 // duyet DSLK don
-        if (p->maSach == ma) return p;                         // tim thay - early return
+        if (ChuyenInHoa(p->maSach) == maUpper) return p;       // tim thay (case-insensitive) - early return
         p = p->next;                                            // node tiep theo
     }
     
@@ -246,8 +255,9 @@ PTRDMS timDanhMucTheoMaSach(const std::string &ma, PTRDS ds[], int n, std::ostre
 
 
 // them dau sach moi vao mang
+// them dau sach moi vao mang
 bool themDauSach(PTRDS ds[], int &n, const std::string &isbn, const std::string &ten, int trang,
-                 const std::string &tg, int nam, const std::string &tl, bool anLang) {
+                 const std::string &tg, int nam, const std::string &tl, bool anLang, long long giaTien) {
     
     if (n >= MAX_DAUSACH) {                                    // kiem tra gioi han
         if (!anLang) thongBao(std::cout, "Gioi han dau sach!", LOI);
@@ -258,19 +268,49 @@ bool themDauSach(PTRDS ds[], int &n, const std::string &isbn, const std::string 
     
     // kiem tra ISBN
     if (!KiemTraChuoiRong(isbn, "ISBN").empty() ||
-        !(loi = ChuanHoaISBNFile(isbn, isbnChuan)).empty() ||
-        !(loi = KiemTraTrungISBN(isbnChuan)).empty()) {
+        !(loi = ChuanHoaISBNFile(isbn, isbnChuan)).empty()) {
         if (!anLang) thongBao(std::cout, loi, LOI);
+        return false;
+    }
+    
+    // Skip KiemTraTrungISBN when loading from DB (anLang=true)
+    if (!anLang && !(loi = KiemTraTrungISBN(isbnChuan)).empty()) {
+        thongBao(std::cout, loi, LOI);
         return false;
     }
 
     // kiem tra cac truong khac
-    if (!(loi = KiemTraChuoiVaDodai(ten, "Ten sach", MAX_TEN_SACH)).empty() ||
-        trang <= 0 || trang > MAX_SO_TRANG ||
-        !(loi = KiemTraChuoiVaDodai(tg, "Tac gia", MAX_TAC_GIA)).empty() ||
-        !(loi = KiemTraNamXuatBan(nam)).empty() ||
-        !(loi = KiemTraChuoiVaDodai(tl, "The loai", MAX_THE_LOAI)).empty()) {
-        if (!anLang) thongBao(std::cout, loi, LOI);
+    std::string checkTen = KiemTraChuoiVaDodai(ten, "Ten sach", MAX_TEN_SACH);
+    if (!checkTen.empty()) {
+        if (anLang) std::cout << "[DB LOAD DEBUG] REJECTED book (ten): " << checkTen << " | Book: " << ten << "\n";
+        if (!anLang) thongBao(std::cout, checkTen, LOI);
+        return false;
+    }
+    
+    if (trang <= 0 || trang > MAX_SO_TRANG) {
+        if (anLang) std::cout << "[DB LOAD DEBUG] REJECTED book (trang): " << trang << " | Book: " << ten << "\n";
+        if (!anLang) thongBao(std::cout, "So trang khong hop le", LOI);
+        return false;
+    }
+    
+    std::string checkTg = KiemTraChuoiVaDodai(tg, "Tac gia", MAX_TAC_GIA);
+    if (!checkTg.empty()) {
+        if (anLang) std::cout << "[DB LOAD DEBUG] REJECTED book (tac gia): " << checkTg << " | Book: " << ten << "\n";
+        if (!anLang) thongBao(std::cout, checkTg, LOI);
+        return false;
+    }
+    
+    std::string checkNam = KiemTraNamXuatBan(nam);
+    if (!checkNam.empty()) {
+        if (anLang) std::cout << "[DB LOAD DEBUG] REJECTED book (nam): " << checkNam << " | Nam: " << nam << " | Book: " << ten << "\n";
+        if (!anLang) thongBao(std::cout, checkNam, LOI);
+        return false;
+    }
+    
+    std::string checkTl = KiemTraChuoiVaDodai(tl, "The loai", MAX_THE_LOAI);
+    if (!checkTl.empty()) {
+        if (anLang) std::cout << "[DB LOAD DEBUG] REJECTED book (the loai): " << checkTl << " | Book: " << ten << "\n";
+        if (!anLang) thongBao(std::cout, checkTl, LOI);
         return false;
     }
 
@@ -282,9 +322,10 @@ bool themDauSach(PTRDS ds[], int &n, const std::string &isbn, const std::string 
     node->tacGia = ChuyenThanhTitleCase(tg);                   // gan tac gia
     node->namXuatBan = nam;                                    // gan nam XB
     node->theLoai = ChuyenThanhTitleCase(tl);                  // gan the loai
+    node->soLuotMuon = 0;                                      // khoi tao so luot muon
+    node->giaTien = giaTien;                                   // gan gia tien
     node->dms = nullptr;                                       // chua co ban sao
     node->tongBanSao = 0;                                      // tong = 0
-    node->soLuotMuon = 0;                                      // khoi tao so luot muon
 
     ds[n++] = node;                                            // them vao mang
     sapXepDauSachTheoTen(ds, 0, n - 1);                        // sap xep lai
@@ -292,6 +333,8 @@ bool themDauSach(PTRDS ds[], int &n, const std::string &isbn, const std::string 
     
     if (!anLang) {
         thongBao(std::cout, "Them thanh cong: " + node->tenSach, THONG_TIN);
+    } else {
+        std::cout << "[DB LOAD DEBUG] Successfully added: " << node->tenSach << " (ISBN: " << node->ISBN << ")\n";
     }
     // Emit event: new book added
     try {
@@ -341,6 +384,22 @@ int timKiemLogic(PTRDS ds[], int n, const std::string &tk, KetQuaTimKiem kq[]) {
         else if (duLieuChuan.tacGia.find(tuKhoaChuan) != std::string::npos)   loaiKhop = 2;
         else if (duLieuChuan.theLoai.find(tuKhoaChuan) != std::string::npos)  loaiKhop = 3;
         else if (duLieuChuan.isbn.find(tuKhoaChuan) != std::string::npos)     loaiKhop = 4;
+        
+        // 5. Tim theo MA SACH (Ma Ca Biet) - Duyet DSLK
+        if (loaiKhop == 0 && p->dms) {
+            PTRDMS pCopy = p->dms;
+            int safety = 0;
+            while (pCopy && safety < MAX_BAN_SAO) {
+                // Chuyen ma sach sang chu thuong de so sanh (tuKhoaChuan da duoc lower case trong timKiemLogic)
+                std::string maCopy = ChuyenInThuong(pCopy->maSach);
+                if (maCopy.find(tuKhoaChuan) != std::string::npos) {
+                    loaiKhop = 1; // Match Code -> High Priority (Equivalent to Exact Name)
+                    break;
+                }
+                pCopy = pCopy->next;
+                safety++;
+            }
+        }
         
         if (loaiKhop > 0 && soKetQua < MAX_KET_QUA_TIM_KIEM) {  // gioi han ket qua
             kq[soKetQua++] = {p, loaiKhop};
@@ -497,41 +556,15 @@ int ChonPivot(PTRDS arr[], int left, int right) {
     return mid;                                // tra ve vi tri median
 }
 
-// Phan hoach Lomuto O(N)
-int PhanHoach(PTRDS arr[], int left, int right) {
-    // Chon median-of-three lam pivot, dua ve cuoi
-    if (left < 0 || right >= MAX_DAUSACH || left >= right)
-        return left;                       // kiem tra hop le
-
-    int pivotIdx = ChonPivot(arr, left, right);   // chon pivot
-    hoanDoi(arr[pivotIdx], arr[right]);           // dua pivot ve cuoi
-    PTRDS pivot = arr[right];                     // lay gia tri pivot
-    if (!pivot) return left;                      // tranh loi null
-
-    // Chia mang: tat ca <= pivot ve ben trai (Lomuto)
-    int i = left - 1;                             // chi so vung nho
-    for (int j = left; j < right; ++j) {
-        if (!arr[j]) continue;                   // bo qua null
-        if (arr[j]->tenSach <= pivot->tenSach) { // nho hon hoac bang pivot
-            i++;
-            hoanDoi(arr[i], arr[j]);            // dua sang ben trai
-        }
-    }
-
-    // Dua pivot ve dung vi tri
-    hoanDoi(arr[i + 1], arr[right]);             // dat pivot dung vi tri
-    return i + 1;                                // tra ve vi tri pivot
-}
-
-// Quicksort dau sach theo ten O(N log N)
+// Quicksort dau sach theo ten (Su dung std::sort de tranh stack overflow)
 void sapXepDauSachTheoTen(PTRDS arr[], int left, int right) {
-    if (left >= right || left < 0 || right >= MAX_DAUSACH)
-        return;                          // dung khi mang rong, 1 phan tu, > max
+    if (left >= right || left < 0 || right >= MAX_DAUSACH) return;
 
-    int p = PhanHoach(arr, left, right); // phan hoach, chia mang
-
-    sapXepDauSachTheoTen(arr, left, p - 1);  // de quy trai
-    sapXepDauSachTheoTen(arr, p + 1, right); // de quy phai
+    std::sort(arr + left, arr + right + 1, [](PTRDS a, PTRDS b) {
+        if (!a) return false;
+        if (!b) return true;
+        return a->tenSach < b->tenSach;
+    });
 }
 
 // insertion sort ban sao O(N^2)
@@ -580,66 +613,25 @@ void hoanDoiKetQua(KetQuaTimKiem &a, KetQuaTimKiem &b) {
 
 
 // phan hoach ket qua O(N)
-static int phanHoachKetQua(KetQuaTimKiem arr[], std::string tenThuong[], int left, int right) {
-    if (left < 0 || right >= MAX_KET_QUA_TIM_KIEM || left > right) {  // kiem tra bounds
-        return left;                                           // tra ve gia tri an toan
-    }
-    
-    int loaiKhopPivot = arr[right].loaiKhop;                   // pivot = loai khop cuoi
-    std::string tenPivot = tenThuong[right];                   // ten pivot
-    int i = left - 1;                                          // chi so phan hoach
-    
-    for (int j = left; j < right; ++j) {
-        bool canSwap = false;                                  // can doi vi tri
-        
-        // so sanh: loai khop truoc, neu bang thi so sanh ten
-        if (arr[j].loaiKhop < loaiKhopPivot) {
-            canSwap = true;                                    // loai khop nho hon
-        } else if (arr[j].loaiKhop == loaiKhopPivot && tenThuong[j] < tenPivot) {
-            canSwap = true;                                    // cung loai, ten nho hon
-        }
-        
-        if (canSwap) {
-            ++i;
-            hoanDoiKetQua(arr[i], arr[j]);                     // doi ket qua
-            // doi ca cache
-            std::string temp = tenThuong[i];
-            tenThuong[i] = tenThuong[j];
-            tenThuong[j] = temp;
-        }
-    }
-    
-    hoanDoiKetQua(arr[i + 1], arr[right]);                     // dat pivot dung vi tri
-    std::string temp = tenThuong[i + 1];
-    tenThuong[i + 1] = tenThuong[right];
-    tenThuong[right] = temp;
-    
-    return i + 1;                                              // tra ve vi tri pivot
-}
-
-// quicksort ket qua O(N log N) trung binh, O(N^2) xau nhat
-static void sapXepNhanhKetQua(KetQuaTimKiem arr[], std::string tenThuong[], int left, int right) {
-    if (left < right && left >= 0 && right < MAX_KET_QUA_TIM_KIEM) {
-        int p = phanHoachKetQua(arr, tenThuong, left, right);        // phan hoach
-        sapXepNhanhKetQua(arr, tenThuong, left, p - 1);              // de quy trai
-        sapXepNhanhKetQua(arr, tenThuong, p + 1, right);             // de quy phai
-    }
-}
-
-// quicksort ket qua O(N log N) trung binh, O(N^2) xau nhat
+// quicksort ket qua O(N log N) (Su dung std::sort)
 void sapXepKetQuaTimKiem(KetQuaTimKiem arr[], int n) {
-    if (n <= 1) return;                                        // khong can sap xep
+    if (n <= 1) return;
     
-    // cache chuoi da chuyen thuong truoc khi sap xep
-    std::string tenThuong[MAX_KET_QUA_TIM_KIEM];               // mang cache ten da chuyen thuong
-    
-    for (int i = 0; i < n; ++i) {                              // chuan bi cache
-        if (arr[i].sach) {
-            tenThuong[i] = ChuyenInThuong(arr[i].sach->tenSach);
+    // Su dung std::sort voi custom comparator
+    std::sort(arr, arr + n, [](const KetQuaTimKiem& a, const KetQuaTimKiem& b) {
+        if (a.loaiKhop != b.loaiKhop) {
+            return a.loaiKhop < b.loaiKhop; // Loai khop nho hon (uu tien cao hon) dung truoc
         }
-    }
-    
-    sapXepNhanhKetQua(arr, tenThuong, 0, n - 1);               // goi quicksort
+        
+        // Neu cung loai khop, so sanh ten sach (case-insensitive)
+        std::string tenA = "";
+        std::string tenB = "";
+        
+        if (a.sach) tenA = ChuyenInThuong(a.sach->tenSach);
+        if (b.sach) tenB = ChuyenInThuong(b.sach->tenSach);
+        
+        return tenA < tenB;
+    });
 }
 
 
@@ -805,7 +797,7 @@ bool XoaSachTheoMaSach(PTRDS ds[], int n, const std::string &ma, std::ostream &o
 
 // cap nhat dau sach
 std::string CapNhatDauSach(PTRDS ds[], int n, const std::string &isbn, const std::string &ten, 
-                          int trang, const std::string &tg, int nam, const std::string &tl, const std::string &viTri) {
+                          int trang, const std::string &tg, int nam, const std::string &tl, const std::string &viTri, long long giaTien = -1) {
     PTRDS d = TimDauSachTheoISBN(ds, n, isbn);                // tim dau sach
     if (!d) return "Loi: Khong tim thay ISBN!";               // khong tim thay
     
@@ -835,6 +827,7 @@ std::string CapNhatDauSach(PTRDS ds[], int n, const std::string &isbn, const std
     d->tacGia = ChuyenThanhTitleCase(tg);                     // cap nhat tac gia
     d->namXuatBan = nam;                                       // cap nhat nam
     d->theLoai = ChuyenThanhTitleCase(tl);                    // cap nhat the loai
+    if (giaTien != -1) d->giaTien = giaTien;                   // cap nhat gia tien
     
     // cap nhat vi tri cho tat ca ban sao (neu co)
     if (!viTriChuan.empty()) {
@@ -915,9 +908,85 @@ bool KiemTraCoTheXoaDauSach(PTRDS dauSach) {
         baoVe++;
     }
     
-    // neu khong co ban sao nao dang muon -> co the xoa
+// neu khong co ban sao nao dang muon -> co the xoa
     return true;
 }
+
+// ==========================================
+// DATABASE INTEGRATION
+// ==========================================
+// DATABASE INTEGRATION
+// ==========================================
+
+void NapDanhSachTuDB() {
+    // Clean up old memory
+    GiaiPhongToanBoDauSach(dsDauSach, soLuongDauSach);
+    
+    QSqlDatabase db = DatabaseManager::instance().database();
+    if (!db.isOpen()) {
+        std::cout << "[DB DEBUG] Database is NOT open in NapDanhSachTuDB!\n";
+        return;
+    }
+    
+    std::cout << "[DB DEBUG] NapDanhSachTuDB: Starting load from " << db.databaseName().toStdString() << "\n";
+
+    // 1. Load Dau Sach
+    QSqlQuery q(db);
+    if (q.exec("SELECT id, isbn, ten_sach, so_trang, tac_gia, nam_xuat_ban, the_loai, so_luot_muon, gia_tien FROM dau_sach ORDER BY id")) {
+        while (q.next()) {
+            int id = q.value(0).toInt();
+            Q_UNUSED(id);
+            std::string isbn = q.value(1).toString().toStdString();
+            std::string ten = q.value(2).toString().toStdString();
+            int trang = q.value(3).toInt();
+            std::string tg = q.value(4).toString().toStdString();
+            int nam = q.value(5).toInt();
+            std::string tl = q.value(6).toString().toStdString();
+            int luotMuon = q.value(7).toInt();
+            long long gia = q.value(8).toLongLong();
+
+            themDauSach(dsDauSach, soLuongDauSach, isbn, ten, trang, tg, nam, tl, true, gia);
+            
+            // Update soLuotMuon
+            PTRDS p = TimDauSachTheoISBN(dsDauSach, soLuongDauSach, isbn);
+            if (p) p->soLuotMuon = luotMuon;
+        }
+    } else {
+        std::cout << "[DB DEBUG] Failed to execute query: " << q.lastError().text().toStdString() << "\n";
+    }
+    
+    // 2. Load Ban Sao
+    if (q.exec("SELECT ma_sach, dau_sach_id, trang_thai, vi_tri FROM ban_sao")) {
+        while (q.next()) {
+            std::string ma = q.value(0).toString().toStdString();
+            // We need to link back to the book.
+            // Since we ordered by ID in DauSach query, and we are processing BanSao...
+            // Wait, we need the ISBN. The legacy way used ISBN from file or looked up by ISBN.
+            // Here we have dau_sach_id. We can't map ID->ptr easily without a map.
+            // But we can query the ISBN for this ID.
+            int dauId = q.value(1).toInt();
+            int tt = q.value(2).toInt();
+            std::string vt = q.value(3).toString().toStdString();
+            
+            QSqlQuery q2(db);
+            q2.prepare("SELECT isbn FROM dau_sach WHERE id = ?");
+            q2.addBindValue(dauId);
+            if (q2.exec() && q2.next()) {
+                std::string isbn = q2.value(0).toString().toStdString();
+                PTRDS ds = TimDauSachTheoISBN(dsDauSach, soLuongDauSach, isbn);
+                if (ds) {
+                    // Use low-level linked list insertion (like legacy NapDanhMucSach)
+                     ChenNodeDMSVaoDauSach(ds, ma, tt, vt);
+                }
+            }
+        }
+    }
+    
+    CapNhatTongBanSao(dsDauSach, soLuongDauSach);
+    sapXepDauSachTheoTen(dsDauSach, 0, soLuongDauSach - 1);
+    std::cout << "[DB DEBUG] Finished loading. Total books: " << soLuongDauSach << "\n";
+}    
+
 
 
 
@@ -1029,7 +1098,7 @@ ThongTinDauSach LayThongTinDauSach(const std::string& isbn) {
 // them dau sach + ban sao (all-in-one, tu dong sap xep)
 std::string ThemDauSachMoi(const std::string& isbn, const std::string& ten, int trang,
                            const std::string& tg, int nam, const std::string& tl, 
-                           int soLuongBanSao, const std::string& viTri) {
+                           int soLuongBanSao, const std::string& viTri, long long giaTien) {
     // validation so luong ban sao
     if (soLuongBanSao <= 0) {
         return "Loi: So luong ban sao phai lon hon 0!";
@@ -1039,7 +1108,7 @@ std::string ThemDauSachMoi(const std::string& isbn, const std::string& ten, int 
     }
     
     // goi backend them dau sach
-    bool ok = themDauSach(dsDauSach, soLuongDauSach, isbn, ten, trang, tg, nam, tl, true);
+    bool ok = themDauSach(dsDauSach, soLuongDauSach, isbn, ten, trang, tg, nam, tl, true, giaTien);
     if (!ok) {
         return "Loi: Khong them duoc dau sach (Backend error)!";
     }
@@ -1065,6 +1134,52 @@ std::string ThemDauSachMoi(const std::string& isbn, const std::string& ten, int 
     // tu dong sap xep sau khi them thanh cong
     sapXepDauSachTheoTen(dsDauSach, 0, soLuongDauSach - 1);
     duLieuDaThayDoi = true;
+    
+    // --- DB SYNC ---
+    QSqlQuery q(DatabaseManager::instance().database());
+    q.prepare("INSERT INTO dau_sach (isbn, ten_sach, so_trang, tac_gia, nam_xuat_ban, the_loai, gia_tien) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    q.addBindValue(QString::fromStdString(isbn));
+    q.addBindValue(QString::fromStdString(ChuyenThanhTitleCase(ten)));
+    q.addBindValue(trang);
+    q.addBindValue(QString::fromStdString(ChuyenThanhTitleCase(tg)));
+    q.addBindValue(nam);
+    q.addBindValue(QString::fromStdString(ChuyenThanhTitleCase(tl)));
+    q.addBindValue((qint64)giaTien);
+    
+    int newBookId = -1;
+    if (q.exec()) {
+        newBookId = q.lastInsertId().toInt();
+    } else {
+        std::cout << "[DB ERROR] Failed to insert dau_sach: " << q.lastError().text().toStdString() << "\n";
+    }
+
+    // Sync newly added copies (they are at the head of the list)
+    if (newBookId != -1 && dauSach && dauSach->dms) {
+        PTRDMS p = dauSach->dms;
+        int count = 0;
+        DatabaseManager::instance().database().transaction();
+        while (p && count < soLuongBanSao) {
+            QSqlQuery qc(DatabaseManager::instance().database());
+            // FIXED: Added dau_sach_id column
+            qc.prepare("INSERT INTO ban_sao (ma_sach, dau_sach_id, trang_thai, vi_tri) VALUES (?, ?, ?, ?)");
+            qc.addBindValue(QString::fromStdString(p->maSach));
+            qc.addBindValue(newBookId); 
+            qc.addBindValue((int)p->trangThai);
+            qc.addBindValue(QString::fromStdString(p->viTri));
+            if (!qc.exec()) {
+                 std::cout << "[DB ERROR] Failed to insert ban_sao: " << qc.lastError().text().toStdString() << "\n";
+            }
+            
+            p = p->next;
+            count++;
+        }
+        DatabaseManager::instance().database().commit();
+    }
+    // --- END DB SYNC ---
+    
+    // [AUDIT LOG]
+    AuditLogger::log(AuditLogger::ACTION_INSERT, "DAU_SACH", QString::fromStdString(isbn), 
+                     "Them dau sach moi: " + QString::fromStdString(ten));
     
     return "";  // thanh cong
 }
@@ -1100,20 +1215,98 @@ std::string ThemBanSaoMoi(const std::string& isbn, int soLuong, const std::strin
     duLieuDaThayDoi = true;
     // Notify listeners that a copy's status changed (thanh ly)
     try { EventBus::instance().dauSachUpdated(QString::fromStdString(isbn)); } catch(...) {}
+
+    // --- DB SYNC ---
+    // Update newly added copies (head of list)
+    if (dauSach && dauSach->dms) {
+        // Query ID of the book
+        int bookId = -1;
+        QSqlQuery qId(DatabaseManager::instance().database());
+        qId.prepare("SELECT id FROM dau_sach WHERE isbn = ?");
+        qId.addBindValue(QString::fromStdString(isbn));
+        if (qId.exec() && qId.next()) {
+            bookId = qId.value(0).toInt();
+        }
+
+        if (bookId != -1) {
+            PTRDMS p = dauSach->dms;
+            int count = 0;
+            DatabaseManager::instance().database().transaction();
+            while (p && count < soLuong) {
+                QSqlQuery qc(DatabaseManager::instance().database());
+                qc.prepare("INSERT INTO ban_sao (ma_sach, dau_sach_id, trang_thai, vi_tri) VALUES (?, ?, ?, ?)");
+                qc.addBindValue(QString::fromStdString(p->maSach));
+                qc.addBindValue(bookId);
+                qc.addBindValue((int)p->trangThai);
+                qc.addBindValue(QString::fromStdString(p->viTri));
+                if (!qc.exec()) {
+                    std::cout << "[DB ERROR] Failed to insert ban_sao (ThemBanSaoMoi): " << qc.lastError().text().toStdString() << "\n";
+                }
+                
+                p = p->next;
+                count++;
+            }
+            DatabaseManager::instance().database().commit();
+        } else {
+             std::cout << "[DB ERROR] Cannot find book ID for ISBN: " << isbn << " to add copies.\n";
+        }
+    }
+    // --- END DB SYNC ---
+
+    // [AUDIT LOG]
+    AuditLogger::log(AuditLogger::ACTION_INSERT, "BAN_SAO", QString::fromStdString(isbn), 
+                     QString("Them %1 ban sao vao dau sach %2").arg(soLuong).arg(QString::fromStdString(isbn)));
+
     return "";  // thanh cong
 }
 
 // cap nhat thong tin dau sach (tu dong sap xep neu ten doi)
 std::string CapNhatThongTinDauSach(const std::string& isbn, const std::string& ten, int trang,
                                    const std::string& tg, int nam, const std::string& tl, 
-                                   const std::string& viTri) {
+                                   const std::string& viTri, long long giaTien) {
     // goi backend cap nhat
-    std::string loi = CapNhatDauSach(dsDauSach, soLuongDauSach, isbn, ten, trang, tg, nam, tl, viTri);
+    std::string loi = CapNhatDauSach(dsDauSach, soLuongDauSach, isbn, ten, trang, tg, nam, tl, viTri, giaTien);
     
     if (loi.empty()) {
         // tu dong sap xep sau khi cap nhat (phong truong hop ten thay doi)
         sapXepDauSachTheoTen(dsDauSach, 0, soLuongDauSach - 1);
         duLieuDaThayDoi = true;
+        
+        // --- DB SYNC ---
+        QSqlQuery q(DatabaseManager::instance().database());
+        if (giaTien != -1) {
+            q.prepare("UPDATE dau_sach SET ten_sach=?, so_trang=?, tac_gia=?, nam_xuat_ban=?, the_loai=?, gia_tien=? WHERE isbn=?");
+            q.addBindValue(QString::fromStdString(ChuyenThanhTitleCase(ten)));
+            q.addBindValue(trang);
+            q.addBindValue(QString::fromStdString(ChuyenThanhTitleCase(tg)));
+            q.addBindValue(nam);
+            q.addBindValue(QString::fromStdString(ChuyenThanhTitleCase(tl)));
+            q.addBindValue((qint64)giaTien);
+            q.addBindValue(QString::fromStdString(isbn));
+        } else {
+            q.prepare("UPDATE dau_sach SET ten_sach=?, so_trang=?, tac_gia=?, nam_xuat_ban=?, the_loai=? WHERE isbn=?");
+            q.addBindValue(QString::fromStdString(ChuyenThanhTitleCase(ten)));
+            q.addBindValue(trang);
+            q.addBindValue(QString::fromStdString(ChuyenThanhTitleCase(tg)));
+            q.addBindValue(nam);
+            q.addBindValue(QString::fromStdString(ChuyenThanhTitleCase(tl)));
+            q.addBindValue(QString::fromStdString(isbn));
+        }
+        q.exec();
+        
+        // Update position for all copies if provided
+        if (!viTri.empty()) {
+             QSqlQuery qc(DatabaseManager::instance().database());
+             qc.prepare("UPDATE ban_sao SET vi_tri=? WHERE ma_sach LIKE ?");
+             qc.addBindValue(QString::fromStdString(ChuanHoaViTri(viTri)));
+             qc.addBindValue(QString::fromStdString(isbn + "-%"));
+             qc.exec();
+        }
+        // --- END DB SYNC ---
+        
+        // [AUDIT LOG]
+        AuditLogger::log(AuditLogger::ACTION_UPDATE, "DAU_SACH", QString::fromStdString(isbn), 
+                         "Cap nhat thong tin dau sach: " + QString::fromStdString(ten));
     }
     
     return loi;  // rong = thanh cong, khac rong = loi
@@ -1141,6 +1334,16 @@ std::string XoaDauSachTheoISBN(const std::string& isbn) {
             sapXepDauSachTheoTen(dsDauSach, 0, soLuongDauSach - 1);
         }
         duLieuDaThayDoi = true;
+        
+        // --- DB SYNC ---
+        QSqlQuery q(DatabaseManager::instance().database());
+        q.prepare("DELETE FROM dau_sach WHERE isbn=?");
+        q.addBindValue(QString::fromStdString(isbn));
+        q.exec();
+        // --- END DB SYNC ---
+
+        // [AUDIT LOG]
+        AuditLogger::log(AuditLogger::ACTION_DELETE, "DAU_SACH", QString::fromStdString(isbn), "Xoa dau sach");
     }
     
     return loi;
@@ -1169,6 +1372,15 @@ std::string ThanhLyBanSaoTheoMa(const std::string& maSach) {
     duLieuDaThayDoi = true;
     // Notify listeners that a copy has been marked as disposed
     try { EventBus::instance().dauSachUpdated(QString::fromStdString(isbn)); } catch(...) {}
+    
+    // --- DB SYNC ---
+    QSqlQuery q(DatabaseManager::instance().database());
+    q.prepare("UPDATE ban_sao SET trang_thai=? WHERE ma_sach=?");
+    q.addBindValue(THANH_LY);
+    q.addBindValue(QString::fromStdString(maSach));
+    q.exec();
+    // --- END DB SYNC ---
+    
     return "";  // thanh cong
 }
 
@@ -1198,6 +1410,13 @@ std::string XoaBanSaoTheoMa(const std::string& maSach) {
     duLieuDaThayDoi = true;
     // Notify listeners that a DauSach was modified (copy removed)
     try { EventBus::instance().dauSachUpdated(QString::fromStdString(TachISBNTuMaSach(maSach))); } catch(...) {}
+
+    // --- DB SYNC ---
+    QSqlQuery q(DatabaseManager::instance().database());
+    q.prepare("DELETE FROM ban_sao WHERE ma_sach=?");
+    q.addBindValue(QString::fromStdString(maSach));
+    q.exec();
+    // --- END DB SYNC ---
     
     return "";  // thanh cong
 }

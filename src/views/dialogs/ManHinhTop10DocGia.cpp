@@ -4,13 +4,14 @@
 #include <QLabel>
 #include <QHeaderView>
 #include <QMessageBox>
+#include "utils/LanguageManager.h"
 #include <QAbstractTableModel>
 #include <QFont>
 #include <algorithm>
 
 extern PTRDG rootDocGia;
 
-// Model for Top10 độc giả (vector-backed)
+// Model for Top10 học viên (vector-backed)
 class Top10DocGiaModel : public QAbstractTableModel {
 public:
     Top10DocGiaModel(std::vector<DocGiaVaSoLuot> *data, QObject *parent = nullptr)
@@ -40,7 +41,7 @@ public:
                 return (r < 3) ? QStringLiteral("🥇🥈🥉").mid(r,1) : QString::number(r + 1);
             case 1: return QString::number(dg->data.MaThe);
             case 2: return QString::fromStdString(std::string(dg->data.Ho + std::string(" ")) + dg->data.Ten);
-            case 3: return dg->data.Phai ? QStringLiteral("Nam") : QStringLiteral("Nữ");
+            case 3: return dg->data.Phai ? LanguageManager::instance().getText("GENDER_MALE") : LanguageManager::instance().getText("GENDER_FEMALE");
             case 4: return QString::number(item.soLuotMuon);
             case 5: return QString::number(item.soDangMuon);
             }
@@ -76,12 +77,12 @@ public:
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override {
         if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
             switch (section) {
-            case 0: return QStringLiteral("Hạng");
-            case 1: return QStringLiteral("Mã Thẻ");
-            case 2: return QStringLiteral("Họ và Tên");
-            case 3: return QStringLiteral("Giới Tính");
-            case 4: return QStringLiteral("Tổng Mượn");
-            case 5: return QStringLiteral("Đang Mượn");
+            case 0: return LanguageManager::instance().getText("TABLE_HEADER_RANK");
+            case 1: return LanguageManager::instance().getText("TABLE_HEADER_CODE"); // Use generic code header if available, or ID
+            case 2: return LanguageManager::instance().getText("TABLE_HEADER_FULLNAME"); // Or "Họ và Tên"
+            case 3: return LanguageManager::instance().getText("TABLE_HEADER_GENDER");
+            case 4: return LanguageManager::instance().getText("TABLE_HEADER_TOTAL_BORROW");
+            case 5: return LanguageManager::instance().getText("TABLE_HEADER_CURRENT_BORROW");
             }
         }
         return QAbstractTableModel::headerData(section, orientation, role);
@@ -95,7 +96,7 @@ private:
 
 ManHinhTop10DocGia::ManHinhTop10DocGia(QWidget *parent)
     : QDialog(parent) {
-    setWindowTitle("Top 10 Độc Giả Hoạt Động Nhiều Nhất");
+    setWindowTitle(LanguageManager::instance().getText("TITLE_TOP10_READERS"));
     setMinimumSize(900, 600);
     setModal(true);
 
@@ -110,7 +111,7 @@ void ManHinhTop10DocGia::thietLapGiaoDien() {
     mainLayout->setContentsMargins(20, 20, 20, 20);
 
     // Title
-    QLabel* titleLabel = new QLabel("TOP 10 ĐỘC GIẢ HOẠT ĐỘNG NHIỀU NHẤT");
+    QLabel* titleLabel = new QLabel(LanguageManager::instance().getText("HEADER_TOP10_READERS"));
     titleLabel->setAlignment(Qt::AlignCenter);
     titleLabel->setStyleSheet(
         "font-size: 20px; "
@@ -125,9 +126,7 @@ void ManHinhTop10DocGia::thietLapGiaoDien() {
     mainLayout->addWidget(titleLabel);
 
     // Info label
-    QLabel* infoLabel = new QLabel(
-        "<b>Thống kê:</b> Dựa trên tổng số lượt mượn sách của độc giả"
-    );
+    QLabel* infoLabel = new QLabel(LanguageManager::instance().getText("MSG_STATS_READERS"));
     infoLabel->setWordWrap(true);
     infoLabel->setStyleSheet(
         "color: #1e293b; "
@@ -163,12 +162,12 @@ void ManHinhTop10DocGia::thietLapGiaoDien() {
     QHBoxLayout* buttonLayout = new QHBoxLayout();
     buttonLayout->setSpacing(10);
 
-    nutLamMoi = new QPushButton("Làm Mới");
+    nutLamMoi = new QPushButton(LanguageManager::instance().getText("BTN_REFRESH"));
     nutLamMoi->setObjectName("refreshButton");
     nutLamMoi->setMinimumHeight(40);
     connect(nutLamMoi, &QPushButton::clicked, this, &ManHinhTop10DocGia::taiDuLieuTop10);
 
-    nutDong = new QPushButton("Đóng");
+    nutDong = new QPushButton(LanguageManager::instance().getText("BTN_CLOSE"));
     nutDong->setObjectName("closeButton");
     nutDong->setMinimumHeight(40);
     connect(nutDong, &QPushButton::clicked, this, &QDialog::accept);
@@ -271,8 +270,8 @@ void ManHinhTop10DocGia::taiDuLieuTop10() {
     danhSachTop.clear();
 
     if (!rootDocGia) {
-        QMessageBox::information(this, "Thông Báo",
-            "Chưa có độc giả nào trong hệ thống.");
+        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_INFO"),
+            LanguageManager::instance().getText("MSG_NO_READERS"));
         return;
     }
 
@@ -298,8 +297,8 @@ void ManHinhTop10DocGia::taiDuLieuTop10() {
     duyetCay(rootDocGia);
 
     if (danhSachTop.empty()) {
-        QMessageBox::information(this, "Thông Báo",
-            "Chưa có độc giả nào mượn sách.");
+        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_INFO"),
+            LanguageManager::instance().getText("MSG_NO_BORROWS"));
         return;
     }
 

@@ -30,6 +30,7 @@ private:
     QLineEdit* leTenVietTat;
     QCheckBox* cbInMau;
     QCheckBox* cbHienThiLogo;
+    QCheckBox* cbSilentPrint;
     QLineEdit* leDuongDanLogo;
     QLineEdit* leQROutput;
     QLineEdit* lePDFOutput;

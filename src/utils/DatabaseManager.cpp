@@ -3,8 +3,11 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QDebug>
+#include <QCryptographicHash> // Added for seeding
 #include "utils/BackupManager.h"
 #include <QFile>
+#include <QDir>
+#include <QFileInfo>
 
 DatabaseManager& DatabaseManager::instance() {
     static DatabaseManager inst;
@@ -17,14 +20,24 @@ bool DatabaseManager::connect(const QString& path) {
 
     // Bảo vệ: yêu cầu path không rỗng và file phải tồn tại. Không tự tạo DB mới ở đây.
     // Nếu DB thiếu, caller (hoặc code khởi tạo) phải quyết định migrate hoặc báo lỗi.
+
+    // Ensure path is not empty
     if (path.isEmpty()) {
-        qWarning() << "[DatabaseManager] connect() gọi với path rỗng — hủy kết nối.";
+        qWarning() << "[DatabaseManager] connect() called with empty path!";
         return false;
     }
-    if (!QFile::exists(path)) {
-        qWarning() << "[DatabaseManager] File DB không tồn tại:" << path << "— connect bị hủy.";
-        return false;
+    
+    // Ensure directory exists so SQLite can create the file
+    QFileInfo info(path);
+    QDir dir = info.absoluteDir();
+    if (!dir.exists()) {
+        if (!dir.mkpath(".")) {
+            qWarning() << "[DatabaseManager] Cannot create directory:" << dir.absolutePath();
+            return false;
+        }
     }
+    // We allow SQLite to create the file if missing
+
 
     m_path = path;
     // Use connection name unique per process
@@ -131,7 +144,8 @@ bool DatabaseManager::createTables() {
         "tac_gia TEXT,"
         "nam_xuat_ban INTEGER,"
         "the_loai TEXT,"
-        "so_luot_muon INTEGER DEFAULT 0"
+        "so_luot_muon INTEGER DEFAULT 0,"
+        "gia_tien INTEGER DEFAULT 0"
         ");"
     );
 
@@ -173,10 +187,174 @@ bool DatabaseManager::createTables() {
         "ngay_tra TEXT,"
         "trang_thai INTEGER DEFAULT 0,"
         "tien_phat INTEGER DEFAULT 0,"
+        "so_lan_gia_han INTEGER DEFAULT 0,"
+        "da_thanh_toan INTEGER DEFAULT 0,"
         "FOREIGN KEY(ma_the) REFERENCES doc_gia(ma_the) ON DELETE CASCADE,"
         "FOREIGN KEY(ban_sao_id) REFERENCES ban_sao(id)"
         ");"
     );
+
+    // MIGRATION FOR FEATURE 4 (Existing DBs)
+    // Add columns if they don't exist
+    // so_lan_gia_han
+    {
+        QSqlQuery checkCol(m_db);
+        if (checkCol.exec("SELECT so_lan_gia_han FROM muon_tra LIMIT 0")) {
+            // Column exists
+        } else {
+            qDebug() << "[DatabaseManager] Adding missing column 'so_lan_gia_han' to 'muon_tra'...";
+            QSqlQuery addCol(m_db);
+            addCol.exec("ALTER TABLE muon_tra ADD COLUMN so_lan_gia_han INTEGER DEFAULT 0");
+        }
+    }
+    // da_thanh_toan
+    {
+        QSqlQuery checkCol(m_db);
+        if (checkCol.exec("SELECT da_thanh_toan FROM muon_tra LIMIT 0")) {
+            // Column exists
+        } else {
+            qDebug() << "[DatabaseManager] Adding missing column 'da_thanh_toan' to 'muon_tra'...";
+            QSqlQuery addCol(m_db);
+            addCol.exec("ALTER TABLE muon_tra ADD COLUMN da_thanh_toan INTEGER DEFAULT 0");
+        }
+    }
+
+    // ==========================================
+    // PHASE 3: ADMIN & SECURITY TABLES
+    // ==========================================
+    
+    qDebug() << "[DatabaseManager] Checking/Creating 'vai_tro' table...";
+    bool roleOk = q.exec(
+        "CREATE TABLE IF NOT EXISTS vai_tro ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "ten_vai_tro TEXT UNIQUE NOT NULL,"
+        "mo_ta TEXT,"
+        "quyen_han TEXT" // JSON or delimited string
+        ");"
+    );
+    if (!roleOk) qDebug() << "Error creating vai_tro:" << q.lastError().text();
+    ok &= roleOk;
+
+    qDebug() << "[DatabaseManager] Checking/Creating 'nguoi_dung' table...";
+    bool userOk = q.exec(
+        "CREATE TABLE IF NOT EXISTS nguoi_dung ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "ten_dang_nhap TEXT UNIQUE NOT NULL,"
+        "mat_khau_hash TEXT NOT NULL,"
+        "muoi TEXT NOT NULL,"
+        "ho_ten TEXT,"
+        "vai_tro_id INTEGER,"
+        "trang_thai INTEGER DEFAULT 1,"
+        "FOREIGN KEY(vai_tro_id) REFERENCES vai_tro(id)"
+        ");"
+    );
+    if (!userOk) qDebug() << "Error creating nguoi_dung:" << q.lastError().text();
+    ok &= userOk;
+
+    // ==========================================
+    // PHASE 2: AUDIT & SETTINGS (NEW)
+    // ==========================================
+
+    // nhat_ky_he_thong (Audit Log)
+    qDebug() << "[DatabaseManager] Creating 'nhat_ky_he_thong' table...";
+    ok &= q.exec(
+        "CREATE TABLE IF NOT EXISTS nhat_ky_he_thong ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "nguoi_dung_id INTEGER,"
+        "hanh_dong TEXT,"       // CREATE, UPDATE, DELETE, LOGIN, RESTORE
+        "bang_du_lieu TEXT,"    // SACH, DOC_GIA, ...
+        "doi_tuong_id TEXT,"    // ID record effected
+        "chi_tiet TEXT,"        // Description/JSON diff
+        "thoi_gian TEXT,"       // YYYY-MM-DD HH:MM:SS
+        "FOREIGN KEY(nguoi_dung_id) REFERENCES nguoi_dung(id)"
+        ");"
+    );
+
+    // cai_dat (Settings)
+    qDebug() << "[DatabaseManager] Creating 'cai_dat' table...";
+    ok &= q.exec(
+        "CREATE TABLE IF NOT EXISTS cai_dat ("
+        "khoa TEXT PRIMARY KEY," // Key (e.g. 'loan_limit')
+        "gia_tri TEXT,"          // Value
+        "mo_ta TEXT,"            // Description
+        "kieu_du_lieu TEXT DEFAULT 'string'" // int, bool, color...
+        ");"
+    );
+
+    // SEED DATA (Default Admin)
+    // Check if roles exist
+    QSqlQuery checkRole("SELECT count(*) FROM vai_tro", m_db);
+    if (checkRole.next()) {
+        int count = checkRole.value(0).toInt();
+        qDebug() << "[DatabaseManager] Role count:" << count;
+        if (count == 0) {
+            // Create default roles
+            qDebug() << "[DatabaseManager] Seeding default roles...";
+            q.prepare("INSERT INTO vai_tro (ten_vai_tro, mo_ta, quyen_han) VALUES (?, ?, ?)");
+            
+            // Admin
+            q.addBindValue("Admin");
+            q.addBindValue("Quản trị viên toàn quyền");
+            q.addBindValue("*"); // All permissions
+            if(!q.exec()) qDebug() << "Failed to insert Admin role:" << q.lastError().text();
+            
+            // Librarian (Thủ thư)
+            q.prepare("INSERT INTO vai_tro (ten_vai_tro, mo_ta, quyen_han) VALUES (?, ?, ?)");
+            q.addBindValue("ThuThu");
+            q.addBindValue("Thủ thư - Quản lý sách và mượn trả");
+            q.addBindValue("DOC_GIA,SACH,MUON_TRA,BAO_CAO");
+            if(!q.exec()) qDebug() << "Failed to insert ThuThu role:" << q.lastError().text();
+        }
+    } else {
+        qDebug() << "[DatabaseManager] Failed to count roles:" << checkRole.lastError().text();
+    }
+    
+    // Check if users exist
+    QSqlQuery checkUser("SELECT count(*) FROM nguoi_dung", m_db);
+    if (checkUser.next() && checkUser.value(0).toInt() == 0) {
+        // Create default admin user (admin / 123456)
+        // Note: Password hashing should normally be done via helper, doing manual here for bootstrap
+        // SHA256("123456" + "somesalt")
+        // Demo implementation:
+        QString salt = "somesalt";
+        QString password = "admin";
+        QString hash = QString(QCryptographicHash::hash((password + salt).toUtf8(), QCryptographicHash::Sha256).toHex());
+        
+        q.prepare("INSERT INTO nguoi_dung (ten_dang_nhap, mat_khau_hash, muoi, ho_ten, vai_tro_id, trang_thai) "
+                  "VALUES (:u, :p, :s, :n, (SELECT id FROM vai_tro WHERE ten_vai_tro='Admin'), 1)");
+        q.bindValue(":u", "admin");
+        q.bindValue(":p", hash);
+        q.bindValue(":s", salt);
+        q.bindValue(":n", "Administrator");
+        q.exec();
+        
+        qDebug() << "[DatabaseManager] Seeded default admin user.";
+    }
+
+
+    // Seed Default Settings if empty
+    QSqlQuery checkSettings("SELECT count(*) FROM cai_dat", m_db);
+    if (checkSettings.next() && checkSettings.value(0).toInt() == 0) {
+        qDebug() << "[DatabaseManager] Seeding default settings...";
+        struct SettingSeed { const char* key; const char* val; const char* desc; const char* type; };
+        SettingSeed seeds[] = {
+            {"so_sach_muon_toi_da", "3", "Số sách tối đa một độc giả được mượn", "int"},
+            {"so_ngay_muon_toi_da", "14", "Thời hạn mượn sách (ngày)", "int"},
+            {"tien_phat_moi_ngay", "5000", "Tiền phạt quá hạn mỗi ngày (VNĐ)", "int"},
+            {"cho_phep_muon_khi_qua_han", "false", "Cho phép mượn tiếp khi đang có sách quá hạn", "bool"},
+            {"tieu_de_thu_vien", "THƯ VIỆN TỔNG HỢP", "Tên hiển thị trên tiêu đề ứng dụng", "string"},
+            {"mau_chu_dao", "#3b82f6", "Màu chủ đạo của giao diện", "color"}
+        };
+        
+        q.prepare("INSERT INTO cai_dat (khoa, gia_tri, mo_ta, kieu_du_lieu) VALUES (?, ?, ?, ?)");
+        for (const auto& s : seeds) {
+            q.addBindValue(s.key);
+            q.addBindValue(s.val);
+            q.addBindValue(s.desc);
+            q.addBindValue(s.type);
+            q.exec();
+        }
+    }
 
     if (!m_db.commit()) {
         qWarning() << "[DatabaseManager] Commit failed:" << m_db.lastError().text();

@@ -6,6 +6,7 @@
 #include "utils/FilePathManager.h"
 #include "utils/TransactionLogger.h"
 #include <QMessageBox>
+#include "utils/LanguageManager.h"
 #include <QTimer>
 #include <QDate>
 
@@ -35,87 +36,99 @@ QString HopThoaiQuetMaVach::layLoaiMaQuet() const {
 }
 
 void HopThoaiQuetMaVach::thieLapGiaoDien() {
-    setWindowTitle("Quét Mã (Barcode/QR Code)");
+    setWindowTitle(LanguageManager::instance().getText("DIALOG_SCAN_TITLE"));
     setMinimumWidth(500);
     setMinimumHeight(400);
     
+    // === DEEP NIGHT THEME SETUP ===
+    this->setStyleSheet("background-color: #1e1e2d; color: #e0e0e0;");
+    
     QVBoxLayout *boTriChinh = new QVBoxLayout(this);
-    boTriChinh->setSpacing(15);
-    boTriChinh->setContentsMargins(20, 20, 20, 20);
+    boTriChinh->setSpacing(20);
+    boTriChinh->setContentsMargins(25, 25, 25, 25);
     
-    // === Hướng dẫn ===
-    QString huongDan;
-    switch(loaiQuet) {
-        case QUET_SACH:
-            huongDan = "Quét mã sách (Barcode/QR) hoặc nhập thủ công";
-            break;
-        case QUET_DOC_GIA:
-            huongDan = "Quét mã thẻ độc giả (Barcode/QR) hoặc nhập thủ công";
-            break;
-        case QUET_TAT_CA:
-            huongDan = "Quét mã (Barcode/QR - sách hoặc độc giả) hoặc nhập thủ công";
-            break;
-    }
+    // Header Label
+    QLabel *lblIcon = new QLabel("📷"); 
+    lblIcon->setAlignment(Qt::AlignCenter);
+    lblIcon->setStyleSheet("font-size: 40px; margin-bottom: 5px;");
+    boTriChinh->addWidget(lblIcon);
     
-    QLabel *nhanHuongDan = new QLabel(huongDan);
-    nhanHuongDan->setStyleSheet(
-        "font-size: 14px; "
-        "color: #555; "
-        "padding: 10px; "
-        "background-color: #f0f8ff; "
-        "border-radius: 5px;"
-    );
-    nhanHuongDan->setWordWrap(true);
+    QString titleText = LanguageManager::instance().getText("HEADER_SCAN_RETURN_SEARCH");
+    if (loaiQuet == QUET_SACH) titleText = LanguageManager::instance().getText("HEADER_SCAN_BOOK");
+    else if (loaiQuet == QUET_DOC_GIA) titleText = LanguageManager::instance().getText("HEADER_SCAN_READER");
+    
+    QLabel *lblTitle = new QLabel(titleText);
+    lblTitle->setAlignment(Qt::AlignCenter);
+    lblTitle->setStyleSheet("font-size: 18px; font-weight: bold; color: #ffffff; letter-spacing: 1px;");
+    boTriChinh->addWidget(lblTitle);
+    
+    // === Hướng dẫn (Subtext) ===
+    QLabel *nhanHuongDan = new QLabel(LanguageManager::instance().getText("MSG_SCAN_INSTRUCTION"));
+    nhanHuongDan->setAlignment(Qt::AlignCenter);
+    nhanHuongDan->setStyleSheet("font-size: 13px; color: #8888aa; margin-bottom: 10px;");
     boTriChinh->addWidget(nhanHuongDan);
     
     // === Ô nhập mã ===
-    QGroupBox *nhomNhap = new QGroupBox("Nhập Mã");
+    QGroupBox *nhomNhap = new QGroupBox(); // No title for cleaner look
+    nhomNhap->setStyleSheet("QGroupBox { border: none; background: transparent; margin: 0; padding: 0; }");
     QVBoxLayout *boTriNhap = new QVBoxLayout(nhomNhap);
+    boTriNhap->setContentsMargins(0,0,0,0);
+    boTriNhap->setSpacing(10);
     
     oNhapMa = new QLineEdit();
-    oNhapMa->setPlaceholderText("Nhập hoặc quét mã vạch...");
+    oNhapMa->setPlaceholderText(LanguageManager::instance().getText("MSG_PLEASE_SCAN"));
+    oNhapMa->setAlignment(Qt::AlignCenter);
     oNhapMa->setStyleSheet(
         "QLineEdit { "
+        "   background-color: #2b2b40; "
+        "   color: #ffffff; "
         "   padding: 12px; "
-        "   font-size: 16px; "
-        "   border: 2px solid #4CAF50; "
-        "   border-radius: 5px; "
+        "   font-size: 18px; "
+        "   font-weight: bold; "
+        "   border: 2px solid #3E3E48; "
+        "   border-radius: 8px; "
+        "   selection-background-color: #5d9cec;"
         "}"
+        "QLineEdit:focus { border-color: #5d9cec; }"
     );
     
     // Khi nhấn Enter trong ô nhập -> tự động quét
     connect(oNhapMa, &QLineEdit::returnPressed, this, &HopThoaiQuetMaVach::xuLyQuetMa);
-    
     boTriNhap->addWidget(oNhapMa);
     
-    // Nút quét và xóa
+    // Nút Action Row
     QHBoxLayout *boTriNutPhu = new QHBoxLayout();
+    boTriNutPhu->setSpacing(10);
     
-    nutQuet = new QPushButton("Quét/Tìm Kiếm");
+    nutQuet = new QPushButton(LanguageManager::instance().getText("BTN_CONFIRM_SCAN"));
+    nutQuet->setCursor(Qt::PointingHandCursor);
     nutQuet->setStyleSheet(
         "QPushButton { "
-        "   background-color: #4CAF50; "
+        "   background-color: #0078d4; "
         "   color: white; "
-        "   padding: 10px 20px; "
+        "   padding: 10px; "
         "   font-size: 14px; "
+        "   font-weight: bold; "
         "   border: none; "
-        "   border-radius: 5px; "
+        "   border-radius: 6px; "
         "} "
-        "QPushButton:hover { background-color: #45a049; }"
+        "QPushButton:hover { background-color: #106ebe; }"
     );
     connect(nutQuet, &QPushButton::clicked, this, &HopThoaiQuetMaVach::xuLyQuetMa);
     
-    nutXoaMa = new QPushButton("🗑️ Xóa");
+    nutXoaMa = new QPushButton("🗑️");
+    nutXoaMa->setFixedWidth(50);
+    nutXoaMa->setCursor(Qt::PointingHandCursor);
     nutXoaMa->setStyleSheet(
         "QPushButton { "
-        "   background-color: #f44336; "
-        "   color: white; "
-        "   padding: 10px 20px; "
+        "   background-color: #3b3b50; "
+        "   color: #e0e0e0; "
+        "   padding: 10px; "
         "   font-size: 14px; "
-        "   border: none; "
-        "   border-radius: 5px; "
+        "   border: 1px solid #45455a; "
+        "   border-radius: 6px; "
         "} "
-        "QPushButton:hover { background-color: #da190b; }"
+        "QPushButton:hover { background-color: #c0392b; border-color: #c0392b; color: white; }"
     );
     connect(nutXoaMa, &QPushButton::clicked, this, &HopThoaiQuetMaVach::xuLyXoaMa);
     
@@ -126,70 +139,71 @@ void HopThoaiQuetMaVach::thieLapGiaoDien() {
     boTriChinh->addWidget(nhomNhap);
     
     // === Kết quả tìm kiếm ===
-    nhanKetQua = new QLabel("Chưa có kết quả");
-    nhanKetQua->setStyleSheet(
-        "font-size: 13px; "
-        "color: #666; "
-        "padding: 8px; "
-        "background-color: #fafafa; "
-        "border-radius: 5px;"
-    );
+    nhanKetQua = new QLabel("");
+    nhanKetQua->setAlignment(Qt::AlignCenter);
+    nhanKetQua->setStyleSheet("font-size: 14px; color: #aaaaaa; padding: 5px;");
     boTriChinh->addWidget(nhanKetQua);
     
     // === Thông tin chi tiết ===
-    nhomThongTin = new QGroupBox("Thông Tin Chi Tiết");
-    QVBoxLayout *boTriThongTin = new QVBoxLayout(nhomThongTin);
-    
-    nhanThongTin = new QLabel("Vui lòng quét hoặc nhập mã để xem thông tin");
-    nhanThongTin->setStyleSheet(
-        "font-size: 13px; "
-        "color: #333; "
-        "padding: 15px;"
+    nhomThongTin = new QGroupBox(LanguageManager::instance().getText("GROUP_SCAN_RESULT"));
+    nhomThongTin->setStyleSheet(
+        "QGroupBox { "
+        "   background-color: #252526; "
+        "   border: 1px solid #3E3E42; "
+        "   border-radius: 6px; "
+        "   margin-top: 20px; "
+        "   padding-top: 15px; "
+        "   color: #E0E0E0; font-weight: bold;"
+        "}"
+        "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; color: #5BA3F5; background-color: #1e1e2d; }"
     );
+    QVBoxLayout *boTriThongTin = new QVBoxLayout(nhomThongTin);
+    boTriThongTin->setContentsMargins(15, 20, 15, 15);
+    
+    nhanThongTin = new QLabel(LanguageManager::instance().getText("MSG_PLEASE_SCAN"));
+    nhanThongTin->setStyleSheet("font-size: 13px; color: #ccc; line-height: 1.4;");
     nhanThongTin->setWordWrap(true);
     nhanThongTin->setAlignment(Qt::AlignTop | Qt::AlignLeft);
     
     boTriThongTin->addWidget(nhanThongTin);
     boTriChinh->addWidget(nhomThongTin);
     
-    // === Nút hành động ===
+    // === Footer Buttons ===
     QHBoxLayout *boTriNut = new QHBoxLayout();
     boTriNut->addStretch();
     
-    nutXacNhan = new QPushButton("✓ Xác Nhận");
+    nutXacNhan = new QPushButton(LanguageManager::instance().getText("BTN_USE"));
     nutXacNhan->setEnabled(false);
+    nutXacNhan->setCursor(Qt::PointingHandCursor);
     nutXacNhan->setStyleSheet(
         "QPushButton { "
-        "   background-color: #2196F3; "
+        "   background-color: #28a745; "
         "   color: white; "
-        "   padding: 10px 30px; "
-        "   font-size: 14px; "
-        "   border: none; "
-        "   border-radius: 5px; "
-        "   min-width: 120px; "
+        "   padding: 10px 25px; "
+        "   font-size: 13px; font-weight: bold; "
+        "   border: none; border-radius: 4px; "
         "} "
-        "QPushButton:hover { background-color: #0b7dda; } "
-        "QPushButton:disabled { background-color: #ccc; }"
+        "QPushButton:hover { background-color: #218838; } "
+        "QPushButton:disabled { background-color: #3a3a4e; color: #666; }"
     );
     connect(nutXacNhan, &QPushButton::clicked, this, &HopThoaiQuetMaVach::xuLyXacNhan);
     
-    nutHuy = new QPushButton("✗ Hủy");
+    nutHuy = new QPushButton(LanguageManager::instance().getText("BTN_CLOSE"));
+    nutHuy->setCursor(Qt::PointingHandCursor);
     nutHuy->setStyleSheet(
         "QPushButton { "
-        "   background-color: #757575; "
-        "   color: white; "
-        "   padding: 10px 30px; "
-        "   font-size: 14px; "
-        "   border: none; "
-        "   border-radius: 5px; "
-        "   min-width: 120px; "
+        "   background-color: transparent; "
+        "   color: #aaa; "
+        "   padding: 10px 20px; "
+        "   font-size: 13px; font-weight: bold; "
+        "   border: 1px solid #444; border-radius: 4px; "
         "} "
-        "QPushButton:hover { background-color: #616161; }"
+        "QPushButton:hover { background-color: #333; color: white; border-color: #666; }"
     );
     connect(nutHuy, &QPushButton::clicked, this, &HopThoaiQuetMaVach::xuLyHuy);
     
-    boTriNut->addWidget(nutXacNhan);
     boTriNut->addWidget(nutHuy);
+    boTriNut->addWidget(nutXacNhan);
     boTriChinh->addLayout(boTriNut);
 }
 
@@ -197,12 +211,12 @@ void HopThoaiQuetMaVach::xuLyQuetMa() {
     QString ma = oNhapMa->text().trimmed();
     
     if (ma.isEmpty()) {
-        QMessageBox::warning(this, "Lỗi", "Vui lòng nhập mã cần quét!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_ERROR"), LanguageManager::instance().getText("MSG_ENTER_CODE"));
         oNhapMa->setFocus();
         return;
     }
     
-    nhanKetQua->setText(" Đang tìm kiếm...");
+    nhanKetQua->setText(LanguageManager::instance().getText("MSG_SEARCHING"));
     nhanKetQua->setStyleSheet("color: #FF9800; font-size: 13px;");
     
     // Delay nhỏ để hiển thị trạng thái đang tìm
@@ -258,30 +272,30 @@ void HopThoaiQuetMaVach::timKiemVaHienThi(const QString &ma) {
                         GhiDanhMucSach(FilePathManager::getDanhMucSachPathStd().c_str(), dsDauSach, soLuongDauSach, true);
                         
                         QString hoTen = QString::fromStdString(docGia->data.Ho + " " + docGia->data.Ten);
-                        nhanKetQua->setText("✓ Đã trả sách thành công!");
+                        nhanKetQua->setText(LanguageManager::instance().getText("MSG_RETURN_SUCCESS_ICON"));
                         nhanKetQua->setStyleSheet("color: #4CAF50; font-size: 13px; font-weight: bold; padding: 8px;");
                         
                         QString thongTin = QString(
-                            "<b>TRẢ SÁCH THÀNH CÔNG</b><br><br>"
-                            "<b>Độc giả:</b> %1 (Mã thẻ: %2)<br>"
-                            "<b>Sách:</b> %3<br>"
-                            "<b>Mã sách:</b> %4<br>"
-                            "<b>Ngày mượn:</b> %5<br>"
-                            "<b>Ngày trả:</b> %6<br>"
+                            "<b>" + LanguageManager::instance().getText("TITLE_RETURN_SUCCESS_HTML") + "</b><br><br>"
+                            "<b>" + LanguageManager::instance().getText("LBL_RETURN_READER") + "</b> %1 (Mã: %2)<br>"
+                            "<b>" + LanguageManager::instance().getText("LBL_RETURN_BOOK") + "</b> %3<br>"
+                            "<b>" + LanguageManager::instance().getText("LBL_RETURN_BOOK_CODE") + "</b> %4<br>"
+                            "<b>" + LanguageManager::instance().getText("LBL_BORROW_DATE") + "</b> %5<br>"
+                            "<b>" + LanguageManager::instance().getText("LBL_RETURN_DATE") + "</b> %6<br>"
                         ).arg(hoTen).arg(maThe).arg(tenSach).arg(maSach).arg(ngayMuon)
                          .arg(QDate::currentDate().toString("dd/MM/yyyy"));
                         
                         nhanThongTin->setText(thongTin);
                         
-                        QMessageBox::information(this, "Thành Công", 
-                            QString("Đã trả sách thành công!\n\nĐộc giả: %1\nSách: %2")
+                        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), 
+                            LanguageManager::instance().getText("MSG_RETURN_SUCCESS_BODY")
                             .arg(hoTen).arg(tenSach));
                         
                         // Đóng dialog sau khi trả thành công
                         QTimer::singleShot(1500, this, &QDialog::accept);
                         return;
                     } else {
-                        nhanKetQua->setText("❌ Lỗi trả sách: " + QString::fromStdString(ketQua));
+                        nhanKetQua->setText(LanguageManager::instance().getText("MSG_RETURN_ERROR_ICON") + QString::fromStdString(ketQua));
                         nhanKetQua->setStyleSheet("color: #f44336; font-size: 13px; padding: 8px;");
                         nhanThongTin->setText(QString::fromStdString(ketQua));
                         return;
@@ -321,10 +335,9 @@ void HopThoaiQuetMaVach::timKiemVaHienThi(const QString &ma) {
     }
     
     if (!timThay) {
-        nhanKetQua->setText("❌ Không tìm thấy mã: " + ma);
+        nhanKetQua->setText(LanguageManager::instance().getText("MSG_CODE_NOT_FOUND") + ma);
         nhanKetQua->setStyleSheet("color: #f44336; font-size: 13px; padding: 8px;");
-        nhanThongTin->setText("Mã vạch không tồn tại trong hệ thống.\n\n"
-                             "Vui lòng kiểm tra lại hoặc thử quét lại.");
+        nhanThongTin->setText(LanguageManager::instance().getText("MSG_BARCODE_NOT_EXIST"));
         nutXacNhan->setEnabled(false);
         maQuetDuoc.clear();
         loaiMaQuet.clear();
@@ -339,18 +352,18 @@ void HopThoaiQuetMaVach::hienThiThongTinSach(const QString &isbn) {
         if (dsDauSach[i] && QString::fromStdString(dsDauSach[i]->ISBN) == isbn) {
             PTRDS sach = dsDauSach[i];
             
-            nhanKetQua->setText("✓ Tìm thấy sách: " + QString::fromStdString(sach->tenSach));
+            nhanKetQua->setText(LanguageManager::instance().getText("MSG_FOUND_BOOK") + QString::fromStdString(sach->tenSach));
             nhanKetQua->setStyleSheet("color: #4CAF50; font-size: 13px; font-weight: bold; padding: 8px;");
             
             QString thongTin = QString(
-                "<b>THÔNG TIN SÁCH</b><br><br>"
-                "<b>Tên sách:</b> %1<br>"
-                "<b>Tác giả:</b> %2<br>"
-                "<b>Thể loại:</b> %3<br>"
+                "<b>" + LanguageManager::instance().getText("TITLE_BOOK_INFO") + "</b><br><br>"
+                "<b>" + LanguageManager::instance().getText("LBL_TITLE") + ":</b> %1<br>"
+                "<b>" + LanguageManager::instance().getText("LBL_AUTHOR") + "</b> %2<br>"
+                "<b>" + LanguageManager::instance().getText("LBL_CATEGORY") + "</b> %3<br>"
                 "<b>ISBN:</b> %4<br>"
-                "<b>Năm xuất bản:</b> %5<br>"
-                "<b>Tổng bản sao:</b> %6<br>"
-                "<b>Số trang:</b> %7"
+                "<b>" + LanguageManager::instance().getText("LBL_PUBLISH_YEAR") + "</b> %5<br>"
+                "<b>" + LanguageManager::instance().getText("LBL_TOTAL_COPIES_SCAN") + "</b> %6<br>"
+                "<b>" + LanguageManager::instance().getText("LBL_PAGES") + "</b> %7"
             ).arg(QString::fromStdString(sach->tenSach))
              .arg(QString::fromStdString(sach->tacGia))
              .arg(QString::fromStdString(sach->theLoai))
@@ -376,26 +389,26 @@ void HopThoaiQuetMaVach::hienThiThongTinDocGia(const QString &maThe) {
         QString tenDayDu = QString::fromStdString(docGia->data.Ho) + " " + 
                           QString::fromStdString(docGia->data.Ten);
         
-        nhanKetQua->setText("✓ Tìm thấy độc giả: " + tenDayDu);
+        nhanKetQua->setText(LanguageManager::instance().getText("MSG_FOUND_READER") + tenDayDu);
         nhanKetQua->setStyleSheet("color: #4CAF50; font-size: 13px; font-weight: bold; padding: 8px;");
         
         QString trangThai;
         QString mauTrangThai;
         switch(docGia->data.TrangThai) {
-            case 0: trangThai = "🔴 Bị khóa"; mauTrangThai = "red"; break;
-            case 1: trangThai = "🟢 Hoạt động"; mauTrangThai = "green"; break;
-            default: trangThai = "⚪ Không xác định"; mauTrangThai = "gray"; break;
+            case 0: trangThai = LanguageManager::instance().getText("STATUS_LOCKED_ICON"); mauTrangThai = "red"; break;
+            case 1: trangThai = LanguageManager::instance().getText("STATUS_ACTIVE_ICON"); mauTrangThai = "green"; break;
+            default: trangThai = LanguageManager::instance().getText("STATUS_UNKNOWN_ICON"); mauTrangThai = "gray"; break;
         }
         
-        QString gioiTinh = (docGia->data.Phai == 0) ? "Nam" : "Nữ";
+        QString gioiTinh = (docGia->data.Phai == 0) ? LanguageManager::instance().getText("GENDER_MALE") : LanguageManager::instance().getText("GENDER_FEMALE");
         
         QString thongTin = QString(
-            "<b>👤 THÔNG TIN ĐỘC GIẢ</b><br><br>"
-            "<b>Họ tên:</b> %1<br>"
-            "<b>Mã thẻ:</b> %2<br>"
-            "<b>Giới tính:</b> %3<br>"
-            "<b>Trạng thái:</b> <span style='color: %4;'>%5</span><br>"
-            "<b>Số sách đang mượn:</b> %6 / 3"
+            "<b>" + LanguageManager::instance().getText("TITLE_READER_INFO") + "</b><br><br>"
+            "<b>" + LanguageManager::instance().getText("LBL_FULLNAME") + "</b> %1<br>"
+            "<b>" + LanguageManager::instance().getText("LBL_CARD_ID") + "</b> %2<br>"
+            "<b>" + LanguageManager::instance().getText("LBL_GENDER_TEXT") + "</b> %3<br>"
+            "<b>" + LanguageManager::instance().getText("LBL_STATUS_TEXT") + "</b> <span style='color: %4;'>%5</span><br>"
+            "<b>" + LanguageManager::instance().getText("LBL_BORROWING_COUNT") + "</b> %6 / 3"
         ).arg(tenDayDu)
          .arg(docGia->data.MaThe)
          .arg(gioiTinh)
@@ -409,7 +422,7 @@ void HopThoaiQuetMaVach::hienThiThongTinDocGia(const QString &maThe) {
 
 void HopThoaiQuetMaVach::xuLyXacNhan() {
     if (maQuetDuoc.isEmpty()) {
-        QMessageBox::warning(this, "Lỗi", "Chưa quét được mã nào!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_ERROR"), LanguageManager::instance().getText("MSG_NO_CODE_SCANNED"));
         return;
     }
     
@@ -424,9 +437,9 @@ void HopThoaiQuetMaVach::xuLyHuy() {
 
 void HopThoaiQuetMaVach::xuLyXoaMa() {
     oNhapMa->clear();
-    nhanKetQua->setText("Chưa có kết quả");
+    nhanKetQua->setText(LanguageManager::instance().getText("MSG_NO_RESULT"));
     nhanKetQua->setStyleSheet("font-size: 13px; color: #666;");
-    nhanThongTin->setText("Vui lòng quét hoặc nhập mã để xem thông tin");
+    nhanThongTin->setText(LanguageManager::instance().getText("MSG_SCAN_RESET"));
     nutXacNhan->setEnabled(false);
     maQuetDuoc.clear();
     loaiMaQuet.clear();

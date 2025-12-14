@@ -12,11 +12,26 @@
 #include <QDateTime>
 #include <QShortcut>
 #include <QTimer>
+#include "utils/LanguageManager.h"
 
 ManHinhThemSach::ManHinhThemSach(QWidget *parent)
     : QDialog(parent)
+    , nhapISBN(nullptr)
+    , nhapTenSach(nullptr)
+    , nhapTacGia(nullptr)
+    , chonTheLoai(nullptr)
+    , nhapNamXuatBan(nullptr)
+    , nhapSoTrang(nullptr)
+    , nhapSoBanSao(nullptr)
+    , nhapViTri(nullptr)
+    , nutLuu(nullptr)
+    , nutHuy(nullptr)
+    , nutXoaForm(nullptr)
+    , nhanTrangThai(nullptr)
+    , shortcutSave(nullptr)
+    , shortcutCancel(nullptr)
 {
-    setWindowTitle("Thêm Đầu Sách Mới");
+    setWindowTitle(LanguageManager::instance().getText("TITLE_ADD_BOOK"));
     setMinimumWidth(550);
     thietLapGiaoDien();
     thietLapKetNoi();
@@ -34,7 +49,7 @@ void ManHinhThemSach::thietLapGiaoDien() {
     mainLayout->setContentsMargins(25, 25, 25, 25);
     
     // Title
-    QLabel *titleLabel = new QLabel("📚 THÊM ĐẦU SÁCH MỚI", this);
+    QLabel *titleLabel = new QLabel(LanguageManager::instance().getText("HEADER_ADD_BOOK"), this);
     QFont titleFont;
     titleFont.setPointSize(14);
     titleFont.setBold(true);
@@ -44,7 +59,7 @@ void ManHinhThemSach::thietLapGiaoDien() {
     mainLayout->addWidget(titleLabel);
     
     // Form group
-    QGroupBox *formGroup = new QGroupBox("Thông Tin Sách", this);
+    QGroupBox *formGroup = new QGroupBox(LanguageManager::instance().getText("GROUP_BOOK_INFO"), this);
     formGroup->setStyleSheet(
         "QGroupBox {"
         "   border: 2px solid #3498db;"
@@ -73,10 +88,10 @@ void ManHinhThemSach::thietLapGiaoDien() {
     
     // ISBN field
     nhapISBN = new QLineEdit(this);
-    nhapISBN->setPlaceholderText("Nhập 10 hoặc 13 chữ số (VD: 9781234567890)");
+    nhapISBN->setPlaceholderText(LanguageManager::instance().getText("PLACEHOLDER_ISBN"));
     nhapISBN->setMaxLength(13);
-    nhapISBN->setToolTip("ISBN phải có 10 hoặc 13 chữ số\nVí dụ: 9781234567890");
-    QLabel *isbnLabel = new QLabel("ISBN *:", this);
+    nhapISBN->setToolTip(LanguageManager::instance().getText("TOOLTIP_ISBN"));
+    QLabel *isbnLabel = new QLabel(LanguageManager::instance().getText("LBL_ISBN") + " *:", this);
     isbnLabel->setStyleSheet("font-weight: bold;");
     isbnLabel->setMinimumWidth(110);
     formLayout->addWidget(isbnLabel, 0, 0, Qt::AlignRight);
@@ -84,10 +99,10 @@ void ManHinhThemSach::thietLapGiaoDien() {
     
     // Book name field
     nhapTenSach = new QLineEdit(this);
-    nhapTenSach->setPlaceholderText("Tên sách (tối đa 100 ký tự)");
+    nhapTenSach->setPlaceholderText(LanguageManager::instance().getText("PLACEHOLDER_BOOK_NAME"));
     nhapTenSach->setMaxLength(100);
-    nhapTenSach->setToolTip("Nhập tên đầy đủ của sách (bắt buộc)\nTối đa 100 ký tự");
-    QLabel *nameLabel = new QLabel("Tên sách *:", this);
+    nhapTenSach->setToolTip(LanguageManager::instance().getText("TOOLTIP_BOOK_NAME"));
+    QLabel *nameLabel = new QLabel(LanguageManager::instance().getText("LBL_TITLE") + " *:", this);
     nameLabel->setStyleSheet("font-weight: bold;");
     nameLabel->setMinimumWidth(110);
     formLayout->addWidget(nameLabel, 1, 0, Qt::AlignRight);
@@ -95,10 +110,10 @@ void ManHinhThemSach::thietLapGiaoDien() {
     
     // Author field
     nhapTacGia = new QLineEdit(this);
-    nhapTacGia->setPlaceholderText("Tên tác giả (tối đa 50 ký tự)");
+    nhapTacGia->setPlaceholderText(LanguageManager::instance().getText("PLACEHOLDER_AUTHOR"));
     nhapTacGia->setMaxLength(50);
-    nhapTacGia->setToolTip("Nhập tên tác giả (bắt buộc)\nVí dụ: Nguyễn Nhật Ánh");
-    QLabel *authorLabel = new QLabel("Tác giả *:", this);
+    nhapTacGia->setToolTip(LanguageManager::instance().getText("TOOLTIP_AUTHOR"));
+    QLabel *authorLabel = new QLabel(LanguageManager::instance().getText("LBL_AUTHOR") + " *:", this);
     authorLabel->setStyleSheet("font-weight: bold;");
     authorLabel->setMinimumWidth(110);
     formLayout->addWidget(authorLabel, 2, 0, Qt::AlignRight);
@@ -107,9 +122,9 @@ void ManHinhThemSach::thietLapGiaoDien() {
     // Genre combo
     chonTheLoai = new QComboBox(this);
     chonTheLoai->setEditable(true);
-    chonTheLoai->setToolTip("Chọn hoặc nhập thể loại sách");
+    chonTheLoai->setToolTip(LanguageManager::instance().getText("PLACEHOLDER_GENRE"));
     diemDayTheLoai();
-    QLabel *genreLabel = new QLabel("Thể loại *:", this);
+    QLabel *genreLabel = new QLabel(LanguageManager::instance().getText("LBL_CATEGORY") + " *:", this);
     genreLabel->setStyleSheet("font-weight: bold;");
     genreLabel->setMinimumWidth(110);
     formLayout->addWidget(genreLabel, 3, 0, Qt::AlignRight);
@@ -119,9 +134,9 @@ void ManHinhThemSach::thietLapGiaoDien() {
     nhapNamXuatBan = new QSpinBox(this);
     nhapNamXuatBan->setRange(1000, QDateTime::currentDateTime().date().year());
     nhapNamXuatBan->setValue(2024);
-    nhapNamXuatBan->setSuffix(" năm");
-    nhapNamXuatBan->setToolTip("Năm xuất bản sách (1000 - hiện tại)");
-    QLabel *yearLabel = new QLabel("Năm xuất bản *:", this);
+    nhapNamXuatBan->setSuffix(LanguageManager::instance().getText("SUFFIX_YEAR"));
+    nhapNamXuatBan->setToolTip(LanguageManager::instance().getText("TOOLTIP_YEAR")); // Need add TOOLTIP_YEAR or Generic
+    QLabel *yearLabel = new QLabel(LanguageManager::instance().getText("LBL_PUBLISH_YEAR") + " *:", this);
     yearLabel->setStyleSheet("font-weight: bold;");
     yearLabel->setMinimumWidth(110);
     formLayout->addWidget(yearLabel, 4, 0, Qt::AlignRight);
@@ -131,9 +146,9 @@ void ManHinhThemSach::thietLapGiaoDien() {
     nhapSoTrang = new QSpinBox(this);
     nhapSoTrang->setRange(1, 10000);
     nhapSoTrang->setValue(100);
-    nhapSoTrang->setSuffix(" trang");
-    nhapSoTrang->setToolTip("Số trang của sách (1-10000)");
-    QLabel *pagesLabel = new QLabel("Số trang *:", this);
+    nhapSoTrang->setSuffix(LanguageManager::instance().getText("SUFFIX_PAGES"));
+    nhapSoTrang->setToolTip(LanguageManager::instance().getText("TOOLTIP_PAGES"));
+    QLabel *pagesLabel = new QLabel(LanguageManager::instance().getText("LBL_PAGE_COUNT") + " *:", this);
     pagesLabel->setStyleSheet("font-weight: bold;");
     pagesLabel->setMinimumWidth(110);
     formLayout->addWidget(pagesLabel, 5, 0, Qt::AlignRight);
@@ -143,9 +158,9 @@ void ManHinhThemSach::thietLapGiaoDien() {
     nhapSoBanSao = new QSpinBox(this);
     nhapSoBanSao->setRange(1, 100);
     nhapSoBanSao->setValue(1);
-    nhapSoBanSao->setSuffix(" bản sao");
-    nhapSoBanSao->setToolTip("Số lượng bản sao muốn thêm cùng lúc (1-100)");
-    QLabel *copiesLabel = new QLabel("Số bản sao:", this);
+    nhapSoBanSao->setSuffix(LanguageManager::instance().getText("SUFFIX_COPIES"));
+    nhapSoBanSao->setToolTip(LanguageManager::instance().getText("TOOLTIP_COPIES")); // Need add TOOLTIP_COPIES or Generic
+    QLabel *copiesLabel = new QLabel(LanguageManager::instance().getText("LBL_TOTAL_COPIES") + ":", this);
     copiesLabel->setStyleSheet("font-weight: bold;");
     copiesLabel->setMinimumWidth(110);
     formLayout->addWidget(copiesLabel, 6, 0, Qt::AlignRight);
@@ -153,10 +168,10 @@ void ManHinhThemSach::thietLapGiaoDien() {
     
     // Location field
     nhapViTri = new QLineEdit(this);
-    nhapViTri->setPlaceholderText("VD: Kệ A1, Phòng 201 (tùy chọn)");
+    nhapViTri->setPlaceholderText(LanguageManager::instance().getText("PLACEHOLDER_LOCATION"));
     nhapViTri->setMaxLength(30);
-    nhapViTri->setToolTip("Vị trí đặt sách trong thư viện (không bắt buộc)\nVí dụ: Kệ A1, Tầng 2");
-    QLabel *locationLabel = new QLabel("Vị trí:", this);
+    nhapViTri->setToolTip(LanguageManager::instance().getText("TOOLTIP_LOCATION")); // Need TOOLTIP_LOCATION ? Actually reuse PLACEHOLDER ? "Vị trí đặt sách..."
+    QLabel *locationLabel = new QLabel(LanguageManager::instance().getText("TABLE_HEADER_LOCATION") + ":", this); // Use Header key
     locationLabel->setStyleSheet("font-weight: bold;");
     locationLabel->setMinimumWidth(110);
     formLayout->addWidget(locationLabel, 7, 0, Qt::AlignRight);
@@ -177,17 +192,17 @@ void ManHinhThemSach::thietLapGiaoDien() {
     mainLayout->addWidget(nhanTrangThai);
     
     // Note
-    QLabel *noteLabel = new QLabel("(*) Các trường bắt buộc", this);
+    QLabel *noteLabel = new QLabel(LanguageManager::instance().getText("LBL_REQUIRED_FIELDS_NOTE"), this);
     noteLabel->setStyleSheet("color: #7f8c8d; font-style: italic; font-size: 10pt;");
     mainLayout->addWidget(noteLabel);
     
     // Buttons
     QHBoxLayout *buttonLayout = new QHBoxLayout();
     
-    nutXoaForm = new QPushButton("🔄 Xóa Form", this);
+    nutXoaForm = new QPushButton("🔄 " + LanguageManager::instance().getText("BTN_CLEAR_FORM"), this);
     nutXoaForm->setMinimumWidth(120);
     nutXoaForm->setFixedHeight(42);
-    nutXoaForm->setToolTip("Xóa tất cả dữ liệu đã nhập");
+    nutXoaForm->setToolTip(LanguageManager::instance().getText("BTN_CLEAR_FORM"));
     nutXoaForm->setStyleSheet(
         "QPushButton {"
         "   background-color: #95a5a6;"
@@ -209,10 +224,10 @@ void ManHinhThemSach::thietLapGiaoDien() {
     buttonLayout->addWidget(nutXoaForm);
     buttonLayout->addStretch();
     
-    nutLuu = new QPushButton("💾 Lưu", this);
+    nutLuu = new QPushButton("💾 " + LanguageManager::instance().getText("BTN_SAVE"), this);
     nutLuu->setMinimumWidth(120);
     nutLuu->setFixedHeight(42);
-    nutLuu->setToolTip("Lưu thông tin sách mới (Ctrl+S)");
+    nutLuu->setToolTip(LanguageManager::instance().getText("BTN_SAVE"));
     nutLuu->setStyleSheet(
         "QPushButton {"
         "   background-color: #27ae60;"
@@ -234,10 +249,10 @@ void ManHinhThemSach::thietLapGiaoDien() {
         "}"
     );
     
-    nutHuy = new QPushButton("❌ Hủy", this);
+    nutHuy = new QPushButton("❌ " + LanguageManager::instance().getText("BTN_CANCEL"), this);
     nutHuy->setMinimumWidth(120);
     nutHuy->setFixedHeight(42);
-    nutHuy->setToolTip("Hủy và đóng cửa sổ (ESC)");
+    nutHuy->setToolTip(LanguageManager::instance().getText("BTN_CANCEL"));
     nutHuy->setStyleSheet(
         "QPushButton {"
         "   background-color: #e74c3c;"
@@ -339,7 +354,7 @@ void ManHinhThemSach::diemDayTheLoai() {
         "Tôn giáo"
     });
     chonTheLoai->setCurrentIndex(-1);
-    chonTheLoai->setPlaceholderText("Chọn hoặc nhập thể loại");
+    chonTheLoai->setPlaceholderText(LanguageManager::instance().getText("PLACEHOLDER_GENRE"));
 }
 
 void ManHinhThemSach::kiemTraISBN() {
@@ -353,14 +368,14 @@ void ManHinhThemSach::kiemTraISBN() {
     // Check length
     if (isbn.length() != 10 && isbn.length() != 13) {
         datPhongCachTruong(nhapISBN, false);
-        hienThiLoi("ISBN phải có 10 hoặc 13 chữ số");
+        hienThiLoi(LanguageManager::instance().getText("MSG_ERROR_ISBN_FORMAT"));
         return;
     }
     
     // Check if already exists: dùng service layer TimDauSach() thay vì truy xuất mảng toàn cục
     if (TimDauSach(isbn.toStdString()) != nullptr) {
         datPhongCachTruong(nhapISBN, false);
-        hienThiLoi("ISBN này đã tồn tại trong hệ thống");
+        hienThiLoi(LanguageManager::instance().getText("MSG_ERROR_ISBN_EXISTS"));
         return;
     }
     
@@ -438,22 +453,22 @@ bool ManHinhThemSach::kiemTraCacTruong() {
     QString genre = chonTheLoai->currentText().trimmed();
     
     if (isbn.isEmpty() || name.isEmpty() || author.isEmpty() || genre.isEmpty()) {
-        hienThiLoi("Vui lòng điền đầy đủ các trường bắt buộc!");
+        hienThiLoi(LanguageManager::instance().getText("MSG_ERROR_MISSING_REQUIRED"));
         return false;
     }
     
     if (isbn.length() != 10 && isbn.length() != 13) {
-        hienThiLoi("ISBN phải có 10 hoặc 13 chữ số!");
+        hienThiLoi(LanguageManager::instance().getText("MSG_ERROR_ISBN_FORMAT"));
         return false;
     }
     
     if (name.length() < 2) {
-        hienThiLoi("Tên sách quá ngắn!");
+        hienThiLoi(LanguageManager::instance().getText("MSG_ERROR_NAME_SHORT"));
         return false;
     }
     
     if (author.length() < 2) {
-        hienThiLoi("Tên tác giả quá ngắn!");
+        hienThiLoi(LanguageManager::instance().getText("MSG_ERROR_AUTHOR_SHORT"));
         return false;
     }
     
@@ -488,20 +503,17 @@ void ManHinhThemSach::khiNhanLuu() {
     );
     
     if (result.empty()) {
-        hienThiThanhCong(QString("Đã thêm đầu sách '%1' với %2 bản sao!").arg(name).arg(copies));
+        hienThiThanhCong(LanguageManager::instance().getText("MSG_SUCCESS_ADD_BOOK_TITLE")); // Simplify success message or use keys
         
-        QMessageBox::information(this, "Thành công", 
-            QString("✅ Đã thêm thành công đầu sách:\n\n"
-                    "📖 %1\n"
-                    "✍️ Tác giả: %2\n"
-                    "📚 %3 bản sao")
+        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), 
+            LanguageManager::instance().getText("MSG_SUCCESS_ADD_BOOK_BODY_HTML")
                 .arg(name).arg(author).arg(copies));
         
         emit sachDaThem();
         accept();
     } else {
         hienThiLoi(Utf8Helper::fromStdString(result));
-        QMessageBox::warning(this, "Lỗi", Utf8Helper::fromStdString(result));
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_ERROR"), Utf8Helper::fromStdString(result));
     }
 }
 
@@ -543,8 +555,8 @@ void ManHinhThemSach::setupTabOrder() {
 void ManHinhThemSach::clearAllFields() {
     // Confirm before clearing
     QMessageBox::StandardButton reply = QMessageBox::question(this,
-        "Xác nhận xóa form",
-        "Bạn có chắc muốn xóa tất cả dữ liệu đã nhập?",
+        LanguageManager::instance().getText("MSG_CONFIRM_CLEAR_FORM_TITLE"),
+        LanguageManager::instance().getText("MSG_CONFIRM_CLEAR_FORM_BODY"),
         QMessageBox::Yes | QMessageBox::No);
     
     if (reply == QMessageBox::Yes) {
@@ -560,7 +572,7 @@ void ManHinhThemSach::clearAllFields() {
         nhapISBN->setFocus();
         
         // Visual feedback
-        hienThiThanhCong("Form đã được xóa");
+        hienThiThanhCong(LanguageManager::instance().getText("MSG_FORM_CLEARED"));
         QTimer::singleShot(2000, [this]() {
             nhanTrangThai->clear();
         });

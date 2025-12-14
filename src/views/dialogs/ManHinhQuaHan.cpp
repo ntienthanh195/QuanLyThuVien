@@ -5,15 +5,15 @@
 #include <QHeaderView>
 #include <QFont>
 #include <QMessageBox>
-#include <QTextDocument>
+
 #include <QTextEdit>
 #include <QDate>
-#include <QPrinter>
-#include <QPrintDialog>
+#include "utils/PrintHelper.h"
 #include <algorithm>
 #include <QTableView>
 #include <QAbstractTableModel>
 #include <vector>
+#include "utils/LanguageManager.h"
 
 const int TIEN_PHAT_MOI_NGAY = 5000;  // 5000 VND per day late fee
 
@@ -43,16 +43,16 @@ public:
             switch (index.column()) {
             case 0: return QString::number(item.docGia->data.MaThe);
             case 1: return QString::fromStdString(item.docGia->data.Ho + " " + item.docGia->data.Ten);
-            case 2: return (item.docGia->data.Phai == 0) ? QString("Nam") : QString("Nữ");
+            case 2: return (item.docGia->data.Phai == 0) ? LanguageManager::instance().getText("GENDER_MALE") : LanguageManager::instance().getText("GENDER_FEMALE");
             case 3: return QString::number(item.soSachQuaHan);
             case 4: return QString::number(item.tongSoNgayQuaHan) + " ngày";
             case 5: return QString::number(item.maxNgayQuaHan) + " ngày";
             case 6: return QString::number(item.phiPhat) + " đ";
             case 7: {
-                if (item.maxNgayQuaHan >= 30) return QString("🔴 Nghiêm Trọng");
-                if (item.maxNgayQuaHan >= 14) return QString("🟠 Cao");
-                if (item.maxNgayQuaHan >= 7) return QString("🟡 Trung Bình");
-                return QString("🟢 Nhẹ");
+                if (item.maxNgayQuaHan >= 30) return LanguageManager::instance().getText("SEVERITY_SEVERE");
+                if (item.maxNgayQuaHan >= 14) return LanguageManager::instance().getText("SEVERITY_HIGH");
+                if (item.maxNgayQuaHan >= 7) return LanguageManager::instance().getText("SEVERITY_MEDIUM");
+                return LanguageManager::instance().getText("SEVERITY_LOW");
             }
             }
         }
@@ -83,14 +83,14 @@ public:
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override {
         if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
             switch (section) {
-            case 0: return QStringLiteral("Mã Thẻ");
-            case 1: return QStringLiteral("Họ Tên");
-            case 2: return QStringLiteral("Giới Tính");
-            case 3: return QStringLiteral("Số Sách QH");
-            case 4: return QStringLiteral("Tổng Ngày");
-            case 5: return QStringLiteral("Ngày Max");
-            case 6: return QStringLiteral("Phí Phạt");
-            case 7: return QStringLiteral("Mức Độ");
+            case 0: return LanguageManager::instance().getText("TABLE_HEADER_CARD_ID");
+            case 1: return LanguageManager::instance().getText("TABLE_HEADER_FULLNAME");
+            case 2: return LanguageManager::instance().getText("TABLE_HEADER_GENDER");
+            case 3: return LanguageManager::instance().getText("TABLE_HEADER_OVERDUE_BOOKS");
+            case 4: return LanguageManager::instance().getText("TABLE_HEADER_TOTAL_DAYS");
+            case 5: return LanguageManager::instance().getText("TABLE_HEADER_MAX_DAYS");
+            case 6: return LanguageManager::instance().getText("TABLE_HEADER_FINE");
+            case 7: return LanguageManager::instance().getText("TABLE_HEADER_SEVERITY");
             }
         }
         return QAbstractTableModel::headerData(section, orientation, role);
@@ -104,7 +104,7 @@ private:
 
 ManHinhQuaHan::ManHinhQuaHan(PTRDG rootDocGia, PTRDS dsDauSach[], int soLuongDauSach, QWidget *parent)
     : QDialog(parent), cayDocGia(rootDocGia), danhSachDauSach(dsDauSach), soLuong(soLuongDauSach) {
-    setWindowTitle("Độc Giả Mượn Quá Hạn");
+    setWindowTitle(LanguageManager::instance().getText("TITLE_OVERDUE_LIST_DIALOG"));
     setMinimumSize(1200, 800);
     setModal(true);
     
@@ -122,7 +122,7 @@ void ManHinhQuaHan::thietLapGiaoDien() {
     mainLayout->setContentsMargins(25, 25, 25, 25);
     
     // Tiêu đề
-    nhanTieuDe = new QLabel("DANH SÁCH ĐỘC GIẢ MƯỢN QUÁ HẠN");
+    nhanTieuDe = new QLabel(LanguageManager::instance().getText("HEADER_OVERDUE_LIST"));
     nhanTieuDe->setStyleSheet(
         "font-size: 24px; "
         "font-weight: bold; "
@@ -138,7 +138,7 @@ void ManHinhQuaHan::thietLapGiaoDien() {
     QHBoxLayout *statsLayout = new QHBoxLayout();
     
     // Revenue panel
-    QGroupBox *boxRevenue = new QGroupBox("Thống Kê Doanh Thu");
+    QGroupBox *boxRevenue = new QGroupBox(LanguageManager::instance().getText("GROUP_REVENUE_STATS"));
     boxRevenue->setStyleSheet(
         "QGroupBox { "
         "    font-weight: bold; "
@@ -164,7 +164,7 @@ void ManHinhQuaHan::thietLapGiaoDien() {
     statsLayout->addWidget(boxRevenue);
     
     // Active readers panel
-    QGroupBox *boxActive = new QGroupBox("Độc Giả Hoạt Động");
+    QGroupBox *boxActive = new QGroupBox(LanguageManager::instance().getText("GROUP_ACTIVE_READERS"));
     boxActive->setStyleSheet(
         "QGroupBox { "
         "    font-weight: bold; "
@@ -193,8 +193,7 @@ void ManHinhQuaHan::thietLapGiaoDien() {
     
     // Panel thông tin
     nhanThongTin = new QLabel(
-        "📌 Danh sách độc giả có sách mượn quá hạn. "
-        "Phí phạt: 5,000đ/ngày sau 7 ngày mượn."
+        LanguageManager::instance().getText("MSG_OVERDUE_NOTE")
     );
     nhanThongTin->setStyleSheet(
         "color: #34495e; "
@@ -234,21 +233,21 @@ void ManHinhQuaHan::thietLapGiaoDien() {
     QHBoxLayout *buttonLayout = new QHBoxLayout();
     buttonLayout->addStretch();
     
-    nutXemChiTiet = new QPushButton("👁️ Xem Chi Tiết", this);
+    nutXemChiTiet = new QPushButton(LanguageManager::instance().getText("BTN_VIEW_DETAIL"), this);
     nutXemChiTiet->setMinimumSize(140, 40);
-    nutXemChiTiet->setToolTip("Xem chi tiết độc giả đã chọn");
+    nutXemChiTiet->setToolTip("Xem chi tiết học viên đã chọn");
     
-    nutXuatBaoCao = new QPushButton("📄 Xuất Báo Cáo", this);
+    nutXuatBaoCao = new QPushButton(LanguageManager::instance().getText("BTN_EXPORT_REPORT"), this);
     nutXuatBaoCao->setMinimumSize(140, 40);
     nutXuatBaoCao->setToolTip("In hoặc xuất báo cáo (Ctrl+P)");
     nutXuatBaoCao->setShortcut(QKeySequence("Ctrl+P"));
     
-    nutLamMoi = new QPushButton("🔄 Làm Mới", this);
+    nutLamMoi = new QPushButton(LanguageManager::instance().getText("BTN_REFRESH"), this);
     nutLamMoi->setMinimumSize(120, 40);
     nutLamMoi->setToolTip("Cập nhật lại danh sách (F5)");
     nutLamMoi->setShortcut(QKeySequence("F5"));
     
-    nutDong = new QPushButton("❌ Đóng", this);
+    nutDong = new QPushButton(LanguageManager::instance().getText("BTN_CLOSE"), this);
     nutDong->setMinimumSize(120, 40);
     nutDong->setToolTip("Đóng cửa sổ (Esc)");
     nutDong->setShortcut(QKeySequence(Qt::Key_Escape));
@@ -381,7 +380,7 @@ void ManHinhQuaHan::capNhatBangQuaHan() {
     danhSachQuaHan.clear();
 
     if (!cayDocGia) {
-        nhanThongTin->setText("⚠️ Chưa có dữ liệu độc giả trong hệ thống");
+        nhanThongTin->setText(LanguageManager::instance().getText("MSG_NO_DATA_SYSTEM"));
         nhanThongTin->setStyleSheet(
             "color: #e74c3c; font-weight: bold; padding: 12px; "
             "background-color: #fadbd8; border-radius: 6px; border-left: 4px solid #e74c3c;"
@@ -393,7 +392,7 @@ void ManHinhQuaHan::capNhatBangQuaHan() {
     duyetInOrder(cayDocGia, danhSachQuaHan);
 
     if (danhSachQuaHan.empty()) {
-        nhanThongTin->setText("✅ Không có độc giả nào mượn quá hạn!");
+        nhanThongTin->setText(LanguageManager::instance().getText("MSG_NO_DATA_OVERDUE"));
         nhanThongTin->setStyleSheet(
             "color: #27ae60; font-weight: bold; padding: 12px; "
             "background-color: #d5f4e6; border-radius: 6px; border-left: 4px solid #27ae60;"
@@ -425,9 +424,7 @@ void ManHinhQuaHan::capNhatBangQuaHan() {
 
     // Cập nhật thông tin
     nhanThongTin->setText(
-        QString("⚠️ Có %1 độc giả mượn quá hạn | "
-               "Tổng %2 cuốn sách quá hạn | "
-               "Cần xử lý ngay!")
+        LanguageManager::instance().getText("MSG_OVERDUE_SUMMARY")
             .arg(soLuongHienThi)
             .arg(tongSachQuaHan)
     );
@@ -481,11 +478,7 @@ void ManHinhQuaHan::capNhatThongKeDoanhThu(const std::vector<DocGiaQuaHan>& ds) 
         else if (item.maxNgayQuaHan >= 14) docGiaCao++;
     }
     
-    nhanDoanhThu->setText(QString(
-        "<b>💰 Tổng phí phạt:</b> %1 đ<br>"
-        "<b>🔴 Nghiêm trọng:</b> %2 độc giả<br>"
-        "<b>🟠 Mức cao:</b> %3 độc giả<br>"
-        "<i>Phí phạt: 5,000đ/ngày sau 7 ngày mượn</i>")
+    nhanDoanhThu->setText(LanguageManager::instance().getText("MSG_REVENUE_STATS_HTML")
         .arg(QString::number(tongPhiPhat).rightJustified(12, ' '))
         .arg(docGiaNghiemTrong)
         .arg(docGiaCao));
@@ -506,11 +499,7 @@ void ManHinhQuaHan::capNhatThongKeDoanhThu(const std::vector<DocGiaQuaHan>& ds) 
     
     double tyLeHoatDong = (tongDocGia > 0) ? (hoatDong30Ngay * 100.0 / tongDocGia) : 0;
     
-    nhanHoatDong->setText(QString(
-        "<b>📊 Tổng độc giả:</b> %1<br>"
-        "<b>🔵 Hoạt động 7 ngày:</b> %2<br>"
-        "<b>🔷 Hoạt động 30 ngày:</b> %3<br>"
-        "<b>📈 Tỷ lệ hoạt động:</b> %4%")
+    nhanHoatDong->setText(LanguageManager::instance().getText("MSG_ACTIVE_STATS_HTML")
         .arg(tongDocGia)
         .arg(hoatDong7Ngay)
         .arg(hoatDong30Ngay)
@@ -520,7 +509,7 @@ void ManHinhQuaHan::capNhatThongKeDoanhThu(const std::vector<DocGiaQuaHan>& ds) 
 void ManHinhQuaHan::onViewReaderDetail() {
     int selectedRow = bangQuaHan->currentIndex().row();
     if (selectedRow < 0) {
-        QMessageBox::warning(this, "Chưa chọn", "Vui lòng chọn độc giả để xem chi tiết!");
+        QMessageBox::warning(this, "Chưa chọn", "Vui lòng chọn học viên để xem chi tiết!");
         return;
     }
 
@@ -559,7 +548,7 @@ void ManHinhQuaHan::hienThiChiTietDocGia(PTRDG docGia) {
                    ".overdue { color: red; font-weight: bold; }"
                    "</style></head><body>";
     
-    html += QString("<h2>👤 Chi Tiết Độc Giả: %1 %2</h2>")
+    html += QString("<h2>Chi Tiết Học Viên: %1 %2</h2>")
             .arg(QString::fromStdString(docGia->data.Ho))
             .arg(QString::fromStdString(docGia->data.Ten));
     
@@ -568,7 +557,7 @@ void ManHinhQuaHan::hienThiChiTietDocGia(PTRDG docGia) {
             .arg(docGia->data.Phai == 0 ? "Nam" : "Nữ")
             .arg(docGia->data.soSachDangMuon);
     
-    html += "<h3>📚 Danh Sách Sách Đang Mượn:</h3>";
+    html += "<h3>Danh Sách Sách Đang Mượn:</h3>";
     html += "<table><tr><th>STT</th><th>Mã Sách</th><th>Tên Sách</th><th>Ngày Mượn</th><th>Ngày Quá Hạn</th><th>Phí Phạt</th></tr>";
     
     MUONTRA mt = docGia->data.dsmt;
@@ -611,11 +600,11 @@ void ManHinhQuaHan::hienThiChiTietDocGia(PTRDG docGia) {
     }
     
     html += "</table>";
-    html += QString("<h3 style='color: #c0392b;'>💰 Tổng Phí Phạt: %1 đ</h3>").arg(tongPhiPhat);
+    html += QString("<h3 style='color: #c0392b;'>Tổng Phí Phạt: %1 đ</h3>").arg(tongPhiPhat);
     html += "</body></html>";
     
     QDialog *dialog = new QDialog(this);
-    dialog->setWindowTitle("Chi Tiết Độc Giả");
+    dialog->setWindowTitle("Chi Tiết Học Viên");
     dialog->setMinimumSize(800, 500);
     
     QVBoxLayout *layout = new QVBoxLayout(dialog);
@@ -633,14 +622,6 @@ void ManHinhQuaHan::hienThiChiTietDocGia(PTRDG docGia) {
 }
 
 void ManHinhQuaHan::onExportReport() {
-    QPrinter printer(QPrinter::HighResolution);
-    printer.setPageSize(QPageSize::A4);
-    
-    QPrintDialog printDialog(&printer, this);
-    if (printDialog.exec() != QDialog::Accepted) {
-        return;
-    }
-    
     QString html = "<html><head><style>"
                    "body { font-family: Arial; margin: 30px; }"
                    ".header { text-align: center; border-bottom: 3px solid #e74c3c; padding-bottom: 15px; }"
@@ -654,7 +635,7 @@ void ManHinhQuaHan::onExportReport() {
                    "</style></head><body>";
     
     html += "<div class='header'>";
-    html += "<h1>⚠️ BÁO CÁO ĐỘC GIẢ MƯỢN QUÁ HẠN</h1>";
+    html += "<h1>BÁO CÁO HỌC VIÊN MƯỢN QUÁ HẠN</h1>";
     html += "<p>Hệ Thống Quản Lý Thư Viện</p>";
     html += "</div>";
     
@@ -689,9 +670,6 @@ void ManHinhQuaHan::onExportReport() {
     
     html += "</body></html>";
     
-    QTextDocument document;
-    document.setHtml(html);
-    document.print(&printer);
-    
-    QMessageBox::information(this, "Xuất Báo Cáo", "✅ Đã in báo cáo quá hạn thành công!");
+    // Use Centralized PrintHelper
+    PrintHelper::inBaoCaoTuyChinh("Báo Cáo Quá Hạn", html, this);
 }

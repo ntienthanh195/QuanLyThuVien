@@ -1,4 +1,5 @@
 #include "giao_dien/WidgetQuanLySach.h"
+#include "utils/LanguageManager.h"
 #include "utils/FilePathManager.h"
 #include "giao_dien/hop_thoai/HopThoaiThemSach.h"
 #include "giao_dien/hop_thoai/HopThoaiSuaSach.h"
@@ -21,10 +22,18 @@
 #  endif
 #endif
 #include <QVBoxLayout>
+#include <QMenu>
+#include <QAction>
+#include <QInputDialog>
 #include <QHBoxLayout>
+#include "utils/PrintHelper.h" // Added include
+#include "views/dialogs/ManHinhPreviewImport.h"
+#include "utils/ImportManager.h"
+#include "giao_dien/hop_thoai/ManHinhQuanLyIn.h" // Moved to top
 #include <QHeaderView>
 #include <QMessageBox>
 #include <QDebug>
+#include "utils/EventBus.h"
 #include <QGraphicsDropShadowEffect>
 #include <QFileDialog>
 #include <QProcess>
@@ -86,15 +95,15 @@ public:
         if (role != Qt::DisplayRole) return QVariant();
         if (orientation == Qt::Horizontal) {
             switch (section) {
-                case 0: return "STT";
-                case 1: return "ISBN";
-                case 2: return "Tên Sách";
-                case 3: return "Tác Giả";
-                case 4: return "Thể Loại";
-                case 5: return "Năm XB";
-                case 6: return "Số Trang";
-                case 7: return "Trạng Thái";
-                case 8: return "Thao Tác";
+                case 0: return QStringLiteral("STT");
+                case 1: return LanguageManager::instance().getText("TABLE_HEADER_ISBN");
+                case 2: return LanguageManager::instance().getText("TABLE_HEADER_TITLE");
+                case 3: return LanguageManager::instance().getText("TABLE_HEADER_AUTHOR");
+                case 4: return LanguageManager::instance().getText("TABLE_HEADER_CATEGORY");
+                case 5: return LanguageManager::instance().getText("TABLE_HEADER_YEAR");
+                case 6: return LanguageManager::instance().getText("TABLE_HEADER_PAGES");
+                case 7: return LanguageManager::instance().getText("TABLE_HEADER_STATUS");
+                case 8: return LanguageManager::instance().getText("TABLE_HEADER_ACTIONS");
             }
         }
         return QVariant();
@@ -165,6 +174,10 @@ WidgetQuanLySach::WidgetQuanLySach(QWidget *cha)
     } catch (...) {
         // ignore watcher setup failures
     }
+    
+    // Connect Language Change
+    connect(&LanguageManager::instance(), &LanguageManager::languageChanged, this, &WidgetQuanLySach::capNhatNgonNgu);
+    QTimer::singleShot(0, this, &WidgetQuanLySach::capNhatNgonNgu);
 }
 
 WidgetQuanLySach::~WidgetQuanLySach() {}
@@ -185,103 +198,117 @@ void WidgetQuanLySach::thieLapGiaoDien() {
 }
 
 void WidgetQuanLySach::thieLapHeaderBar() {
-    QWidget *headerBar = new QWidget();
-    headerBar->setStyleSheet("QWidget { background: transparent; }");
-    QHBoxLayout *layout = new QHBoxLayout(headerBar);
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(10);
+    // Header Bar Container
+    QWidget *headerContainer = new QWidget();
+    headerContainer->setStyleSheet("background-color: transparent;");
+    QHBoxLayout *headerLayout = new QHBoxLayout(headerContainer);
+    headerLayout->setContentsMargins(0, 0, 0, 0);
+    headerLayout->setSpacing(15);
+
+    // Group 1: DATA (Thêm Sách, Nhập Excel)
+    QWidget *groupData = new QWidget();
+    QHBoxLayout *layoutData = new QHBoxLayout(groupData);
+    layoutData->setContentsMargins(0, 0, 0, 0);
+    layoutData->setSpacing(8);
     
-    // Create action buttons
-    auto createButton = [](const QString &icon, const QString &text, const QString &color) -> QPushButton* {
-        QPushButton *btn = new QPushButton(icon + " " + text);
-        btn->setFixedHeight(36);
-        btn->setMinimumWidth(110);
-
-        // Map legacy gray token to navy palette for consistency
-        QString base = color;
-        if (color.compare("#2D2D30", Qt::CaseInsensitive) == 0) {
-            base = "#242933"; // neutral dark slate surface for buttons
-        }
-
-        // Simple hover/pressed colors (keep accents for primary / danger)
-        QString hoverColor;
-        QString pressedColor;
-        if (base.compare("#3B82F6", Qt::CaseInsensitive) == 0 || base.compare("#0078D4", Qt::CaseInsensitive) == 0) {
-            hoverColor = "#3a7bc8";
-            pressedColor = "#2a5a8a";
-        } else if (base.compare("#C42B1C", Qt::CaseInsensitive) == 0) {
-            hoverColor = "#f56565";
-            pressedColor = "#fc8181";
-        } else {
-            hoverColor = "#2d3541";  // subtle hover for neutral
-            pressedColor = "#1a1d23"; // darker on press
-        }
-
-        btn->setStyleSheet(QString(
-            "QPushButton {"
-            "    background-color: %1;"
-            "    color: white;"
-            "    border: none;"
-            "    border-radius: 4px;"
-            "    font-size: 13px;"
-            "    font-weight: 500;"
-            "    padding: 0 16px;"
-            "}"
-            "QPushButton:hover {"
-            "    background-color: %2;"
-            "}"
-            "QPushButton:pressed {"
-            "    background-color: %3;"
-            "}"
-        ).arg(base, hoverColor, pressedColor));
-        return btn;
-    };
-    
-    // Buttons
-    nutThemSach = createButton("+", "Thêm Sách", "#0078D4");
-    nutNhapFile = createButton("⇩", "Nhập Excel", "#2D2D30");
-    nutNhapFile->setStyleSheet(
-        "QPushButton {"
-        "    background-color: #242933;"
-        "    color: #E2E8F0;"
-        "    border: 1px solid #151820;"
-        "    border-radius: 4px;"
-        "    font-size: 13px;"
-        "    padding: 0 16px;"
-        "}"
-        "QPushButton:hover {"
-        "    background-color: #2d3541;"
-        "    border: 1px solid #4A90E2;"
-        "}"
+    nutThemSach = new QPushButton(" Thêm Sách");
+    nutThemSach->setIcon(QIcon(":/icons/plus.svg"));
+    nutThemSach->setStyleSheet(
+        "QPushButton { background-color: #0078D4; color: white; border: none; border-radius: 4px; padding: 6px 12px; font-weight: 600; }"
+        "QPushButton:hover { background-color: #106EBE; }"
+        "QPushButton:pressed { background-color: #005A9E; }"
     );
     
-    nutXuatFile = createButton("⎙", "In", "#2D2D30");
+    nutNhapFile = new QPushButton(" Nhập Excel");
+    nutNhapFile->setIcon(QIcon(":/icons/import.svg")); 
+    nutNhapFile->setStyleSheet(
+        "QPushButton { background-color: #2D2D30; color: #E0E0E0; border: 1px solid #3E3E42; border-radius: 4px; padding: 6px 12px; }"
+        "QPushButton:hover { background-color: #3E3E42; border-color: #0078D4; }"
+    );
+    
+    layoutData->addWidget(nutThemSach);
+    layoutData->addWidget(nutNhapFile);
+    
+    // Group 2: ACTIONS (In Ấn)
+    QWidget *groupActions = new QWidget();
+    QHBoxLayout *layoutActions = new QHBoxLayout(groupActions);
+    layoutActions->setContentsMargins(0, 0, 0, 0);
+    layoutActions->setSpacing(8);
+
+    nutXuatFile = new QPushButton(" In Ấn ▾");
+    nutXuatFile->setIcon(QIcon(":/icons/print.svg"));
     nutXuatFile->setStyleSheet(nutNhapFile->styleSheet());
     
-    nutSuaSach = createButton("✏", "Sửa", "#2D2D30");
+    layoutActions->addWidget(nutXuatFile);
+
+    // Group 3: SELECTION (Chi Tiết, Sửa, Xóa) - Initially Disabled
+    QWidget *groupSelection = new QWidget();
+    QHBoxLayout *layoutSelection = new QHBoxLayout(groupSelection);
+    layoutSelection->setContentsMargins(0, 0, 0, 0);
+    layoutSelection->setSpacing(8);
+
+    auto createSelectBtn = [](QString text, QString icon, QString color) {
+        QPushButton *btn = new QPushButton(" " + text);
+        btn->setIcon(QIcon(icon));
+        btn->setEnabled(false); // Default disabled
+        btn->setStyleSheet(QString(
+            "QPushButton { background-color: %1; color: white; border: none; border-radius: 4px; padding: 6px 12px; font-weight: 600; }"
+            "QPushButton:hover { background-color: %2; }"
+            "QPushButton:disabled { background-color: #2D2D30; color: #666; }"
+        ).arg(color).arg(color == "#C42B1C" ? "#A80000" : "#2D2D30")); // Simple logic, refine later if needed
+        return btn;
+    };
+
+    nutXemChiTiet = createSelectBtn("Chi Tiết", ":/icons/info.svg", "#2D2D30");
+    nutXemChiTiet->setStyleSheet(nutNhapFile->styleSheet()); // Use standard neutral style
+
+    nutSuaSach = createSelectBtn("Sửa", ":/icons/edit.svg", "#2D2D30");
     nutSuaSach->setStyleSheet(nutNhapFile->styleSheet());
+
+    nutXoaSach = createSelectBtn("Xóa", ":/icons/delete.svg", "#C42B1C"); // Red for delete
+
+    layoutSelection->addWidget(nutXemChiTiet);
+    layoutSelection->addWidget(nutSuaSach);
+    layoutSelection->addWidget(nutXoaSach);
+
+    // Add groups to main header layout
+    headerLayout->addWidget(groupData);
+    // Vertical separator
+    QFrame *line1 = new QFrame(); line1->setFrameShape(QFrame::VLine); line1->setStyleSheet("color: #3E3E42;");
+    headerLayout->addWidget(line1);
     
-    nutXemChiTiet = createButton("ⓘ", "Chi Tiết", "#2D2D30");
-    nutXemChiTiet->setStyleSheet(nutNhapFile->styleSheet());
+    headerLayout->addWidget(groupActions);
     
-    nutXoaSach = createButton("✖", "Xóa", "#C42B1C");
+    QFrame *line2 = new QFrame(); line2->setFrameShape(QFrame::VLine); line2->setStyleSheet("color: #3E3E42;");
+    headerLayout->addWidget(line2);
+
+    headerLayout->addWidget(groupSelection);
+    headerLayout->addStretch();
+
+    boTriChinh->addWidget(headerContainer);
     
-    layout->addWidget(nutThemSach);
-    layout->addWidget(nutNhapFile);
-    layout->addWidget(nutXuatFile);
-    layout->addWidget(nutSuaSach);
-    layout->addWidget(nutXemChiTiet);
-    layout->addWidget(nutXoaSach);
-    layout->addStretch();
-    
-    boTriChinh->addWidget(headerBar);
-    
-    // Connect signals
+    // Connect standard signals (re-using existing slots)
     connect(nutThemSach, &QPushButton::clicked, this, &WidgetQuanLySach::xuLyNutThemSach);
+    connect(nutNhapFile, &QPushButton::clicked, this, &WidgetQuanLySach::xuLyNhapDuLieuTu);
+    connect(nutXemChiTiet, &QPushButton::clicked, this, &WidgetQuanLySach::xuLyNutXemChiTiet);
     connect(nutSuaSach, &QPushButton::clicked, this, &WidgetQuanLySach::xuLyNutSuaSach);
     connect(nutXoaSach, &QPushButton::clicked, this, &WidgetQuanLySach::xuLyNutXoaSach);
-    connect(nutXemChiTiet, &QPushButton::clicked, this, &WidgetQuanLySach::xuLyNutXemChiTiet);
-    connect(nutNhapFile, &QPushButton::clicked, this, &WidgetQuanLySach::xuLyNhapDuLieuTu);
+    
+    // Header: In -> Unified Print Dialog
+    connect(nutXuatFile, &QPushButton::clicked, this, [this]() {
+        // Use the centralized Print Manager Dialog
+        ManHinhQuanLyIn dict(nullptr, {}, this);
+        
+        // Pass context if a book is selected
+        if (dauSachDangChon) {
+            dict.setBookContext(dauSachDangChon);
+        }
+        
+        // Set Mode
+        dict.setMode(ManHinhQuanLyIn::BOOK_CONTEXT);
+        
+        dict.exec();
+    });
 }
 
 void WidgetQuanLySach::onWatchedFileChanged(const QString &path) {
@@ -432,6 +459,7 @@ void WidgetQuanLySach::thieLapBangSach() {
     bangSach->setProperty("class", "InnerTable");
     
     // Set column widths
+    bangSach->horizontalHeader()->setStretchLastSection(true);
     bangSach->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
     bangSach->horizontalHeader()->setDefaultSectionSize(150);
     bangSach->setColumnWidth(0, 50);   // STT
@@ -447,184 +475,68 @@ void WidgetQuanLySach::thieLapBangSach() {
     // Row height
     bangSach->verticalHeader()->setDefaultSectionSize(45);
     bangSach->verticalHeader()->setVisible(false);
-    bangSach->setMinimumHeight(500);
+    bangSach->setMinimumHeight(450);
     boTriChinh->addWidget(bangSach, 1);
+    
+    // Hint label
+    QLabel *hintLabel = new QLabel("Mẹo: Nhấp đúp vào sách để xem chi tiết & in tem");
+    hintLabel->setStyleSheet("color: #666; font-style: italic; font-size: 11px; margin-top: 2px;");
+    hintLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    boTriChinh->addWidget(hintLabel);
 
     // Selection handling
+    // Selection handling
     connect(bangSach->selectionModel(), &QItemSelectionModel::currentRowChanged, this, [this](const QModelIndex &current, const QModelIndex&) {
-        if (!current.isValid()) return;
-        int row = current.row();
-        extern PTRDS* LayDanhSachDauSach();
-        extern int LaySoLuongDauSach();
-        PTRDS *arr = LayDanhSachDauSach();
-        int n = LaySoLuongDauSach();
-        if (row < 0 || row >= n) return;
-        dauSachDangChon = arr ? arr[row] : nullptr;
+        if (!current.isValid()) {
+            xuLyChonDong(-1, -1);
+            return;
+        }
+        xuLyChonDong(current.row(), current.column());
+    });
+
+    // Right-click Context Menu
+    bangSach->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(bangSach, &QTableView::customContextMenuRequested, this, [this](const QPoint &pos) {
+        QModelIndex index = bangSach->indexAt(pos);
+        if (!index.isValid()) return;
+
+        QMenu contextMenu(this);
+        contextMenu.setStyleSheet("QMenu { background-color: #2D2D30; color: white; border: 1px solid #3E3E42; }"
+                                  "QMenu::item { padding: 8px 20px; }"
+                                  "QMenu::item:selected { background-color: #0078D4; }");
+
+        QAction *actChiTiet = contextMenu.addAction(QIcon(":/icons/info.svg"), "Xem Chi Tiết");
+        QAction *actSua = contextMenu.addAction(QIcon(":/icons/edit.svg"), "Sửa Sách");
+        contextMenu.addSeparator();
+        QAction *actInTem = contextMenu.addAction(QIcon(":/icons/barcode.svg"), "In Tem Mã Vạch");
+        contextMenu.addSeparator();
+        QAction *actXoa = contextMenu.addAction(QIcon(":/icons/delete.svg"), "Xóa Sách");
+
+        connect(actChiTiet, &QAction::triggered, this, &WidgetQuanLySach::xuLyNutXemChiTiet);
+        connect(actSua, &QAction::triggered, this, &WidgetQuanLySach::xuLyNutSuaSach);
+        connect(actInTem, &QAction::triggered, this, [this]() {
+            if (dauSachDangChon) {
+                // Same logic as menu
+                QString ten = QString::fromStdString(dauSachDangChon->tenSach);
+                QString ma = QString::fromStdString(dauSachDangChon->ISBN);
+                PrintHelper::inTemMaVachSach(ma, ten, this);
+            }
+        });
+        connect(actXoa, &QAction::triggered, this, &WidgetQuanLySach::xuLyNutXoaSach);
+
+        contextMenu.exec(bangSach->viewport()->mapToGlobal(pos));
     });
 
     // Double-click to show detail
     connect(bangSach, &QTableView::doubleClicked, this, [this](const QModelIndex &index) {
         if (!index.isValid()) return;
-        int row = index.row();
-        extern PTRDS* LayDanhSachDauSach();
-        extern int LaySoLuongDauSach();
-        PTRDS *arr = LayDanhSachDauSach();
-        int n = LaySoLuongDauSach();
-        if (row < 0 || row >= n) return;
-        dauSachDangChon = arr ? arr[row] : nullptr;
         if (dauSachDangChon) xuLyNutXemChiTiet();
     });
 }
 
 void WidgetQuanLySach::thieLapNutChucNang() {
-    ResponsiveHelper::ScreenSize screenSize = ResponsiveHelper::detectScreenSize();
-    
-    nhomChucNang = new QGroupBox("⚙️ Chức Năng");
-    int padding = ResponsiveHelper::getScaledSpacing(15, screenSize);
-    nhomChucNang->setStyleSheet(QString(
-        "QGroupBox {"
-        "    background-color: #242933;"
-        "    border: 1px solid #151820;"
-        "    border-radius: 12px;"
-        "    padding: %1px;"
-        "    font-size: 14px;"
-        "    font-weight: bold;"
-        "    color: #FFFFFF;"
-        "}"
-    ).arg(padding));
-    
-    QHBoxLayout *boTri = new QHBoxLayout(nhomChucNang);
-    boTri->setSpacing(ResponsiveHelper::getScaledSpacing(15, screenSize));
-    
-    nutThemSach = new QPushButton(QIcon(":/icons/plus.svg"), " Thêm Sách");
-    nutSuaSach = new QPushButton(QIcon(":/icons/edit.svg"), " Sửa");
-    nutXoaSach = new QPushButton(QIcon(":/icons/trash.svg"), " Xóa");
-    nutThemBanSao = new QPushButton(QIcon(":/icons/copy.svg"), " Thêm Bản Sao");
-    nutXemChiTiet = new QPushButton(QIcon(":/icons/info.svg"), " Chi Tiết");
-    
-    // Tooltips
-    nutThemSach->setToolTip("Thêm đầu sách mới vào thư viện");
-    nutSuaSach->setToolTip("Sửa thông tin đầu sách đã chọn");
-    nutXoaSach->setToolTip("Xóa đầu sách và tất cả bản sao");
-    nutThemBanSao->setToolTip("Thêm bản sao cho đầu sách đã chọn");
-    nutXemChiTiet->setToolTip("Xem chi tiết đầu sách và danh sách bản sao");
-    
-    // Responsive button styling
-    int buttonPadding = ResponsiveHelper::getScaledSpacing(15, screenSize);
-    int fontSize = ResponsiveHelper::getScaledFontSize(14, screenSize);
-    
-    // Gradient + shadow styles cho từng button
-    QString kieuThemSach = QString(
-        "QPushButton {"
-        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1BC5BD, stop:1 #0e6c66);"
-        "    color: white; border: none; border-radius: 8px;"
-        "    padding: %1px 25px; font-weight: bold; font-size: %2px;"
-        "}"
-        "QPushButton:hover {"
-        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #0e9d95, stop:1 #084c47);"
-        "}"
-        "QPushButton:disabled { background-color: #2B2B40; color: #6C6C80; }"
-    ).arg(buttonPadding).arg(fontSize);
-    
-    QString kieuSuaSach = QString(
-        "QPushButton {"
-        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #4A90E2, stop:1 #2a5a8a);"
-        "    color: white; border: none; border-radius: 8px;"
-        "    padding: %1px 25px; font-weight: bold; font-size: %2px;"
-        "}"
-        "QPushButton:hover {"
-        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #3a7bc8, stop:1 #2a5a8a);"
-        "}"
-        "QPushButton:disabled { background-color: #242933; color: #6C6C80; }"
-    ).arg(buttonPadding).arg(fontSize);
-    
-    QString kieuXoaSach = QString(
-        "QPushButton {"
-        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #F64E60, stop:1 #c62828);"
-        "    color: white; border: none; border-radius: 8px;"
-        "    padding: %1px 25px; font-weight: bold; font-size: %2px;"
-        "}"
-        "QPushButton:hover {"
-        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #d32f2f, stop:1 #b71c1c);"
-        "}"
-        "QPushButton:disabled { background-color: #2B2B40; color: #6C6C80; }"
-    ).arg(buttonPadding).arg(fontSize);
-    
-    QString kieuThemBanSao = QString(
-        "QPushButton {"
-        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FFA800, stop:1 #e65100);"
-        "    color: white; border: none; border-radius: 8px;"
-        "    padding: %1px 25px; font-weight: bold; font-size: %2px;"
-        "}"
-        "QPushButton:hover {"
-        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #d68910, stop:1 #bf360c);"
-        "}"
-        "QPushButton:disabled { background-color: #2B2B40; color: #6C6C80; }"
-    ).arg(buttonPadding).arg(fontSize);
-    
-    QString kieuChiTiet = QString(
-        "QPushButton {"
-        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #8950FC, stop:1 #5e35b1);"
-        "    color: white; border: none; border-radius: 8px;"
-        "    padding: %1px 25px; font-weight: bold; font-size: %2px;"
-        "}"
-        "QPushButton:hover {"
-        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #6c2bd9, stop:1 #4527a0);"
-        "}"
-        "QPushButton:disabled { background-color: #2B2B40; color: #6C6C80; }"
-    ).arg(buttonPadding).arg(fontSize);
-    
-    nutThemSach->setStyleSheet(kieuThemSach);
-    nutSuaSach->setStyleSheet(kieuSuaSach);
-    nutXoaSach->setStyleSheet(kieuXoaSach);
-    nutThemBanSao->setStyleSheet(kieuThemBanSao);
-    nutXemChiTiet->setStyleSheet(kieuChiTiet);
-    
-    // Shadow effects
-    QGraphicsDropShadowEffect *shadowThem = new QGraphicsDropShadowEffect();
-    shadowThem->setBlurRadius(15);
-    shadowThem->setOffset(0, 3);
-    shadowThem->setColor(QColor(0, 0, 0, 80));
-    nutThemSach->setGraphicsEffect(shadowThem);
-    
-    QGraphicsDropShadowEffect *shadowSua = new QGraphicsDropShadowEffect();
-    shadowSua->setBlurRadius(15);
-    shadowSua->setOffset(0, 3);
-    shadowSua->setColor(QColor(0, 0, 0, 80));
-    nutSuaSach->setGraphicsEffect(shadowSua);
-    
-    QGraphicsDropShadowEffect *shadowXoa = new QGraphicsDropShadowEffect();
-    shadowXoa->setBlurRadius(15);
-    shadowXoa->setOffset(0, 3);
-    shadowXoa->setColor(QColor(0, 0, 0, 80));
-    nutXoaSach->setGraphicsEffect(shadowXoa);
-    
-    QGraphicsDropShadowEffect *shadowBanSao = new QGraphicsDropShadowEffect();
-    shadowBanSao->setBlurRadius(15);
-    shadowBanSao->setOffset(0, 3);
-    shadowBanSao->setColor(QColor(0, 0, 0, 80));
-    nutThemBanSao->setGraphicsEffect(shadowBanSao);
-    
-    QGraphicsDropShadowEffect *shadowChiTiet = new QGraphicsDropShadowEffect();
-    shadowChiTiet->setBlurRadius(15);
-    shadowChiTiet->setOffset(0, 3);
-    shadowChiTiet->setColor(QColor(0, 0, 0, 80));
-    nutXemChiTiet->setGraphicsEffect(shadowChiTiet);
-    
-    boTri->addWidget(nutThemSach);
-    boTri->addWidget(nutSuaSach);
-    boTri->addWidget(nutXoaSach);
-    boTri->addWidget(nutThemBanSao);
-    boTri->addWidget(nutXemChiTiet);
-    boTri->addStretch();
-    
-    boTriChinh->addWidget(nhomChucNang);
-    
-    connect(nutThemSach, &QPushButton::clicked, this, &WidgetQuanLySach::xuLyNutThemSach);
-    connect(nutSuaSach, &QPushButton::clicked, this, &WidgetQuanLySach::xuLyNutSuaSach);
-    connect(nutXoaSach, &QPushButton::clicked, this, &WidgetQuanLySach::xuLyNutXoaSach);
-    connect(nutThemBanSao, &QPushButton::clicked, this, &WidgetQuanLySach::xuLyNutThemBanSao);
-    connect(nutXemChiTiet, &QPushButton::clicked, this, &WidgetQuanLySach::xuLyNutXemChiTiet);
+    // Chức năng đã được chuyển lên Header Bar.
+    nhomChucNang = nullptr;
 }
 
 void WidgetQuanLySach::taiLaiDanhSach() {
@@ -643,7 +555,14 @@ void WidgetQuanLySach::hienThiDanhSachSach() {
 }
 
 void WidgetQuanLySach::xuLyChonDong(int dong, int) {
-    if (dong < 0) return;
+    if (dong < 0) {
+        // Clear selection
+        dauSachDangChon = nullptr;
+        if (nutXemChiTiet) nutXemChiTiet->setEnabled(false);
+        if (nutSuaSach) nutSuaSach->setEnabled(false);
+        if (nutXoaSach) nutXoaSach->setEnabled(false);
+        return;
+    }
     auto m = bangSach->model();
     if (!m) return;
     QString isbn = m->data(m->index(dong, 1), Qt::DisplayRole).toString();
@@ -655,6 +574,12 @@ void WidgetQuanLySach::xuLyChonDong(int dong, int) {
         if (dsDauSach[i] && QString::fromStdString(dsDauSach[i]->ISBN) == isbn) {
             dauSachDangChon = dsDauSach[i];
             emit thongBaoCapNhat(QString("Đã chọn: %1").arg(QString::fromStdString(dauSachDangChon->tenSach)));
+            
+            // Enable buttons
+            if (nutXemChiTiet) nutXemChiTiet->setEnabled(true);
+            if (nutSuaSach) nutSuaSach->setEnabled(true);
+            if (nutXoaSach) nutXoaSach->setEnabled(true);
+            
             break;
         }
     }
@@ -723,6 +648,7 @@ void WidgetQuanLySach::xuLyNutXoaSach() {
             GhiDanhMucSach(FilePathManager::getDanhMucSachPathStd().c_str(), dsDauSach, soLuongDauSach, true);
             
             QMessageBox::information(this, "Thành công", "Đã xóa đầu sách thành công!");
+            EventBus::instance().dauSachRemoved(QString::fromStdString(dauSachDangChon->ISBN)); // REALTIME UPDATE
             dauSachDangChon = nullptr;
             taiLaiDanhSach();
             emit thongBaoCapNhat("Đã xóa đầu sách!");
@@ -859,124 +785,58 @@ void WidgetQuanLySach::taiDanhSachTheLoai() {
     }
 }
 void WidgetQuanLySach::xuLyNhapDuLieuTu() {
-    // Ask user to choose an Excel file
     QString file = QFileDialog::getOpenFileName(this, tr("Chọn file Excel để nhập"), QDir::currentPath(), tr("Excel Files (*.xlsx);;All Files (*)"));
     if (file.isEmpty()) return;
 
-    // Find the import script in tools/
-    // Prefer repository-relative tools/import_from_excel.py
-    QString repoTools = QDir(FilePathManager::getRootPath()).filePath("tools/import_from_excel.py");
-    QString pythonExe = "python";
-    QString scriptToRun = repoTools;
-    if (!QFile::exists(scriptToRun)) {
-        // fallback: script next to executable
-        scriptToRun = QDir(QCoreApplication::applicationDirPath()).filePath("tools/import_from_excel.py");
-        if (!QFile::exists(scriptToRun)) {
-            QMessageBox::warning(this, tr("Không tìm thấy script"), tr("Không thể tìm thấy file tools/import_from_excel.py"));
-            return;
-        }
-    }
+    ImportManager importer(this);
+    if (!importer.ensureDependencies(this)) return;
 
-    // Run preview
-    QProcess proc;
-    QStringList args;
-    args << scriptToRun << "--file" << file << "--preview" << "--out" << "tools";
-    proc.start(pythonExe, args);
-    bool started = proc.waitForStarted(10000);
-    if (!started) {
-        QMessageBox::critical(this, tr("Lỗi"), tr("Không thể khởi chạy python. Hãy đảm bảo Python có trong PATH."));
+    // Show loading
+    QProgressDialog progress(tr("Đang xử lý tập tin Excel..."), QString(), 0, 0, this);
+    progress.setWindowModality(Qt::WindowModal);
+    progress.setMinimumDuration(0);
+    progress.show();
+    QCoreApplication::processEvents();
+
+    auto result = importer.runPreview(file);
+    progress.close();
+
+    if (!result.success) {
+        QMessageBox::critical(this, tr("Lỗi"), tr("Không thể đọc file Excel:\n") + result.message);
         return;
     }
-    proc.waitForFinished(-1);
-    QString stdoutStr = QString::fromUtf8(proc.readAllStandardOutput());
-    QString stderrStr = QString::fromUtf8(proc.readAllStandardError());
 
-    // Build preview dialog
-    QDialog dlg(this);
-    dlg.setWindowTitle(tr("Kết quả Import (Preview)"));
-    dlg.setModal(true);
-    QVBoxLayout *lay = new QVBoxLayout(&dlg);
+    // Show Preview Dialog
+    ManHinhPreviewImport dlg(result, file, &importer, this);
+    if (dlg.exec() == QDialog::Accepted) {
+        // Success
+        taiLaiDanhSach();
+        // Force refresh table
+        hienThiDanhSachSach();
+    }
+}
 
-    QLabel *lbl = new QLabel(tr("Kết quả preview từ script import:"));
-    lay->addWidget(lbl);
-
-    QTextEdit *out = new QTextEdit();
-    out->setReadOnly(true);
-    out->setPlainText(stdoutStr + (stderrStr.isEmpty() ? QString() : QString("\n--- ERRORS ---\n") + stderrStr));
-    out->setMinimumSize(700, 380);
-    lay->addWidget(out);
-
-    QHBoxLayout *btnLay = new QHBoxLayout();
-    btnLay->addStretch();
-    QPushButton *btnApply = new QPushButton(tr("Áp dụng (ghi file import)"));
-    QPushButton *btnOpenPreviews = new QPushButton(tr("Mở file preview"));
-    QPushButton *btnClose = new QPushButton(tr("Đóng"));
-    btnLay->addWidget(btnOpenPreviews);
-    btnLay->addWidget(btnApply);
-    btnLay->addWidget(btnClose);
-    lay->addLayout(btnLay);
-
-    connect(btnClose, &QPushButton::clicked, &dlg, &QDialog::reject);
-
-    connect(btnOpenPreviews, &QPushButton::clicked, this, [this]() {
-        // Open the generated preview CSVs in the OS default viewer
-        QString base = QDir(FilePathManager::getRootPath()).filePath("tools");
-        QString p1 = QDir(base).filePath("preview_dausach.csv");
-        QString p2 = QDir(base).filePath("preview_bansao.csv");
-        if (QFile::exists(p1)) QDesktopServices::openUrl(QUrl::fromLocalFile(p1));
-        if (QFile::exists(p2)) QDesktopServices::openUrl(QUrl::fromLocalFile(p2));
-    });
-
-    connect(btnApply, &QPushButton::clicked, this, [this, &dlg, pythonExe, scriptToRun, file]() {
-        // Ask user whether to apply directly into DB
-        QMessageBox::StandardButton reply = QMessageBox::question(this, tr("Áp dụng import"),
-            tr("Bạn muốn áp dụng trực tiếp vào SQLite DB (recommended)?\n"
-               "Chọn Yes để ghi vào database (tạo backup tự động).\n"
-               "Chọn No để chỉ ghi các file import vào thư mục data/ (không thay đổi DB)."),
-            QMessageBox::Yes|QMessageBox::No|QMessageBox::Cancel, QMessageBox::Yes);
-
-        if (reply == QMessageBox::Cancel) return;
-
-        QProcess *applyProc = new QProcess(this);
-        QStringList applyArgs;
-        if (reply == QMessageBox::Yes) {
-            // Apply directly to DB
-            applyArgs << scriptToRun << "--file" << file << "--to-db" << "--mode" << "merge";
-        } else {
-            // Write import files only
-            applyArgs << scriptToRun << "--file" << file << "--apply" << "--out" << "data";
-        }
-
-        QProgressDialog *progress = new QProgressDialog(tr("Đang áp dụng import..."), QString(), 0, 0, this);
-        progress->setWindowModality(Qt::WindowModal);
-        progress->setCancelButton(nullptr);
-        progress->setMinimumDuration(200);
-        progress->setWindowTitle(tr("Vui lòng chờ"));
-
-        connect(applyProc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, [this, applyProc, progress, &dlg]() {
-            QString outStr = QString::fromUtf8(applyProc->readAllStandardOutput());
-            QString errStr = QString::fromUtf8(applyProc->readAllStandardError());
-            QString msg = outStr;
-            if (!errStr.isEmpty()) msg += "\n--- ERRORS ---\n" + errStr;
-            QMessageBox::information(this, tr("Hoàn thành"), msg);
-            progress->close();
-            applyProc->deleteLater();
-            // reload UI data
-            this->taiLaiDanhSach();
-            dlg.accept();
-        });
-
-        applyProc->start(pythonExe, applyArgs);
-        if (!applyProc->waitForStarted(10000)) {
-            QMessageBox::critical(this, tr("Lỗi"), tr("Không thể khởi chạy python để áp dụng import."));
-            applyProc->deleteLater();
-            progress->close();
-            return;
-        }
-        progress->show();
-    });
-
-    dlg.exec();
+void WidgetQuanLySach::capNhatNgonNgu() {
+    // 1. Buttons
+    if(nutThemSach) nutThemSach->setText(" " + LanguageManager::instance().getText("BTN_ADD_BOOK"));
+    if(nutNhapFile) nutNhapFile->setText(" " + LanguageManager::instance().getText("BTN_IMPORT"));
+    if(nutXuatFile) nutXuatFile->setText(" " + LanguageManager::instance().getText("BTN_EXPORT_PRINT"));
+    if(nutXemChiTiet) nutXemChiTiet->setText(" " + LanguageManager::instance().getText("BTN_DETAILS"));
+    if(nutSuaSach) nutSuaSach->setText(" " + LanguageManager::instance().getText("BTN_EDIT"));
+    if(nutXoaSach) nutXoaSach->setText(" " + LanguageManager::instance().getText("BTN_DELETE"));
+    if(nutTimKiem) nutTimKiem->setText(LanguageManager::instance().getText("BTN_SEARCH"));
+    if(nutLamMoi) nutLamMoi->setText(LanguageManager::instance().getText("BTN_REFRESH"));
+    
+    // 2. Search
+    if(oNhapTimKiem) oNhapTimKiem->setPlaceholderText(LanguageManager::instance().getText("PLACEHOLDER_SEARCH_BOOK"));
+    
+    // 3. Update Model Headers
+    auto legacy = dynamic_cast<LegacyBookModel*>(bangSach->model());
+    if (legacy) {
+        legacy->refresh(); 
+        QEvent e(QEvent::LanguageChange);
+        if (bangSach) QApplication::sendEvent(bangSach->horizontalHeader(), &e);
+    }
 }
 void WidgetQuanLySach::hienThiBanSao(PTRDS dauSach) {
     // Clear existing cache

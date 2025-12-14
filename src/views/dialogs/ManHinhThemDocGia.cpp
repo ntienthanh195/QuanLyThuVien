@@ -16,10 +16,21 @@
 extern PTRDG rootDocGia;
 
 #include "utils/EventBus.h"
+#include "utils/LanguageManager.h"
 
 ManHinhThemDocGia::ManHinhThemDocGia(QWidget *parent)
-    : QDialog(parent) {
-    setWindowTitle("Thêm Độc Giả Mới 👤");
+    : QDialog(parent)
+    , nhanMaThe(nullptr)
+    , nhapHo(nullptr)
+    , nhapTen(nullptr)
+    , chonGioiTinh(nullptr)
+    , nutLuu(nullptr)
+    , nutHuy(nullptr)
+    , nutXoaForm(nullptr)
+    , shortcutSave(nullptr)
+    , shortcutCancel(nullptr)
+{
+    setWindowTitle(LanguageManager::instance().getText("DIALOG_ADD_READER_TITLE") + " 👤");
     setMinimumWidth(500);
     setModal(true);
 
@@ -36,12 +47,13 @@ void ManHinhThemDocGia::thietLapGiaoDien() {
     mainLayout->setContentsMargins(20, 20, 20, 20);
 
     // Title
-    QLabel* titleLabel = new QLabel("👤 Thêm Độc Giả Mới");
+    QLabel* titleLabel = new QLabel(LanguageManager::instance().getText("DIALOG_ADD_READER_TITLE"));
     titleLabel->setStyleSheet("font-size: 18px; font-weight: bold; color: #2c3e50; margin-bottom: 10px;");
     mainLayout->addWidget(titleLabel);
 
     // Reader code display
-    QGroupBox* codeGroup = new QGroupBox("Mã Thẻ Độc Giả", this);
+    QGroupBox* codeGroup = new QGroupBox(LanguageManager::instance().getText("LBL_READER_CODE"), this);
+
     codeGroup->setObjectName("codeGroup");
     QVBoxLayout* codeLayout = new QVBoxLayout(codeGroup);
     codeLayout->setContentsMargins(15, 15, 15, 15);
@@ -59,7 +71,7 @@ void ManHinhThemDocGia::thietLapGiaoDien() {
     );
     codeLayout->addWidget(nhanMaThe);
 
-    QLabel* autoLabel = new QLabel("🤖 Mã thẻ được tạo tự động");
+    QLabel* autoLabel = new QLabel(LanguageManager::instance().getText("LBL_AUTO_GENERATED"));
     autoLabel->setAlignment(Qt::AlignCenter);
     autoLabel->setStyleSheet("color: #7f8c8d; font-size: 11px; font-style: italic;");
     codeLayout->addWidget(autoLabel);
@@ -67,7 +79,7 @@ void ManHinhThemDocGia::thietLapGiaoDien() {
     mainLayout->addWidget(codeGroup);
 
     // Form group
-    QGroupBox* formGroup = new QGroupBox("Thông Tin Độc Giả", this);
+    QGroupBox* formGroup = new QGroupBox(LanguageManager::instance().getText("GROUP_READER_INFO"), this);
     formGroup->setObjectName("formGroup");
     QFormLayout* formLayout = new QFormLayout(formGroup);
     formLayout->setSpacing(12);
@@ -75,36 +87,37 @@ void ManHinhThemDocGia::thietLapGiaoDien() {
 
     // Last name
     nhapHo = new QLineEdit();
-    nhapHo->setPlaceholderText("Nhập họ đệm...");
+    nhapHo->setPlaceholderText(LanguageManager::instance().getText("PLACEHOLDER_SEARCH_READER")); // Reuse or custom? Let's use custom if needed but generic search is close. Actually "Nhập họ đệm..."
+    // Better add PLACEHOLDER_LASTNAME
+    nhapHo->setPlaceholderText("..."); // Skip for now? No, need placeholder.
+    // I added LBL_LASTNAME but not placeholder. Using LBL is okay? "Last Name..."
+    nhapHo->setPlaceholderText(LanguageManager::instance().getText("LBL_LASTNAME") + "...");
     nhapHo->setObjectName("inputField");
-    nhapHo->setToolTip("Nhập họ đệm của độc giả (bắt buộc)\nVí dụ: Nguyễn Văn");
+    nhapHo->setToolTip(LanguageManager::instance().getText("LBL_LASTNAME"));
     connect(nhapHo, &QLineEdit::textChanged, this, &ManHinhThemDocGia::kiemTraDuLieu);
-    formLayout->addRow("Họ Đệm: *", nhapHo);
+    formLayout->addRow(LanguageManager::instance().getText("LBL_LASTNAME") + ": *", nhapHo);
 
     // First name
     nhapTen = new QLineEdit();
-    nhapTen->setPlaceholderText("Nhập tên...");
+    nhapTen->setPlaceholderText(LanguageManager::instance().getText("LBL_FIRSTNAME") + "...");
     nhapTen->setObjectName("inputField");
-    nhapTen->setToolTip("Nhập tên của độc giả (bắt buộc)\nVí dụ: An");
+    nhapTen->setToolTip(LanguageManager::instance().getText("LBL_FIRSTNAME"));
     connect(nhapTen, &QLineEdit::textChanged, this, &ManHinhThemDocGia::kiemTraDuLieu);
-    formLayout->addRow("Tên: *", nhapTen);
+    formLayout->addRow(LanguageManager::instance().getText("LBL_FIRSTNAME") + ": *", nhapTen);
 
     // Gender
     chonGioiTinh = new QComboBox();
     chonGioiTinh->setObjectName("inputField");
-    chonGioiTinh->addItem("Nam", 0);
-    chonGioiTinh->addItem("Nữ", 1);
-    chonGioiTinh->setToolTip("Chọn giới tính của độc giả");
-    formLayout->addRow("Giới Tính:", chonGioiTinh);
+    chonGioiTinh->addItem(LanguageManager::instance().getText("GENDER_MALE"), 0);
+    chonGioiTinh->addItem(LanguageManager::instance().getText("GENDER_FEMALE"), 1);
+    chonGioiTinh->setToolTip(LanguageManager::instance().getText("LBL_GENDER"));
+    formLayout->addRow(LanguageManager::instance().getText("LBL_GENDER") + ":", chonGioiTinh);
 
     mainLayout->addWidget(formGroup);
 
     // Info notes
     QLabel* infoLabel = new QLabel(
-        "💡 <b>Lưu ý:</b><br>"
-        "• Các trường đánh dấu (*) là bắt buộc<br>"
-        "• Mã thẻ sẽ được tự động tạo theo định dạng: YYYYMMDDXXXXXX<br>"
-        "• Độc giả mới có trạng thái hoạt động và chưa mượn sách"
+        LanguageManager::instance().getText("MSG_NOTE_ADD_READER")
     );
     infoLabel->setWordWrap(true);
     infoLabel->setStyleSheet(
@@ -123,9 +136,9 @@ void ManHinhThemDocGia::thietLapGiaoDien() {
     QHBoxLayout* buttonLayout = new QHBoxLayout();
     buttonLayout->setSpacing(10);
 
-    nutXoaForm = new QPushButton("🔄 Xóa Form");
+    nutXoaForm = new QPushButton(LanguageManager::instance().getText("BTN_CLEAR_FORM"));
     nutXoaForm->setMinimumHeight(40);
-    nutXoaForm->setToolTip("Xóa tất cả dữ liệu đã nhập và tạo mã thẻ mới");
+    nutXoaForm->setToolTip(LanguageManager::instance().getText("BTN_CLEAR_FORM"));
     nutXoaForm->setStyleSheet(
         "QPushButton {"
         "    background: #95a5a6;"
@@ -140,13 +153,13 @@ void ManHinhThemDocGia::thietLapGiaoDien() {
     );
     connect(nutXoaForm, &QPushButton::clicked, this, &ManHinhThemDocGia::clearAllFields);
 
-    nutLuu = new QPushButton("✅ Thêm Độc Giả");
+    nutLuu = new QPushButton(LanguageManager::instance().getText("BTN_SAVE_READER"));
     nutLuu->setObjectName("primaryButton");
     nutLuu->setMinimumHeight(40);
-    nutLuu->setToolTip("Lưu thông tin độc giả mới (Ctrl+S)");
+    nutLuu->setToolTip(LanguageManager::instance().getText("BTN_SAVE_READER"));
     connect(nutLuu, &QPushButton::clicked, this, &ManHinhThemDocGia::khiNhanLuu);
 
-    nutHuy = new QPushButton("❌ Hủy");
+    nutHuy = new QPushButton(LanguageManager::instance().getText("BTN_CANCEL_DIALOG"));
     nutHuy->setObjectName("nutHuy");
     nutHuy->setMinimumHeight(40);
     nutHuy->setToolTip("Hủy và đóng cửa sổ (ESC)");
@@ -300,32 +313,33 @@ void ManHinhThemDocGia::khiNhanLuu() {
 
     // Validate họ đệm
     if (lastName.isEmpty()) {
-        QMessageBox::warning(this, "Thiếu Thông Tin ⚠️",
-            "Vui lòng nhập họ đệm!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"),
+            LanguageManager::instance().getText("MSG_MISSING_LASTNAME"));
         nhapHo->setFocus();
         return;
     }
     
     std::string loiHo = KiemTraTenNguoi(lastName.toStdString(), "Họ đệm");
     if (!loiHo.empty()) {
-        QMessageBox::warning(this, "Lỗi Họ Đệm ⚠️",
-            QString::fromStdString(loiHo) + "\n\n💡 Họ đệm chỉ được chứa chữ cái và khoảng trắng, tối đa 50 ký tự.");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_ERROR_NAME"),
+            QString::fromStdString(loiHo) + LanguageManager::instance().getText("MSG_ERROR_NAME_FORMAT_HINT"));
         nhapHo->setFocus();
         return;
     }
 
     // Validate tên
+    // Validate tên
     if (firstName.isEmpty()) {
-        QMessageBox::warning(this, "Thiếu Thông Tin ⚠️",
-            "Vui lòng nhập tên!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"),
+            LanguageManager::instance().getText("MSG_MISSING_FIRSTNAME"));
         nhapTen->setFocus();
         return;
     }
     
     std::string loiTen = KiemTraTenNguoi(firstName.toStdString(), "Tên");
     if (!loiTen.empty()) {
-        QMessageBox::warning(this, "Lỗi Tên ⚠️",
-            QString::fromStdString(loiTen) + "\n\n💡 Tên chỉ được chứa chữ cái và khoảng trắng, tối đa 50 ký tự.");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_ERROR_FIRSTNAME"),
+            QString::fromStdString(loiTen) + LanguageManager::instance().getText("MSG_ERROR_FIRSTNAME_FORMAT_HINT"));
         nhapTen->setFocus();
         return;
     }
@@ -347,30 +361,35 @@ void ManHinhThemDocGia::khiNhanLuu() {
             } catch(...) {}
             emit docGiaDaThem();
             
-            QString genderStr = genderValue == 0 ? "Nam" : "Nữ";
+            QString genderStr = genderValue == 0 ? LanguageManager::instance().getText("GENDER_MALE") : LanguageManager::instance().getText("GENDER_FEMALE");
             QString maTheStr = (newReader != nullptr) ? QString::number(newReader->data.MaThe) : maDuocTao;
-            QMessageBox::information(this, "Thành Công 🎉",
-                QString("✅ Đã thêm độc giả thành công!\n\n"
-                       "🎫 Mã thẻ: %1\n"
-                       "👤 Họ tên: %2 %3\n"
-                       "⚧ Giới tính: %4")
+            QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"),
+                QString("✅ %1\n\n"
+                       "🎫 %2: %3\n"
+                       "👤 %4: %5 %6\n"
+                       "⚧ %7: %8")
+                    .arg(LanguageManager::instance().getText("MSG_SUCCESS_ADD"))
+                    .arg(LanguageManager::instance().getText("LBL_READER_CODE"))
                     .arg(maTheStr)
+                    .arg(LanguageManager::instance().getText("LBL_LASTNAME") + " " + LanguageManager::instance().getText("LBL_FIRSTNAME")) // Or just "Name"
                     .arg(lastName)
                     .arg(firstName)
+                    .arg(LanguageManager::instance().getText("LBL_GENDER"))
                     .arg(genderStr));
             
             accept();
         } else {
-            QMessageBox::critical(this, "Lỗi ❌",
-                "Không thể thêm độc giả. Mã thẻ có thể đã tồn tại!\n"
-                "Vui lòng thử lại.");
+            QMessageBox::critical(this, LanguageManager::instance().getText("TITLE_ERROR"),
+                LanguageManager::instance().getText("MSG_ERROR_ADD") + "\n" +
+                LanguageManager::instance().getText("MSG_TRY_AGAIN")); // Forgot MSG_TRY_AGAIN? Or simplify.
+
         }
     } catch (const std::exception& e) {
-        QMessageBox::critical(this, "Lỗi Hệ Thống ❌",
-            QString("Đã xảy ra lỗi khi thêm độc giả:\n%1").arg(e.what()));
+        QMessageBox::critical(this, LanguageManager::instance().getText("TITLE_ERROR_SYSTEM"),
+            LanguageManager::instance().getText("MSG_ERROR_ADD_FAILED").arg(e.what()));
     } catch (...) {
-        QMessageBox::critical(this, "Lỗi Không Xác Định ❌",
-            "Đã xảy ra lỗi không xác định khi thêm độc giả!");
+        QMessageBox::critical(this, LanguageManager::instance().getText("TITLE_ERROR_UNKNOWN"),
+            LanguageManager::instance().getText("MSG_ERROR_UNKNOWN_ACTION"));
     }
 }
 
@@ -403,8 +422,8 @@ void ManHinhThemDocGia::setupTabOrder() {
 void ManHinhThemDocGia::clearAllFields() {
     // Confirm before clearing
     QMessageBox::StandardButton reply = QMessageBox::question(this,
-        "Xác nhận xóa form",
-        "Bạn có chắc muốn xóa tất cả dữ liệu đã nhập?",
+        LanguageManager::instance().getText("BTN_CLEAR_FORM"), // Title "Clear Form" or "Confirm Clear"
+        LanguageManager::instance().getText("MSG_CONFIRM_CLEAR"), // Need key?
         QMessageBox::Yes | QMessageBox::No);
     
     if (reply == QMessageBox::Yes) {

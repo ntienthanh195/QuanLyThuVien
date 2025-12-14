@@ -393,7 +393,7 @@ void AutoArchiveBackups() {
         // name like month_YYYYMM.zip
         if (name.size() < 11) continue;
         int y = std::stoi(name.substr(6,4));
-        int m = std::stoi(name.substr(10,2));
+        // int m = std::stoi(name.substr(10,2));
         if (y < curYear) monthsByYear[y].push_back(entry.path().string());
     }
 

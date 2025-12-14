@@ -8,8 +8,6 @@
 #include <QPushButton>
 #include <QLabel>
 #include <QGroupBox>
-#include <QPrinter>
-#include <QPrintDialog>
 #include "models/DocGia.h"
 #include "models/DauSach.h"
 

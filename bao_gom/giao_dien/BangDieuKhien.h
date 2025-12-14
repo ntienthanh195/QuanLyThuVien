@@ -31,6 +31,7 @@ public:
     
     // Cập nhật dữ liệu dashboard
     void capNhatThongKe();
+    void capNhatNgonNgu(); // New method
     void capNhatBieuDo();
 
 public slots:
@@ -60,11 +61,16 @@ private slots:
     void xuLyInDanhMucSach();
     void xuLyInPhieuMuon();
     void xuLyInPhieuTra();
+    
+    // Export Log
+    void xuatBaoCaoLog();
 
 private:
     void thieLapGiaoDien();
+    QWidget* taoHeaderDashboard();
     void taoTheThongKe(QVBoxLayout *boTri);
-    void taoBieuDoTronThongKe();
+    QWidget* taoBieuDoTronThongKe();
+    QWidget* taoBieuDoCotThongKe();
     void taoThongBaoNhanh();
     void taoNutTruyCapNhanh();
     
@@ -76,6 +82,7 @@ private:
 
     // Thêm hoạt động gần đây
     void appendActivity(const QString &text);
+    void ghiNhatKy(const QString &hanhDong, const QString &noiDung);
     
     // Widgets
     QGridLayout *boTriChinh;

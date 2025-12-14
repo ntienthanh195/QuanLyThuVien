@@ -5,6 +5,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QHeaderView>
+#include "utils/LanguageManager.h"
 #include <QMessageBox>
 #include <QAbstractTableModel>
 #include <QFont>
@@ -27,7 +28,7 @@ namespace {
             if (!book) return QVariant();
             if (role == Qt::DisplayRole) {
                 switch (index.column()) {
-                case 0: return QString::number(r + 1);
+                case 0: return (r < 3) ? QStringLiteral("🥇🥈🥉").mid(r,1) : QString::number(r + 1);
                 case 1: return QString::fromStdString(book->ISBN);
                 case 2: return QString::fromStdString(book->tenSach);
                 case 3: return QString::fromStdString(book->tacGia);
@@ -43,12 +44,12 @@ namespace {
         QVariant headerData(int section, Qt::Orientation orientation, int role=Qt::DisplayRole) const override {
             if (orientation==Qt::Horizontal && role==Qt::DisplayRole) {
                 switch (section) {
-                case 0: return QStringLiteral("Hạng");
-                case 1: return QStringLiteral("ISBN");
-                case 2: return QStringLiteral("Tên Sách");
-                case 3: return QStringLiteral("Tác Giả");
-                case 4: return QStringLiteral("Thể Loại");
-                case 5: return QStringLiteral("Số Lượt Mượn");
+                case 0: return LanguageManager::instance().getText("TABLE_HEADER_RANK");
+                case 1: return LanguageManager::instance().getText("LBL_ISBN");
+                case 2: return LanguageManager::instance().getText("TABLE_HEADER_TITLE");
+                case 3: return LanguageManager::instance().getText("LBL_AUTHOR");
+                case 4: return LanguageManager::instance().getText("LBL_CATEGORY");
+                case 5: return LanguageManager::instance().getText("TABLE_HEADER_BORROW_COUNT");
                 }
             }
             return QAbstractTableModel::headerData(section, orientation, role);
@@ -61,7 +62,7 @@ namespace {
 
 ManHinhTop10Sach::ManHinhTop10Sach(QWidget *parent)
     : QDialog(parent) {
-    setWindowTitle("Top 10 Sách Được Mượn Nhiều Nhất");
+    setWindowTitle(LanguageManager::instance().getText("TITLE_TOP10_BOOKS"));
     setMinimumSize(900, 600);
     setModal(true);
 
@@ -76,7 +77,7 @@ void ManHinhTop10Sach::thietLapGiaoDien() {
     mainLayout->setContentsMargins(20, 20, 20, 20);
 
     // Title
-    QLabel* titleLabel = new QLabel("TOP 10 SÁCH ĐƯỢC MƯỢN NHIỀU NHẤT");
+    QLabel* titleLabel = new QLabel(LanguageManager::instance().getText("HEADER_TOP10_BOOKS"));
     titleLabel->setAlignment(Qt::AlignCenter);
     titleLabel->setStyleSheet(
         "font-size: 20px; "
@@ -92,7 +93,7 @@ void ManHinhTop10Sach::thietLapGiaoDien() {
 
     // Info label
     QLabel* infoLabel = new QLabel(
-        "<b>Thống kê:</b> Dựa trên số lượt mượn của từng đầu sách"
+        LanguageManager::instance().getText("MSG_STATS_BOOKS")
     );
     infoLabel->setWordWrap(true);
     infoLabel->setStyleSheet(
@@ -137,12 +138,12 @@ void ManHinhTop10Sach::thietLapGiaoDien() {
         QVariant headerData(int section, Qt::Orientation orientation, int role=Qt::DisplayRole) const override {
             if (orientation==Qt::Horizontal && role==Qt::DisplayRole) {
                 switch (section) {
-                case 0: return QStringLiteral("Hạng");
-                case 1: return QStringLiteral("ISBN");
-                case 2: return QStringLiteral("Tên Sách");
-                case 3: return QStringLiteral("Tác Giả");
-                case 4: return QStringLiteral("Thể Loại");
-                case 5: return QStringLiteral("Số Lượt Mượn");
+                case 0: return LanguageManager::instance().getText("TABLE_HEADER_RANK");
+                case 1: return LanguageManager::instance().getText("LBL_ISBN");
+                case 2: return LanguageManager::instance().getText("TABLE_HEADER_TITLE");
+                case 3: return LanguageManager::instance().getText("LBL_AUTHOR");
+                case 4: return LanguageManager::instance().getText("LBL_CATEGORY");
+                case 5: return LanguageManager::instance().getText("TABLE_HEADER_BORROW_COUNT");
                 }
             }
             return QAbstractTableModel::headerData(section, orientation, role);
@@ -174,12 +175,12 @@ void ManHinhTop10Sach::thietLapGiaoDien() {
     QHBoxLayout* buttonLayout = new QHBoxLayout();
     buttonLayout->setSpacing(10);
 
-    nutLamMoi = new QPushButton("Làm Mới");
+    nutLamMoi = new QPushButton(LanguageManager::instance().getText("BTN_REFRESH"));
     nutLamMoi->setObjectName("refreshButton");
     nutLamMoi->setMinimumHeight(40);
     connect(nutLamMoi, &QPushButton::clicked, this, &ManHinhTop10Sach::taiDuLieuTop10);
 
-    nutDong = new QPushButton("Đóng");
+    nutDong = new QPushButton(LanguageManager::instance().getText("BTN_CLOSE"));
     nutDong->setObjectName("closeButton");
     nutDong->setMinimumHeight(40);
     connect(nutDong, &QPushButton::clicked, this, &QDialog::accept);
@@ -283,8 +284,8 @@ void ManHinhTop10Sach::taiDuLieuTop10() {
     TopSachDTO topBooks[10];
     int count = LayTopSach(dsDauSach, soLuongDauSach, topBooks);
     if (count == 0) {
-        QMessageBox::information(this, "Thông Báo",
-            "Chưa có dữ liệu mượn sách nào trong hệ thống.");
+        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_INFO"),
+            LanguageManager::instance().getText("MSG_NO_DATA"));
         return;
     }
     for (int i = 0; i < count; ++i) danhSachTop.push_back(topBooks[i]);

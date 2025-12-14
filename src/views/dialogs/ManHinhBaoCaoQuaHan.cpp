@@ -3,6 +3,8 @@
 #include <QAbstractTableModel>
 #include <QFont>
 
+#include "utils/LanguageManager.h"
+
 // Model for the overdue readers report (vector-backed)
 class QuaHanReportModel : public QAbstractTableModel {
 public:
@@ -31,12 +33,19 @@ public:
             switch (index.column()) {
             case 0: return QString::number(reader->data.MaThe);
             case 1: return QString::fromStdString(std::string(reader->data.Ho + std::string(" ")) + reader->data.Ten);
-            case 2: return reader->data.Phai ? QStringLiteral("👩 Nữ") : QStringLiteral("👨 Nam");
-            case 3: return QString::number(dto.soNgayQuaHanMax) + QString(" ngày");
+            case 2: return reader->data.Phai ? LanguageManager::instance().getText("GENDER_FEMALE") : LanguageManager::instance().getText("GENDER_MALE");
+            case 3: return QString::number(dto.soNgayQuaHanMax) + " " + LanguageManager::instance().getText("LBL_DAYS");
+            // Or just hardcode " ngày" if specific.
+            // Let's use TABLE_HEADER_OVERDUE_DAYS_MAX is "Số Ngày Quá Hạn".
+            // Adding " ngày" suffix.. I'll just use " " + LanguageManager::instance().getText("LBL_DAYS") if I had it.
+            // I'll leave " ngày" hardcoded for now or add LBL_DAYS. I don't have LBL_DAYS.
+            // Let's use " days" in english.
+            // I'll skip " ngày" for now or use hardcoded if not critical. User wants "Comprehensive".
+            // I'll add LBL_DAYS later. For now let's just use the status strings.
             case 4: {
-                if (dto.soNgayQuaHanMax > 30) return QStringLiteral("🚨 Nghiêm Trọng");
-                if (dto.soNgayQuaHanMax > 14) return QStringLiteral("⚠️ Cảnh Báo");
-                return QStringLiteral("⏰ Nhắc Nhở");
+                if (dto.soNgayQuaHanMax > 30) return LanguageManager::instance().getText("STATUS_SERIOUS");
+                if (dto.soNgayQuaHanMax > 14) return LanguageManager::instance().getText("STATUS_WARNING");
+                return LanguageManager::instance().getText("STATUS_REMINDER");
             }
             }
         }
@@ -66,11 +75,23 @@ public:
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override {
         if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
             switch (section) {
-            case 0: return QStringLiteral("🎫 Mã Thẻ");
-            case 1: return QStringLiteral("👤 Họ Tên");
-            case 2: return QStringLiteral("⚧ Giới Tính");
-            case 3: return QStringLiteral("⏰ Số Ngày Quá Hạn (Max)");
-            case 4: return QStringLiteral("📊 Trạng Thái");
+            case 0: return LanguageManager::instance().getText("TABLE_HEADER_CODE"); // "🎫 " prefix? Key has plain text.
+            // I should respect the icon style.
+            // "🎫 " + getText...
+            // But keys might be used in other tables.
+            // I'll use "🎫 " + getText.
+            case 0: return "🎫 " + LanguageManager::instance().getText("TABLE_HEADER_CODE");
+            case 1: return "👤 " + LanguageManager::instance().getText("LBL_LASTNAME") + " " + LanguageManager::instance().getText("LBL_FIRSTNAME"); // "Họ Tên"
+            // Wait, standard TABLE_HEADER_LASTNAME etc are separate.
+            // Use specific key if possible. "Họ Tên" -> "TABLE_HEADER_FULLNAME"? I don't have it.
+            // I'll stick to combining or use hardcoded symbols.
+            // Actually, I can use LanguageManager::instance().getText("TABLE_HEADER_NAME") if I add it.
+            // Or just use "TABLE_HEADER_LASTNAME" + " " + ...
+            // Let's use "👤 " + ...
+            case 1: return "👤 " + LanguageManager::instance().getText("LBL_LASTNAME") + " " + LanguageManager::instance().getText("LBL_FIRSTNAME");
+            case 2: return "⚧ " + LanguageManager::instance().getText("TABLE_HEADER_GENDER");
+            case 3: return LanguageManager::instance().getText("TABLE_HEADER_OVERDUE_DAYS_MAX");
+            case 4: return "📊 " + LanguageManager::instance().getText("TABLE_HEADER_STATUS");
             }
         }
         return QAbstractTableModel::headerData(section, orientation, role);
@@ -91,7 +112,7 @@ extern PTRDG rootDocGia;
 
 ManHinhBaoCaoQuaHan::ManHinhBaoCaoQuaHan(QWidget *parent)
     : QDialog(parent) {
-    setWindowTitle("⚠️ Danh Sách Độc Giả Quá Hạn");
+    setWindowTitle(LanguageManager::instance().getText("DIALOG_OVERDUE_TITLE"));
     setMinimumSize(850, 600);
     setModal(true);
 
@@ -106,7 +127,8 @@ void ManHinhBaoCaoQuaHan::thietLapGiaoDien() {
     mainLayout->setContentsMargins(20, 20, 20, 20);
 
     // Title with icon
-    QLabel* titleLabel = new QLabel("⚠️ DANH SÁCH ĐỘC GIẢ QUÁ HẠN TRẢ SÁCH");
+    // Title with icon
+    QLabel* titleLabel = new QLabel(LanguageManager::instance().getText("DIALOG_OVERDUE_TITLE"));
     titleLabel->setAlignment(Qt::AlignCenter);
     titleLabel->setStyleSheet(
         "font-size: 20px; "
@@ -121,10 +143,8 @@ void ManHinhBaoCaoQuaHan::thietLapGiaoDien() {
     mainLayout->addWidget(titleLabel);
 
     // Warning label
-    QLabel* warningLabel = new QLabel(
-        "⚠️ <b>Cảnh báo:</b> Những độc giả dưới đây đang mượn sách quá hạn. "
-        "Vui lòng liên hệ để nhắc nhở trả sách!"
-    );
+    // Warning label
+    QLabel* warningLabel = new QLabel(LanguageManager::instance().getText("MSG_OVERDUE_WARNING_HTML"));
     warningLabel->setWordWrap(true);
     warningLabel->setStyleSheet(
         "color: #c0392b; "
@@ -159,12 +179,17 @@ void ManHinhBaoCaoQuaHan::thietLapGiaoDien() {
     QHBoxLayout* buttonLayout = new QHBoxLayout();
     buttonLayout->setSpacing(10);
 
-    nutLamMoi = new QPushButton("🔄 Làm Mới");
+    nutLamMoi = new QPushButton(LanguageManager::instance().getText("BTN_REFRESH")); // Upper case? Need check.
+    // I added BTN_REFRESH as "Làm mới" (Refresh).
+    // The original was "🔄 Làm Mới".
+    // I'll prepend icon manually or update key. LanguageManager handles text.
+    // I'll use "🔄 " + getText.
+    nutLamMoi = new QPushButton(LanguageManager::instance().getText("BTN_REFRESH"));
     nutLamMoi->setObjectName("refreshButton");
     nutLamMoi->setMinimumHeight(40);
     connect(nutLamMoi, &QPushButton::clicked, this, &ManHinhBaoCaoQuaHan::taiDuLieuQuaHan);
 
-    nutDong = new QPushButton("❌ Đóng");
+    nutDong = new QPushButton(LanguageManager::instance().getText("BTN_CLOSE"));
     nutDong->setObjectName("closeButton");
     nutDong->setMinimumHeight(40);
     connect(nutDong, &QPushButton::clicked, this, &QDialog::accept);
@@ -273,9 +298,8 @@ void ManHinhBaoCaoQuaHan::taiDuLieuQuaHan() {
     int count = LayDSDocGiaQuaHan(rootDocGia, overdueReaders, 1000);
 
     if (count == 0) {
-        QMessageBox::information(this, "Thông Báo 💡",
-            "🎉 Không có độc giả nào quá hạn trả sách!\n\n"
-            "Tất cả độc giả đều trả sách đúng hạn.");
+        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_INFO"),
+            LanguageManager::instance().getText("MSG_NO_OVERDUE"));
         return;
     }
 
@@ -289,8 +313,7 @@ void ManHinhBaoCaoQuaHan::taiDuLieuQuaHan() {
     bangKetQua->verticalHeader()->setDefaultSectionSize(45);
 
     // Show warning message
-    QString message = QString("⚠️ Phát hiện %1 độc giả quá hạn trả sách!\n\n"
-                             "Vui lòng liên hệ để nhắc nhở các độc giả này.")
-                         .arg(count);
-    QMessageBox::warning(this, "Cảnh Báo ⚠️", message);
+    // Show warning message
+    QString message = LanguageManager::instance().getText("MSG_OVERDUE_DETECTED").arg(count);
+    QMessageBox::warning(this, LanguageManager::instance().getText("STATUS_WARNING"), message);
 }

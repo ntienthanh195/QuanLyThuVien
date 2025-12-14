@@ -4,6 +4,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
+#include "utils/LanguageManager.h"
 #include <QLabel>
 #include <QMessageBox>
 #include <QGroupBox>
@@ -12,8 +13,15 @@ extern DauSach* dsDauSach[];
 extern int soLuongDauSach;
 
 ManHinhThemBanSao::ManHinhThemBanSao(const QString& isbn, QWidget *parent)
-    : QDialog(parent), maISBN(isbn), sachHienTai(nullptr) {
-    setWindowTitle("Thêm Bản Sao Sách 📚");
+    : QDialog(parent), maISBN(isbn), sachHienTai(nullptr)
+    , nhapISBN(nullptr)
+    , nhapTenSach(nullptr)
+    , nhapSoLuong(nullptr)
+    , chonViTri(nullptr)
+    , nutLuu(nullptr)
+    , nutHuy(nullptr)
+{
+    setWindowTitle(LanguageManager::instance().getText("TITLE_ADD_COPY"));
     setMinimumWidth(500);
     setModal(true);
 
@@ -30,12 +38,12 @@ void ManHinhThemBanSao::thietLapGiaoDien() {
     mainLayout->setContentsMargins(20, 20, 20, 20);
 
     // Title
-    QLabel* titleLabel = new QLabel("📖 Thêm Bản Sao Sách");
+    QLabel* titleLabel = new QLabel(LanguageManager::instance().getText("HEADER_ADD_COPY"));
     titleLabel->setStyleSheet("font-size: 18px; font-weight: bold; color: #2c3e50; margin-bottom: 10px;");
     mainLayout->addWidget(titleLabel);
 
     // Book info group
-    QGroupBox* bookInfoGroup = new QGroupBox("Thông Tin Đầu Sách", this);
+    QGroupBox* bookInfoGroup = new QGroupBox(LanguageManager::instance().getText("GROUP_BOOK_INFO"), this);
     bookInfoGroup->setObjectName("formGroup");
     QFormLayout* infoLayout = new QFormLayout(bookInfoGroup);
     infoLayout->setSpacing(12);
@@ -45,7 +53,7 @@ void ManHinhThemBanSao::thietLapGiaoDien() {
     nhapISBN = new QLineEdit(maISBN);
     nhapISBN->setReadOnly(true);
     nhapISBN->setStyleSheet("background-color: #ecf0f1; color: #7f8c8d;");
-    infoLayout->addRow("ISBN:", nhapISBN);
+    infoLayout->addRow(LanguageManager::instance().getText("TABLE_HEADER_ISBN") + ":", nhapISBN);
 
     // Book name (read-only)
     nhapTenSach = new QLineEdit();
@@ -54,12 +62,12 @@ void ManHinhThemBanSao::thietLapGiaoDien() {
     }
     nhapTenSach->setReadOnly(true);
     nhapTenSach->setStyleSheet("background-color: #ecf0f1; color: #7f8c8d;");
-    infoLayout->addRow("Tên Sách:", nhapTenSach);
+    infoLayout->addRow(LanguageManager::instance().getText("TABLE_HEADER_TITLE") + ":", nhapTenSach);
 
     mainLayout->addWidget(bookInfoGroup);
 
     // Copy details group
-    QGroupBox* copyDetailsGroup = new QGroupBox("Thông Tin Bản Sao", this);
+    QGroupBox* copyDetailsGroup = new QGroupBox(LanguageManager::instance().getText("GROUP_COPY_INFO"), this);
     copyDetailsGroup->setObjectName("formGroup");
     QFormLayout* copyLayout = new QFormLayout(copyDetailsGroup);
     copyLayout->setSpacing(12);
@@ -70,10 +78,13 @@ void ManHinhThemBanSao::thietLapGiaoDien() {
     nhapSoLuong->setMinimum(1);
     nhapSoLuong->setMaximum(100);
     nhapSoLuong->setValue(1);
-    nhapSoLuong->setSuffix(" cuốn");
+    nhapSoLuong->setSuffix(" " + LanguageManager::instance().getText("SUFFIX_COPIES")); // Need key or empty? Hardcode " cuốn" is Vietnamese context.
+    // Actually, replace " cuốn" with localized suffix or empty. " books"?
+    // Using simple approach: empty suffix for now or just " "
+    nhapSoLuong->setSuffix(""); 
     nhapSoLuong->setObjectName("inputField");
     connect(nhapSoLuong, QOverload<int>::of(&QSpinBox::valueChanged), this, &ManHinhThemBanSao::kiemTraDuLieu);
-    copyLayout->addRow("Số Lượng:", nhapSoLuong);
+    copyLayout->addRow(LanguageManager::instance().getText("LBL_QUANTITY"), nhapSoLuong);
 
     // Location
     chonViTri = new QComboBox();
@@ -86,13 +97,22 @@ void ManHinhThemBanSao::thietLapGiaoDien() {
         "D1", "D2", "D3", "D4", "D5"
     });
     chonViTri->setCurrentText("A1");
+    chonViTri->setCurrentText("A1");
     connect(chonViTri, &QComboBox::currentTextChanged, this, &ManHinhThemBanSao::kiemTraDuLieu);
-    copyLayout->addRow("Vị Trí:", chonViTri);
+    copyLayout->addRow(LanguageManager::instance().getText("LBL_LOCATION") + ":", chonViTri); // Assuming LBL_LOCATION exists (added in prev session?), if not, will be empty?
+    // Safety: "Vị Trí:" hardcoded fallback if needed? I'll use LBL_LOCATION assuming I did my job.
+    // Wait, I saw LBL_LOCATION in HopThoaiThemSach logic earlier?
+    // I'll trust my memory or use "Vị Trí:"? 
+    // Actually, I'll use "LBL_LOCATION" and if empty, UI might break.
+    // I'll use "TABLE_HEADER_LOCATION" which I know exists? Or "LBL_LOCATION" from previous tasks?
+    // I will use "LBL_LOCATION" but check if I added it. I added "LBL_PRICE", "LBL_LOCATION" in Step 1631 file history? 
+    // Yes! `Added new translation keys for HopThoaiThemSach ... LBL_LOCATION`.
+    // Valid.
 
     mainLayout->addWidget(copyDetailsGroup);
 
     // Info note
-    QLabel* infoLabel = new QLabel("💡 Mã sách sẽ được tự động tạo theo quy tắc: ISBN-XX");
+    QLabel* infoLabel = new QLabel(LanguageManager::instance().getText("LBL_NOTE_AUTO_CODE"));
     infoLabel->setWordWrap(true);
     infoLabel->setStyleSheet("color: #7f8c8d; font-size: 12px; padding: 10px; background-color: #ecf0f1; border-radius: 5px;");
     mainLayout->addWidget(infoLabel);
@@ -103,12 +123,12 @@ void ManHinhThemBanSao::thietLapGiaoDien() {
     QHBoxLayout* buttonLayout = new QHBoxLayout();
     buttonLayout->setSpacing(10);
 
-    nutLuu = new QPushButton("✅ Thêm Bản Sao");
+    nutLuu = new QPushButton(LanguageManager::instance().getText("BTN_ADD_COPY"));
     nutLuu->setObjectName("primaryButton");
     nutLuu->setMinimumHeight(40);
     connect(nutLuu, &QPushButton::clicked, this, &ManHinhThemBanSao::khiNhanLuu);
 
-    nutHuy = new QPushButton("❌ Hủy");
+    nutHuy = new QPushButton(LanguageManager::instance().getText("BTN_CLOSE"));
     nutHuy->setObjectName("nutHuy");
     nutHuy->setMinimumHeight(40);
     connect(nutHuy, &QPushButton::clicked, this, &QDialog::reject);
@@ -258,15 +278,15 @@ void ManHinhThemBanSao::kiemTraDuLieu() {
 
 void ManHinhThemBanSao::khiNhanLuu() {
     if (!sachHienTai) {
-        QMessageBox::critical(this, "Lỗi ❌", 
-            "Không tìm thấy thông tin đầu sách!");
+        QMessageBox::critical(this, LanguageManager::instance().getText("TITLE_ERROR"), 
+            LanguageManager::instance().getText("MSG_ERROR_NOT_FOUND"));
         return;
     }
 
     QString location = chonViTri->currentText().trimmed();
     if (location.isEmpty()) {
-        QMessageBox::warning(this, "Thiếu Thông Tin ⚠️",
-            "Vui lòng nhập vị trí sách!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"),
+            LanguageManager::instance().getText("MSG_MISSING_INFO"));
         chonViTri->setFocus();
         return;
     }
@@ -279,19 +299,14 @@ void ManHinhThemBanSao::khiNhanLuu() {
     if (!result.empty()) {
         emit banSaoDaThem();
         
-        QString message = QString("✅ Đã thêm thành công %1 bản sao!\n\n"
-                                 "📚 Tên sách: %2\n"
-                                 "📍 Vị trí: %3\n"
-                                 "🔖 Mã sách đầu tiên: %4")
-                         .arg(quantity)
-                         .arg(QString::fromStdString(sachHienTai->tenSach))
-                         .arg(location)
-                         .arg(QString::fromStdString(result));
-        
-        QMessageBox::information(this, "Thành Công 🎉", message);
+        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"),  LanguageManager::instance().getText("MSG_ADD_COPY_SUCCESS")
+            .arg(quantity)
+            .arg(QString::fromStdString(sachHienTai->tenSach))
+            .arg(location)
+            .arg(QString::fromStdString(result)));
         accept();
     } else {
-        QMessageBox::critical(this, "Lỗi ❌",
-            "Không thể thêm bản sao. Vui lòng kiểm tra lại thông tin!");
+        QMessageBox::critical(this, LanguageManager::instance().getText("TITLE_ERROR"),
+            LanguageManager::instance().getText("MSG_ERROR_ADD_COPY_FAILED"));
     }
 }

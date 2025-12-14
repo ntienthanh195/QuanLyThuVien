@@ -28,7 +28,7 @@ std::string ThemNhieuBanSao(PTRDS dauSach, int soLuong, const std::string &viTri
 
 //  NHOM 3: QUAN LY DAU SACH (MANG CON TRO) 
 bool themDauSach(PTRDS ds[], int &n, const std::string &isbn, const std::string &ten, int trang,
-                 const std::string &tg, int nam, const std::string &tl, bool anLang = false);  // them + validation + sort
+                 const std::string &tg, int nam, const std::string &tl, bool anLang = false, long long giaTien = 0);  // them + validation + sort
 PTRDS TimDauSachTheoISBN(PTRDS ds[], int n, const std::string &isbn);                           // linear search O(N)
 
 //  NHOM 4: TIM KIEM & LIET KE 
@@ -120,11 +120,11 @@ ThongTinDauSach LayThongTinDauSach(const std::string& isbn);                    
 // Command - Thao tac du lieu (Create, Update, Delete)
 std::string ThemDauSachMoi(const std::string& isbn, const std::string& ten, int trang,
                            const std::string& tg, int nam, const std::string& tl, 
-                           int soLuongBanSao, const std::string& viTri = "");                  // them dau sach + ban sao (all-in-one)
+                           int soLuongBanSao, const std::string& viTri = "", long long giaTien = 0);                  // them dau sach + ban sao (all-in-one)
 std::string ThemBanSaoMoi(const std::string& isbn, int soLuong, const std::string& viTri = ""); // them ban sao vao dau sach co san
-std::string CapNhatThongTinDauSach(const std::string& isbn, const std::string& ten, int trang,
-                                   const std::string& tg, int nam, const std::string& tl, 
-                                   const std::string& viTri = "");                              // cap nhat thong tin dau sach
+std::string CapNhatThongTinDauSach(const std::string &isbn, const std::string &ten, int trang,
+                                   const std::string &tg, int nam, const std::string &tl, 
+                                   const std::string &viTri = "", long long giaTien = -1);            // cap nhat thong tin              // cap nhat thong tin dau sach
 std::string XoaDauSachTheoISBN(const std::string& isbn);                                       // xoa dau sach (validation + auto sort)
 std::string ThanhLyBanSaoTheoMa(const std::string& maSach);                                    // thanh ly 1 ban sao
 std::string XoaBanSaoTheoMa(const std::string& maSach);                                        // xoa 1 ban sao (validation + cap nhat tong)
@@ -134,5 +134,8 @@ void DanhDauDuLieuThayDoi();                                                    
 int LayDanhSachBanSaoSapXep(const std::string& isbn, PTRDMS* mangKetQua, int maxKetQua);      // lay danh sach ban sao da sap xep theo ma
 std::string LayViTriDauTienCuaDauSach(const std::string& isbn);                               // lay vi tri cua ban sao dau tien
 bool CoTheBanSao(const std::string& isbn);                                                     // kiem tra dau sach co ban sao hay khong
+
+// DATABASE LOADING
+void NapDanhSachTuDB();                                                                       // Load initial data from SQLite
 
 #endif // QUANLYSACH_H

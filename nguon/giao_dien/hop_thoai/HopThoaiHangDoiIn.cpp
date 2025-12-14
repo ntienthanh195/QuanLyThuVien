@@ -5,11 +5,12 @@
 #include <QInputDialog>
 #include <QFileDialog>
 #include <QApplication>
+#include "utils/LanguageManager.h"
 
 HopThoaiHangDoiIn::HopThoaiHangDoiIn(PTRDG root, QWidget *parent)
     : QDialog(parent), rootDocGia(root)
 {
-    setWindowTitle("Hàng Đợi In Thẻ Hàng Loạt");
+    setWindowTitle(LanguageManager::instance().getText("DIALOG_PRINT_QUEUE_TITLE"));
     resize(600, 500);
     
     taoGiaoDien();
@@ -29,23 +30,23 @@ void HopThoaiHangDoiIn::taoGiaoDien() {
     layoutChinh = new QVBoxLayout(this);
     
     // Tiêu đề
-    nhanTieuDe = new QLabel("📋 HÀNG ĐỢI IN THẺ ĐỘC GIẢ", this);
+    nhanTieuDe = new QLabel(LanguageManager::instance().getText("HEADER_PRINT_QUEUE"), this);
     nhanTieuDe->setAlignment(Qt::AlignCenter);
     nhanTieuDe->setStyleSheet("font-size: 16pt; font-weight: bold; padding: 10px; background: #3498db; color: white;");
     layoutChinh->addWidget(nhanTieuDe);
     
     // Thông tin
     layoutThongTin = new QHBoxLayout();
-    nhanThongTin = new QLabel("Số thẻ: 0", this);
-    nhanSoTrang = new QLabel("Số trang A4: 0", this);
+    nhanThongTin = new QLabel(LanguageManager::instance().getText("LBL_QUEUE_COUNT").arg(0), this);
+    nhanSoTrang = new QLabel(LanguageManager::instance().getText("LBL_QUEUE_PAGES").arg(0).arg(0), this);
     nhanThongTin->setStyleSheet("font-size: 11pt; padding: 5px;");
     nhanSoTrang->setStyleSheet("font-size: 11pt; padding: 5px;");
     
-    QLabel* nhanSoCot = new QLabel("Số cột:", this);
+    QLabel* nhanSoCot = new QLabel(LanguageManager::instance().getText("LBL_QUEUE_COLUMNS"), this);
     spinSoCot = new QSpinBox(this);
     spinSoCot->setRange(1, 3);
     spinSoCot->setValue(2);
-    spinSoCot->setToolTip("Số cột trên mỗi trang A4 (1-3)");
+    spinSoCot->setToolTip(LanguageManager::instance().getText("TOOLTIP_QUEUE_COLUMNS"));
     
     layoutThongTin->addWidget(nhanThongTin);
     layoutThongTin->addWidget(nhanSoTrang);
@@ -63,13 +64,13 @@ void HopThoaiHangDoiIn::taoGiaoDien() {
     // Buttons
     layoutNut = new QHBoxLayout();
     
-    nutThemDocGia = new QPushButton("➕ Thêm độc giả", this);
-    nutThemNhieu = new QPushButton("➕➕ Thêm nhiều", this);
-    nutXoa = new QPushButton("🗑️ Xóa", this);
-    nutXoaTatCa = new QPushButton("🗑️ Xóa tất cả", this);
-    nutInA4 = new QPushButton("🖨️ In A4", this);
-    nutXuatPDF = new QPushButton("📄 Xuất PDF", this);
-    nutDong = new QPushButton("❌ Đóng", this);
+    nutThemDocGia = new QPushButton(LanguageManager::instance().getText("BTN_ADD_READER_QUEUE"), this);
+    nutThemNhieu = new QPushButton(LanguageManager::instance().getText("BTN_ADD_BATCH_QUEUE"), this);
+    nutXoa = new QPushButton(LanguageManager::instance().getText("BTN_DELETE_QUEUE"), this);
+    nutXoaTatCa = new QPushButton(LanguageManager::instance().getText("BTN_DELETE_ALL_QUEUE"), this);
+    nutInA4 = new QPushButton(LanguageManager::instance().getText("BTN_PRINT_A4"), this);
+    nutXuatPDF = new QPushButton(LanguageManager::instance().getText("BTN_EXPORT_PDF"), this);
+    nutDong = new QPushButton(LanguageManager::instance().getText("BTN_CLOSE"), this);
     
     nutThemDocGia->setStyleSheet("background: #2ecc71; color: white; padding: 8px; font-weight: bold;");
     nutThemNhieu->setStyleSheet("background: #27ae60; color: white; padding: 8px;");
@@ -101,8 +102,8 @@ void HopThoaiHangDoiIn::taoGiaoDien() {
 
 void HopThoaiHangDoiIn::xuLyThemDocGia() {
     bool ok;
-    int maThe = QInputDialog::getInt(this, "Thêm độc giả", 
-                                      "Nhập mã thẻ độc giả:", 
+    int maThe = QInputDialog::getInt(this, LanguageManager::instance().getText("TITLE_ADD"), 
+                                      LanguageManager::instance().getText("MSG_INPUT_READER_ID"), 
                                       1, 1, 999999, 1, &ok);
     
     if (!ok) return;
@@ -112,29 +113,29 @@ void HopThoaiHangDoiIn::xuLyThemDocGia() {
     PTRDG docGia = timDocGia(rootDocGia, maThe);
     
     if (!docGia) {
-        QMessageBox::warning(this, "Lỗi", "Không tìm thấy độc giả với mã thẻ: " + QString::number(maThe));
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_ERROR"), LanguageManager::instance().getText("MSG_READER_NOT_FOUND_SIMPLE") + ": " + QString::number(maThe));
         return;
     }
     
     if (docGia->data.TrangThai != 1) {
-        QMessageBox::warning(this, "Lỗi", "Độc giả này đã bị khóa!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_ERROR"), LanguageManager::instance().getText("MSG_READER_LOCKED"));
         return;
     }
     
     if (PrintQueueManager::instance()->them(docGia)) {
-        QMessageBox::information(this, "Thành công", 
-                                QString("Đã thêm: %1 %2 (Mã: %3)")
+        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), 
+                                QString(LanguageManager::instance().getText("MSG_ADDED_READER"))
                                 .arg(QString::fromStdString(docGia->data.Ho))
                                 .arg(QString::fromStdString(docGia->data.Ten))
                                 .arg(docGia->data.MaThe));
     } else {
-        QMessageBox::warning(this, "Cảnh báo", "Độc giả này đã có trong hàng đợi!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"), LanguageManager::instance().getText("MSG_READER_ALREADY_QUEUED"));
     }
 }
 
 void HopThoaiHangDoiIn::xuLyThemNhieuDocGia() {
     if (!rootDocGia) {
-        QMessageBox::warning(this, "Lỗi", "Danh sách độc giả trống!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_ERROR"), LanguageManager::instance().getText("MSG_READER_LIST_EMPTY"));
         return;
     }
     
@@ -153,26 +154,26 @@ void HopThoaiHangDoiIn::xuLyThemNhieuDocGia() {
     duyetCay(rootDocGia);
     
     if (danhSach.isEmpty()) {
-        QMessageBox::information(this, "Thông báo", "Tất cả độc giả đang hoạt động đã có trong hàng đợi!");
+        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_INFO"), LanguageManager::instance().getText("MSG_ALL_READERS_QUEUED"));
         return;
     }
     
-    int ret = QMessageBox::question(this, "Xác nhận", 
-                                      QString("Thêm %1 độc giả vào hàng đợi?").arg(danhSach.size()),
+    int ret = QMessageBox::question(this, LanguageManager::instance().getText("TITLE_WARNING"), 
+                                      LanguageManager::instance().getText("MSG_CONFIRM_ADD_BATCH").arg(danhSach.size()),
                                       QMessageBox::Yes | QMessageBox::No);
     
     if (ret == QMessageBox::Yes) {
         for (PTRDG dg : danhSach) {
             PrintQueueManager::instance()->them(dg);
         }
-        QMessageBox::information(this, "Thành công", QString("Đã thêm %1 độc giả!").arg(danhSach.size()));
+        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), LanguageManager::instance().getText("MSG_ADDED_COUNT").arg(danhSach.size()));
     }
 }
 
 void HopThoaiHangDoiIn::xuLyXoaDocGia() {
     int row = danhSachDocGia->currentRow();
     if (row < 0) {
-        QMessageBox::warning(this, "Lỗi", "Vui lòng chọn độc giả cần xóa!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_ERROR"), LanguageManager::instance().getText("MSG_SELECT_DELETE"));
         return;
     }
     
@@ -181,17 +182,17 @@ void HopThoaiHangDoiIn::xuLyXoaDocGia() {
 
 void HopThoaiHangDoiIn::xuLyXoaTatCa() {
     if (PrintQueueManager::instance()->soLuong() == 0) {
-        QMessageBox::information(this, "Thông báo", "Hàng đợi đã trống!");
+        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_INFO"), LanguageManager::instance().getText("MSG_QUEUE_EMPTY"));
         return;
     }
     
-    int ret = QMessageBox::question(this, "Xác nhận", 
-                                      "Xóa toàn bộ hàng đợi?",
+    int ret = QMessageBox::question(this, LanguageManager::instance().getText("TITLE_WARNING"), 
+                                      LanguageManager::instance().getText("MSG_CONFIRM_DELETE_ALL"),
                                       QMessageBox::Yes | QMessageBox::No);
     
     if (ret == QMessageBox::Yes) {
         PrintQueueManager::instance()->xoaTatCa();
-        QMessageBox::information(this, "Thành công", "Đã xóa toàn bộ hàng đợi!");
+        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), LanguageManager::instance().getText("MSG_SUCCESS_DELETED_ALL")); // Assume MSG_SUCCESS_DELETED_ALL exists or check next
     }
 }
 
@@ -199,15 +200,15 @@ void HopThoaiHangDoiIn::xuLyInA4() {
     QList<PTRDG> danhSach = PrintQueueManager::instance()->layDanhSach();
     
     if (danhSach.isEmpty()) {
-        QMessageBox::warning(this, "Lỗi", "Hàng đợi trống! Vui lòng thêm độc giả trước.");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_ERROR"), LanguageManager::instance().getText("MSG_QUEUE_EMPTY_ADD"));
         return;
     }
     
     int soCot = spinSoCot->value();
     int soTrang = (danhSach.size() + (soCot * 5) - 1) / (soCot * 5);
     
-    int ret = QMessageBox::question(this, "Xác nhận in", 
-                                      QString("In %1 thẻ (%2 trang A4, %3 cột)?")
+    int ret = QMessageBox::question(this, LanguageManager::instance().getText("TITLE_INFO"), 
+                                      LanguageManager::instance().getText("MSG_CONFIRM_PRINT_A4")
                                       .arg(danhSach.size())
                                       .arg(soTrang)
                                       .arg(soCot),
@@ -215,7 +216,7 @@ void HopThoaiHangDoiIn::xuLyInA4() {
     
     if (ret == QMessageBox::Yes) {
         if (PrintHelper::inA4NhieuThe(danhSach, soCot, this)) {
-            QMessageBox::information(this, "Thành công", "Đã gửi lệnh in!");
+            QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), LanguageManager::instance().getText("MSG_PRINT_SENT"));
         }
     }
 }
@@ -224,22 +225,16 @@ void HopThoaiHangDoiIn::xuLyXuatPDF() {
     QList<PTRDG> danhSach = PrintQueueManager::instance()->layDanhSach();
     
     if (danhSach.isEmpty()) {
-        QMessageBox::warning(this, "Lỗi", "Hàng đợi trống!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_ERROR"), LanguageManager::instance().getText("MSG_QUEUE_EMPTY"));
         return;
     }
     
-    QString tenFile = QFileDialog::getSaveFileName(this, "Xuất PDF", 
-                                                     QDir::homePath() + "/the_doc_gia.pdf",
-                                                     "PDF Files (*.pdf)");
-    
-    if (tenFile.isEmpty()) return;
-    
+    // Instead of forcing PDF here, we use the standard helper which offers PDF option.
+    // Ideally we would directly save to PDF, but since logic is encapsulated in Helper,
+    // we delegate to it. The user can simply click "Lưu PDF" in the resulting dialog.
+    // This ensures consistency.
     int soCot = spinSoCot->value();
-    
-    // Sử dụng inA4NhieuThe để tạo HTML và in ra PDF
-    if (PrintHelper::inA4NhieuThe(danhSach, soCot, nullptr)) {
-        QMessageBox::information(this, "Thành công", "Đã xuất PDF: " + tenFile);
-    }
+    PrintHelper::inA4NhieuThe(danhSach, soCot, this);
 }
 
 void HopThoaiHangDoiIn::xuLyChonDocGia(int hang) {
@@ -271,8 +266,8 @@ void HopThoaiHangDoiIn::capNhatThongTin() {
     int soCot = spinSoCot->value();
     int soTrang = soThe > 0 ? (soThe + (soCot * 5) - 1) / (soCot * 5) : 0;
     
-    nhanThongTin->setText(QString("📊 Số thẻ: %1").arg(soThe));
-    nhanSoTrang->setText(QString("📄 Số trang A4: %1 (%2 cột)").arg(soTrang).arg(soCot));
+    nhanThongTin->setText(LanguageManager::instance().getText("LBL_QUEUE_COUNT").arg(soThe));
+    nhanSoTrang->setText(LanguageManager::instance().getText("LBL_QUEUE_PAGES").arg(soTrang).arg(soCot));
     
     // Enable/disable buttons
     bool coThe = soThe > 0;

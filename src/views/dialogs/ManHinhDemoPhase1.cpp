@@ -162,7 +162,7 @@ void ManHinhDemoPhase1::taoNhomTruongNhapLieu() {
     
     // Search field
     truongTimKiem = new TruongTimKiem(groupInput);
-    truongTimKiem->datPlaceholder("Tìm kiếm độc giả, sách...");
+    truongTimKiem->datPlaceholder("Tìm kiếm học viên, sách...");
     layoutInput->addWidget(truongTimKiem);
     
     // Họ tên (bắt buộc)

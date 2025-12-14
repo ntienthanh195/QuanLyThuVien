@@ -9,6 +9,8 @@
 #include "views/dialogs/ManHinhBaoCaoQuaHan.h"
 #include "views/dialogs/ManHinhThongKe.h"
 #include "views/dialogs/ManHinhBackup.h"
+#include "views/dialogs/ManHinhCauHinh.h"
+#include "utils/PrintHelper.h"
 #include "views/dialogs/ManHinhTop10.h"
 #include "views/dialogs/ManHinhQuaHan.h"
 #include "views/dialogs/ManHinhDemoPhase1.h"
@@ -27,6 +29,7 @@
 #include <QApplication>
 #include <QDebug>
 #include "models/QuanLySach.h"
+#include "utils/LanguageManager.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -38,7 +41,7 @@ MainWindow::MainWindow(QWidget *parent)
     , loanWidget(nullptr)
     , menuSidebar(nullptr)
 {
-    setWindowTitle("🏛️ Hệ Thống Quản Lý Thư Viện");
+    setWindowTitle("Hệ Thống Quản Lý Thư Viện");
     
     // Deep Dark Theme - use centralized stylesheet
     this->setProperty("class", "MainWindow");
@@ -89,9 +92,25 @@ MainWindow::MainWindow(QWidget *parent)
     // Ket noi signals
     setupConnections();
     
+    // Load Print Config
+    QSettings settings("HVPG", "QuanLyThuVien");
+    PrintHelper::PrintConfig cfg = PrintHelper::getCauHinh();
+    cfg.printerReceipt = settings.value("Printer/Receipt", "").toString();
+    cfg.printerReport = settings.value("Printer/Report", "").toString();
+    cfg.silentPrint = settings.value("Printer/Silent", false).toBool();
+    cfg.inMauSac = settings.value("Printer/Color", false).toBool();
+    PrintHelper::setCauHinh(cfg);
+    
     // Hien thi bang dieu khien
     stackedWidget->setCurrentIndex(0);
-    menuSidebar->setCurrentRow(0);
+    menuSidebar->setCurrentRow(0); // Trigger row 0 (title) - effectively selects nothing or first available?
+    // Actually row 0 is title (Index 0). Row 1 is Home.
+    // The signal handler ignores row <= 0.
+    
+    // Connect localization signal
+    connect(&LanguageManager::instance(), &LanguageManager::languageChanged, this, &MainWindow::capNhatNgonNgu);
+    capNhatNgonNgu(); // Initial set (rebuilds sidebar and sets text)
+    menuSidebar->setCurrentRow(1); // Select Home by default
 }
 
 MainWindow::~MainWindow() {
@@ -115,48 +134,7 @@ void MainWindow::setupSidebar() {
     menuSidebar->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     menuSidebar->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     
-    // Thêm tiêu đề với icon chuyên nghiệp - Responsive font
-    QLabel *tieuDe = new QLabel("📚 THƯ VIỆN", menuSidebar);
-    QFont fontTieuDe;
-    int titleFontSize = ResponsiveHelper::getScaledFontSize(18, screenSize);
-    fontTieuDe.setPointSize(titleFontSize);
-    fontTieuDe.setBold(true);
-    fontTieuDe.setLetterSpacing(QFont::PercentageSpacing, 102);
-    tieuDe->setFont(fontTieuDe);
-    tieuDe->setAlignment(Qt::AlignCenter);
-    tieuDe->setProperty("class", "SidebarTitle");
-    
-    // Tạo widget container cho tiêu đề
-    QListWidgetItem *itemTieuDe = new QListWidgetItem(menuSidebar);
-    int titleHeight = ResponsiveHelper::getScaledHeight(60, screenSize);
-    itemTieuDe->setSizeHint(QSize(0, titleHeight));
-    itemTieuDe->setFlags(Qt::NoItemFlags); // Không thể chọn
-    menuSidebar->setItemWidget(itemTieuDe, tieuDe);
-    
-    // Thêm các mục menu với Unicode icons hiện đại (đã gom các chức năng vào tabs)
-    QStringList danhSachMenu = {
-        "🏠  Trang Chủ",           // Dashboard (có Top 10, Backup, About)
-        "📖  Quản Lý Sách",        // Books (có tabs: Danh Sách, Top 10, Thống Kê)
-        "👥  Quản Lý Độc Giả",    // Readers (có tabs: Danh Sách, Quá Hạn)
-        "🔄  Mượn Trả Sách",       // Loan/Return
-        "",                        // Separator
-        "ℹ️  Giới Thiệu",         // About
-        "❌  Thoát"                // Exit
-    };
-    
-    for (const QString &menu : danhSachMenu) {
-        QListWidgetItem *item = new QListWidgetItem(menu, menuSidebar);
-        item->setSizeHint(QSize(0, 46));
-        
-        if (menu.isEmpty()) {
-            // Separator
-            item->setFlags(Qt::NoItemFlags);
-            item->setBackground(QColor("#F3F4F6"));
-            item->setSizeHint(QSize(0, 1));
-        } else {
-            item->setFont(QFont("Segoe UI", 13, QFont::Normal));
-        }
-    }
+    // List initialization moved to capNhatNgonNgu() for dynamic localization
     
     // Kết nối signal
     connect(menuSidebar, &QListWidget::currentRowChanged, this, [this](int row) {
@@ -166,11 +144,11 @@ void MainWindow::setupSidebar() {
         // Map row sang chức năng
         // Row 1: Trang Chủ
         // Row 2: Quản Lý Sách
-        // Row 3: Quản Lý Độc Giả  
+        // Row 3: Quản Lý Học Viên
         // Row 4: Mượn Trả Sách
-        // Row 5: separator
-        // Row 6: Giới Thiệu
-        // Row 7: Thoát
+        // Row 6: Cấu Hình (New)
+        // Row 7: Giới Thiệu
+        // Row 8: Thoát
         
         switch(row) {
             case 1: // Trang Chủ
@@ -186,10 +164,13 @@ void MainWindow::setupSidebar() {
             case 4: // Mượn trả sách
                 showLoanManagement();
                 break;
-            case 6: // Giới thiệu
+            case 6: // Cấu hình
+                showSettings();
+                break;
+            case 7: // Giới thiệu
                 showAbout();
                 break;
-            case 7: // Thoát
+            case 8: // Thoát
                 close();
                 break;
         }
@@ -225,15 +206,16 @@ void MainWindow::setupHomeScreen() {
     mainLayout->setContentsMargins(50, 50, 50, 50);
     
     // Tieu de
-    QLabel *titleLabel = new QLabel("HỆ THỐNG QUẢN LÝ THƯ VIỆN", homeWidget);
+    // Tieu de
+    lblHomeTitle = new QLabel("HỆ THỐNG QUẢN LÝ THƯ VIỆN", homeWidget);
     QFont titleFont;
     titleFont.setPointSize(24);
     titleFont.setBold(true);
-    titleLabel->setFont(titleFont);
-    titleLabel->setAlignment(Qt::AlignCenter);
-    titleLabel->setStyleSheet("color: #2c3e50; margin-bottom: 30px;");
+    lblHomeTitle->setFont(titleFont);
+    lblHomeTitle->setAlignment(Qt::AlignCenter);
+    lblHomeTitle->setStyleSheet("color: #2c3e50; margin-bottom: 30px;");
     
-    mainLayout->addWidget(titleLabel);
+    mainLayout->addWidget(lblHomeTitle);
     mainLayout->addStretch(1);
     
     // Container cho cac nut
@@ -242,58 +224,58 @@ void MainWindow::setupHomeScreen() {
     buttonLayout->setSpacing(15);
     
     // Tao cac nut menu
-    QPushButton *btnBooks = createMenuButton("📚 QUẢN LÝ SÁCH", ":/icons/book.png");
-    btnBooks->setToolTip("Quản lý danh mục sách trong thư viện (Ctrl+B)");
-    btnBooks->setShortcut(QKeySequence("Ctrl+B"));
+    btnHomeBooks = createMenuButton("QUẢN LÝ SÁCH", ":/icons/book.png");
+    btnHomeBooks->setToolTip("Quản lý danh mục sách trong thư viện (Ctrl+B)");
+    btnHomeBooks->setShortcut(QKeySequence("Ctrl+B"));
     
-    QPushButton *btnReaders = createMenuButton("👥 QUẢN LÝ ĐỘC GIẢ", ":/icons/reader.png");
-    btnReaders->setToolTip("Quản lý thông tin độc giả (Ctrl+R)");
-    btnReaders->setShortcut(QKeySequence("Ctrl+R"));
+    btnHomeReaders = createMenuButton("QUẢN LÝ HỌC VIÊN", ":/icons/reader.png");
+    btnHomeReaders->setToolTip("Quản lý thông tin học viên (Ctrl+R)");
+    btnHomeReaders->setShortcut(QKeySequence("Ctrl+R"));
     
-    QPushButton *btnLoans = createMenuButton("📖 MƯỢN - TRẢ SÁCH", ":/icons/loan.png");
-    btnLoans->setToolTip("Quản lý mượn trả sách (Ctrl+L)");
-    btnLoans->setShortcut(QKeySequence("Ctrl+L"));
+    btnHomeLoans = createMenuButton("MƯỢN - TRẢ SÁCH", ":/icons/loan.png");
+    btnHomeLoans->setToolTip("Quản lý mượn trả sách (Ctrl+L)");
+    btnHomeLoans->setShortcut(QKeySequence("Ctrl+L"));
     
     // Reports section
-    QPushButton *btnTop10 = createMenuButton("🏆 TOP 10 SÁCH", ":/icons/top10.png");
-    btnTop10->setToolTip("Xem 10 sách được mượn nhiều nhất (Ctrl+T)");
-    btnTop10->setShortcut(QKeySequence("Ctrl+T"));
-    btnTop10->setProperty("class", "MenuButtonOrange");
+    btnHomeTop10 = createMenuButton("TOP 10 SÁCH", ":/icons/top10.png");
+    btnHomeTop10->setToolTip("Xem 10 sách được mượn nhiều nhất (Ctrl+T)");
+    btnHomeTop10->setShortcut(QKeySequence("Ctrl+T"));
+    btnHomeTop10->setProperty("class", "MenuButtonOrange");
     
-    QPushButton *btnStats = createMenuButton("📊 THỐNG KÊ HỆ THỐNG", ":/icons/stats.png");
-    btnStats->setToolTip("Xem thống kê tổng quan hệ thống (Ctrl+S)");
-    btnStats->setShortcut(QKeySequence("Ctrl+S"));
-    btnStats->setProperty("class", "MenuButtonPurple");
+    btnHomeStats = createMenuButton("THỐNG KÊ HỆ THỐNG", ":/icons/stats.png");
+    btnHomeStats->setToolTip("Xem thống kê tổng quan hệ thống (Ctrl+S)");
+    btnHomeStats->setShortcut(QKeySequence("Ctrl+S"));
+    btnHomeStats->setProperty("class", "MenuButtonPurple");
     
-    QPushButton *btnBackup = createMenuButton("💾 SAO LƯU DỮ LIỆU", ":/icons/backup.png");
-    btnBackup->setToolTip("Sao lưu và phục hồi dữ liệu (Ctrl+K)");
-    btnBackup->setShortcut(QKeySequence("Ctrl+K"));
-    btnBackup->setProperty("class", "MenuButtonTeal");
+    btnHomeBackup = createMenuButton("SAO LƯU DỮ LIỆU", ":/icons/backup.png");
+    btnHomeBackup->setToolTip("Sao lưu và phục hồi dữ liệu (Ctrl+K)");
+    btnHomeBackup->setShortcut(QKeySequence("Ctrl+K"));
+    btnHomeBackup->setProperty("class", "MenuButtonTeal");
     
-    QPushButton *btnOverdue = createMenuButton("⚠️ ĐỘC GIẢ QUÁ HẠN", ":/icons/overdue.png");
-    btnOverdue->setToolTip("Danh sách độc giả mượn quá hạn (Ctrl+O)");
-    btnOverdue->setShortcut(QKeySequence("Ctrl+O"));
-    btnOverdue->setProperty("class", "MenuButtonWarning");
+    btnHomeOverdue = createMenuButton("HỌC VIÊN QUÁ HẠN", ":/icons/overdue.png");
+    btnHomeOverdue->setToolTip("Danh sách học viên mượn quá hạn (Ctrl+O)");
+    btnHomeOverdue->setShortcut(QKeySequence("Ctrl+O"));
+    btnHomeOverdue->setProperty("class", "MenuButtonWarning");
     
-    QPushButton *btnAbout = createMenuButton("ℹ️ THÔNG TIN", ":/icons/info.png");
-    btnAbout->setToolTip("Thông tin ứng dụng (F1)");
-    btnAbout->setShortcut(QKeySequence("F1"));
+    btnHomeAbout = createMenuButton("THÔNG TIN", ":/icons/info.png");
+    btnHomeAbout->setToolTip("Thông tin ứng dụng (F1)");
+    btnHomeAbout->setShortcut(QKeySequence("F1"));
     
-    QPushButton *btnExit = createMenuButton("🚺 THOÁT", "");
-    btnExit->setToolTip("Thoát ứng dụng (Ctrl+Q)");
-    btnExit->setShortcut(QKeySequence("Ctrl+Q"));
+    btnHomeExit = createMenuButton("THOÁT", "");
+    btnHomeExit->setToolTip("Thoát ứng dụng (Ctrl+Q)");
+    btnHomeExit->setShortcut(QKeySequence("Ctrl+Q"));
     
-    btnExit->setProperty("class", "MenuButtonDanger");
+    btnHomeExit->setProperty("class", "MenuButtonDanger");
     
-    buttonLayout->addWidget(btnBooks);
-    buttonLayout->addWidget(btnReaders);
-    buttonLayout->addWidget(btnLoans);
-    buttonLayout->addWidget(btnTop10);
-    buttonLayout->addWidget(btnStats);
-    buttonLayout->addWidget(btnBackup);
-    buttonLayout->addWidget(btnOverdue);
-    buttonLayout->addWidget(btnAbout);
-    buttonLayout->addWidget(btnExit);
+    buttonLayout->addWidget(btnHomeBooks);
+    buttonLayout->addWidget(btnHomeReaders);
+    buttonLayout->addWidget(btnHomeLoans);
+    buttonLayout->addWidget(btnHomeTop10);
+    buttonLayout->addWidget(btnHomeStats);
+    buttonLayout->addWidget(btnHomeBackup);
+    buttonLayout->addWidget(btnHomeOverdue);
+    buttonLayout->addWidget(btnHomeAbout);
+    buttonLayout->addWidget(btnHomeExit);
     
     buttonContainer->setMaximumWidth(600);
     
@@ -301,19 +283,23 @@ void MainWindow::setupHomeScreen() {
     mainLayout->addStretch(2);
     
     // Ket noi signals
-    connect(btnBooks, &QPushButton::clicked, this, &MainWindow::showBookManagement);
-    connect(btnReaders, &QPushButton::clicked, this, &MainWindow::showReaderManagement);
-    connect(btnLoans, &QPushButton::clicked, this, &MainWindow::showLoanManagement);
-    connect(btnTop10, &QPushButton::clicked, this, &MainWindow::showTop10Report);
-    connect(btnStats, &QPushButton::clicked, this, &MainWindow::showStatistics);
-    connect(btnBackup, &QPushButton::clicked, this, &MainWindow::showBackupDialog);
-    connect(btnOverdue, &QPushButton::clicked, this, &MainWindow::showOverdueReport);
-    connect(btnAbout, &QPushButton::clicked, this, &MainWindow::showAbout);
-    connect(btnExit, &QPushButton::clicked, this, &QWidget::close);
+    connect(btnHomeBooks, &QPushButton::clicked, this, &MainWindow::showBookManagement);
+    connect(btnHomeReaders, &QPushButton::clicked, this, &MainWindow::showReaderManagement);
+    connect(btnHomeLoans, &QPushButton::clicked, this, &MainWindow::showLoanManagement);
+    connect(btnHomeTop10, &QPushButton::clicked, this, &MainWindow::showTop10Report);
+    connect(btnHomeStats, &QPushButton::clicked, this, &MainWindow::showStatistics);
+    connect(btnHomeBackup, &QPushButton::clicked, this, &MainWindow::showBackupDialog);
+    connect(btnHomeOverdue, &QPushButton::clicked, this, &MainWindow::showOverdueReport);
+    connect(btnHomeAbout, &QPushButton::clicked, this, &MainWindow::showAbout);
+    connect(btnHomeExit, &QPushButton::clicked, this, &QWidget::close);
 }
 
-QPushButton* MainWindow::createMenuButton(const QString &text, const QString & /*iconPath*/) {
+QPushButton* MainWindow::createMenuButton(const QString &text, const QString &iconPath) {
     QPushButton *button = new QPushButton(text, homeWidget);
+    if (!iconPath.isEmpty()) {
+        button->setIcon(QIcon(iconPath));
+        button->setIconSize(QSize(32, 32));
+    }
     button->setMinimumHeight(60);
     button->setMinimumWidth(500);
     
@@ -351,7 +337,7 @@ void MainWindow::setupConnections() {
     
     connect(bangDieuKhien, &WidgetBangDieuKhien::yeuCauDangKyDocGia, this, [this]() {
         showReaderManagement();
-        // Trigger thêm độc giả trong WidgetQuanLyDocGia
+        // Trigger thêm học viên trong WidgetQuanLyDocGia
     });
     
     connect(bangDieuKhien, &WidgetBangDieuKhien::yeuCauTaoPhieuMuon, this, [this]() {
@@ -392,6 +378,11 @@ void MainWindow::showLoanManagement() {
 
 void MainWindow::showAbout() {
     ManHinhGioiThieu dialog(this);
+    dialog.exec();
+}
+
+void MainWindow::showSettings() {
+    ManHinhCauHinh dialog(this);
     dialog.exec();
 }
 
@@ -450,7 +441,7 @@ void MainWindow::closeEvent(QCloseEvent *event) {
             this,
             "Xác nhận thoát",
             "Dữ liệu đã thay đổi sẽ được lưu tự động.\n\n"
-            "💾 Bạn có muốn tạo backup trước khi thoát không?",
+            "Bạn có muốn tạo backup trước khi thoát không?",
             QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel
         );
         
@@ -458,11 +449,11 @@ void MainWindow::closeEvent(QCloseEvent *event) {
             // Tạo backup trước khi thoát
             std::string loi = TaoBackup();
             if (loi.empty()) {
-                QMessageBox::information(this, "Backup Thành Công ✅",
+                QMessageBox::information(this, "Backup Thành Công",
                     "Đã tạo backup dữ liệu thành công!\n\n"
                     "Hệ thống sẽ thoát.");
             } else {
-                QMessageBox::warning(this, "Backup Thất Bại ⚠️",
+                QMessageBox::warning(this, "Backup Thất Bại",
                     QString("Không thể tạo backup:\n%1\n\n"
                            "Hệ thống vẫn sẽ thoát.").arg(QString::fromStdString(loi)));
             }
@@ -479,14 +470,14 @@ void MainWindow::closeEvent(QCloseEvent *event) {
         QMessageBox::StandardButton reply = QMessageBox::question(
             this,
             "Thoát Ứng Dụng",
-            "💾 Bạn có muốn tạo backup trước khi thoát không?",
+            "Bạn có muốn tạo backup trước khi thoát không?",
             QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel
         );
         
         if (reply == QMessageBox::Yes) {
             std::string loi = TaoBackup();
             if (loi.empty()) {
-                QMessageBox::information(this, "Backup Thành Công ✅",
+                QMessageBox::information(this, "Backup Thành Công",
                     "Đã tạo backup dữ liệu thành công!");
             }
             event->accept();
@@ -526,4 +517,139 @@ QWidget* MainWindow::TaoTagTrangThai(int trangThai) {
     layout->addWidget(label);
 
     return container;
+}
+
+// ============ GLOBAL BARCODE SCANNER ============
+#include <QKeyEvent>
+#include <QDateTime>
+
+void MainWindow::keyPressEvent(QKeyEvent *event) {
+    qint64 now = QDateTime::currentMSecsSinceEpoch();
+    
+    // Check if input is targeting a text field?
+    // If user is typing in a search box, we might interfere.
+    // Heuristic: Barcodes are typed extremely fast (<60ms per char).
+    // Humans type >100ms per char usually.
+    
+    if (now - lastKeyTime > 100) {
+        // Gap too long, reset buffer (likely manual typing or start of scan)
+        barcodeBuffer.clear();
+    }
+    lastKeyTime = now;
+    
+    // Handle Enter Key (End of Barcode)
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+        if (!barcodeBuffer.isEmpty() && barcodeBuffer.length() >= 2) { 
+            // Valid barcode detected (at least 2 chars, e.g. ID '1')
+            qDebug() << "Global Scanner Detected:" << barcodeBuffer;
+            
+            // Switch to Loan Tab logic
+            // 1. Show Loan Widget if not active
+            if (stackedWidget->currentIndex() != 3) {
+                showLoanManagement(); // Switch tab
+            }
+            
+            // 2. Pass data to Loan Widget
+            if (loanWidget) {
+                loanWidget->handleGlobalScan(barcodeBuffer);
+            }
+            
+            barcodeBuffer.clear();
+            event->accept(); // Consume event so it doesn't trigger buttons
+            return;
+        }
+        barcodeBuffer.clear();
+    } else {
+        // Accumulate printable keys
+        if (event->text().length() > 0) {
+            barcodeBuffer.append(event->text());
+        }
+    }
+    
+    // Pass to default handler (propagation)
+    QMainWindow::keyPressEvent(event);
+}
+
+void MainWindow::capNhatNgonNgu() {
+    //! [1] Window Title & App Title
+    setWindowTitle(LanguageManager::instance().getText("APP_WINDOW_TITLE"));
+    if (lblHomeTitle) lblHomeTitle->setText(LanguageManager::instance().getText("APP_TITLE"));
+
+    //! [2] Rebuild Sidebar
+    if (menuSidebar) {
+        menuSidebar->clear();
+        
+        // Responsive size
+        ResponsiveHelper::ScreenSize screenSize = ResponsiveHelper::detectScreenSize();
+        
+        // Row 0: Title
+        QLabel *tieuDe = new QLabel(LanguageManager::instance().getText("SIDEBAR_TITLE"), menuSidebar);
+        QFont fontTieuDe;
+        int titleFontSize = ResponsiveHelper::getScaledFontSize(18, screenSize);
+        fontTieuDe.setPointSize(titleFontSize);
+        fontTieuDe.setBold(true);
+        fontTieuDe.setLetterSpacing(QFont::PercentageSpacing, 102);
+        tieuDe->setFont(fontTieuDe);
+        tieuDe->setAlignment(Qt::AlignCenter);
+        tieuDe->setProperty("class", "SidebarTitle");
+        
+        QListWidgetItem *itemTieuDe = new QListWidgetItem(menuSidebar);
+        int titleHeight = ResponsiveHelper::getScaledHeight(60, screenSize);
+        itemTieuDe->setSizeHint(QSize(0, titleHeight));
+        itemTieuDe->setFlags(Qt::NoItemFlags);
+        menuSidebar->setItemWidget(itemTieuDe, tieuDe);
+        
+        // Menu Items Structure (Must match rows in setupConnections)
+        QStringList danhSachMenu = {
+            LanguageManager::instance().getText("MENU_HOME"),        // Row 1
+            LanguageManager::instance().getText("MENU_BOOKS"),       // Row 2
+            LanguageManager::instance().getText("MENU_READERS"),     // Row 3
+            LanguageManager::instance().getText("MENU_LOANS"),       // Row 4
+            "",                                                      // Row 5 (Separator)
+            LanguageManager::instance().getText("MENU_SETTINGS"),    // Row 6
+            LanguageManager::instance().getText("MENU_ABOUT"),       // Row 7
+            LanguageManager::instance().getText("MENU_EXIT")         // Row 8
+        };
+        
+        for (const QString &menu : danhSachMenu) {
+            QListWidgetItem *item = new QListWidgetItem(menu, menuSidebar);
+            item->setSizeHint(QSize(0, 46));
+            
+            if (menu.isEmpty()) {
+                item->setFlags(Qt::NoItemFlags);
+                item->setBackground(QColor("#F3F4F6"));
+                item->setSizeHint(QSize(0, 1));
+            } else {
+                item->setFont(QFont("Segoe UI", 13, QFont::Normal));
+            }
+        }
+        
+        // Bottom Credit
+        QListWidgetItem *itemBottom = new QListWidgetItem(menuSidebar);
+        itemBottom->setSizeHint(QSize(0, 80));
+        itemBottom->setFlags(Qt::NoItemFlags);
+        QWidget *bottomWidget = new QWidget(menuSidebar);
+        QVBoxLayout *bottomLayout = new QVBoxLayout(bottomWidget);
+        bottomLayout->setContentsMargins(8, 0, 8, 8);
+        bottomLayout->setSpacing(0);
+        bottomLayout->addStretch();
+        
+        QLabel *hiddenCredit = new QLabel("CHĂM RỐCH THI", bottomWidget);
+        hiddenCredit->setStyleSheet("color: transparent; font-size:1px; line-height:1px; margin:0;");
+        hiddenCredit->setAlignment(Qt::AlignCenter);
+        bottomLayout->addWidget(hiddenCredit);
+        
+        menuSidebar->setItemWidget(itemBottom, bottomWidget);
+    }
+    
+    //! [3] Update Home Buttons
+    if (btnHomeBooks) btnHomeBooks->setText(LanguageManager::instance().getText("BTN_MENU_BOOKS"));
+    if (btnHomeReaders) btnHomeReaders->setText(LanguageManager::instance().getText("BTN_MENU_READERS"));
+    if (btnHomeLoans) btnHomeLoans->setText(LanguageManager::instance().getText("BTN_MENU_LOANS"));
+    if (btnHomeTop10) btnHomeTop10->setText(LanguageManager::instance().getText("BTN_MENU_TOP10"));
+    if (btnHomeStats) btnHomeStats->setText(LanguageManager::instance().getText("BTN_MENU_STATS"));
+    if (btnHomeBackup) btnHomeBackup->setText(LanguageManager::instance().getText("BTN_MENU_BACKUP"));
+    if (btnHomeOverdue) btnHomeOverdue->setText(LanguageManager::instance().getText("BTN_MENU_OVERDUE"));
+    if (btnHomeAbout) btnHomeAbout->setText(LanguageManager::instance().getText("BTN_MENU_ABOUT"));
+    if (btnHomeExit) btnHomeExit->setText(LanguageManager::instance().getText("BTN_MENU_EXIT"));
 }

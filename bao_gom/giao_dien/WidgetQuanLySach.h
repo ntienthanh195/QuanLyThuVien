@@ -62,6 +62,9 @@ private slots:
     void xuLyNhapDuLieuTu();
     void onWatchedFileChanged(const QString &path);
 
+    // Multilingual Support
+    void capNhatNgonNgu();
+
 private:
     void thieLapGiaoDien();
     void thieLapHeaderBar();

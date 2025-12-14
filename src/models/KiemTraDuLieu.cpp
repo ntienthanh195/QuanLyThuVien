@@ -243,12 +243,12 @@ std::string KiemTraSoThuc(const std::string& str, const std::string& tenTruong, 
     }
     
     // Kiem tra format so thuc
-    bool coDau = false;
+    // bool coDau = false;
     bool coCham = false;
     size_t start = 0;
     
     if (str[0] == '-' || str[0] == '+') {
-        coDau = true;
+        // coDau = true;
         start = 1;
     }
     

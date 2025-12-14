@@ -43,6 +43,47 @@ public:
     // Cập nhật hiển thị
     void lamMoi();
 
+public:
+
+    // Universal Scanner Support
+    void xuLySmartScan(const QString& inputOverride = QString()); // DEPRECATED - Valid for legacy references
+
+    // NEW SIMPLIFIED SCANNER LOGIC
+    void xuLyQuetThongMinh(const QString& input);
+    
+    enum TrangThaiSach {
+        SACH_RANH,
+        SACH_DOC_GIA_HIEN_TAI_DANG_MUON,
+        SACH_NGUOI_KHAC_DANG_MUON,
+        SACH_KHONG_TON_TAI
+    };
+
+
+
+protected:
+    bool eventFilter(QObject *obj, QEvent *event) override;
+
+private:
+     // New Helper Methods for Scanner
+    void xuLyQuetMaDocGia(const QString& maThe);
+    void xuLyQuetMaSach(const QString& maSach);
+    TrangThaiSach kiemTraTrangThaiSach(const QString& maSach);
+    void xuLyTuDongMuon(const QString& maSach);
+    void xuLyTuDongTra(const QString& maSach);
+
+    // Scanner deduplication
+    QString m_scanBuffer;
+    
+    // Batch Print Queue
+    QTimer* m_batchPrintTimer;
+    QStringList m_batchPrintQueueMa;
+    QStringList m_batchPrintQueueTen;
+    
+    // Batch Return Queue (separate from borrow)
+    QStringList m_batchReturnQueueMa;
+    QStringList m_batchReturnQueueTen;
+    bool m_lastOperationWasBorrow = true; // Track mode to print correct receipt
+
 signals:
     void thongBaoCapNhat(const QString &thongDiep);
     void duLieuThayDoi();  // Signal for auto-save
@@ -61,21 +102,31 @@ private slots:
     void xuLyHuyChonDocGia();
     
     // Mượn sách
-    void xuLyThayDoiCheckbox(int trangThai);
-    void xuLyNutXacNhanMuon();
+    // Checkbox deleted
+    void xuLyNutXacNhanMuon(bool skipConfirm = false);
     void xuLyNutQuetMaSach();
     void xuLyNutQuetMaDocGia();
     
     // Trả sách
-    void xuLyNutXacNhanTra();
+    // Trả sách
+    void xuLyNutXacNhanTra(bool skipConfirm = false);
     void xuLyNutBaoMat();
+    void xuLyNutThanhToan(); // Feature 4: Thanh Toan
+    void xuLyNutGiaHan(); // Extension slot
     void xuLyChonSachTra(int hang, int cot);
     void xuLyInLaiPhieu();
     
     // Legacy (giữ lại cho tương thích)
     void xuLyNhapMaThe(const QString &maThe);
+    void onGlobalScanReceived(const QString &code);
+    void xuLyInBatch();
+
+    // Multilingual Support
+    void capNhatNgonNgu();
     void xuLyChonSachMuon(int dong);
     void xuLyChuyenTab(int chiSo);
+
+
 
 private:
     void thieLapGiaoDien();
@@ -91,6 +142,11 @@ private:
     void hienThiTrang();
     void capNhatBangSachDangMuon();
     
+    // Scanner helpers
+    bool laSachDocGiaHienTaiDangMuon(const QString& maSach);
+    
+    void capNhatThongTinDocGia(); // NEW: Update reader info label
+    
     // Legacy helpers
     void hienThiThongTinDocGia(PTRDG docGia);
     void hienThiDanhSachSachCoTheMuon();
@@ -101,9 +157,14 @@ private:
     int tinhSoNgayQuaHan(const std::string &ngayMuon);
     int tinhTienPhat(int soNgayQuaHan);
     
+    // Auto-Return Helpers
+    PTRDG TimDocGiaDangMuonSach(const QString &input, QString &resolvedMaSach);
+    void xuLyReturnPressedMaSachTra();
+    
     // Layout chính
     QVBoxLayout *boTriChinh;
     QTabWidget *hopTab;
+    QLabel *nhanTieuDeChinh; // New: Main Title
     
     // === TAB MƯỢN SÁCH ===
     QWidget *widgetMuonSach;
@@ -115,11 +176,13 @@ private:
     QPushButton *nutTimDocGia;
     QPushButton *nutTrangTruoc;
     QPushButton *nutTrangSau;
+    QPushButton *nutLamMoiDocGia; // New: Refresh button member
     QLabel *nhanTrangHienTai;
     QLabel *nhanTongDocGia;
     
     // Panel chi tiết (cột phải)
     QLabel *nhanThongTinDocGia;
+    QGroupBox *nhomThongTinDocGia; // New: GroupBox Member
     QGroupBox *nhanTieuDeSachDangMuon;
     QTableView *bangSachDangMuon; // Changed from QTableWidget to QTableView
     QAbstractItemModel *modelSachDangMuon;
@@ -127,10 +190,12 @@ private:
     QLineEdit *oNhapISBN;
     QPushButton *nutQuetMaSach;
     QPushButton *nutQuetMaDocGia;
-    QCheckBox *hopXacNhanMuon;
+    // ck hopXacNhanMuon deleted
     QPushButton *nutXacNhanMuon;
     QPushButton *nutXacNhanTra;
     QPushButton *nutBaoMat;
+    QPushButton *nutThanhToan; // New button
+    QPushButton *nutGiaHan; // Extension button
     QPushButton *nutInLaiPhieu;
     
     // Phân trang
@@ -141,9 +206,15 @@ private:
     
     // === TAB TRẢ SÁCH ===
     QWidget *widgetTraSach;
+    QLineEdit *oNhapMaSachTra;
+    QPushButton *nutTraSachNhanh; // Nút xác nhận trả (hoặc Auto-Submit)
+    QPushButton *nutQuetMaSachTra;
+    QLabel *nhanTieuDeTraSach; // New: Return Tab Title
+    QLabel *nhanHuongDanTraSach; // New: Instruction Label
     
     // === TAB LỊCH SỬ ===
     QWidget *widgetLichSu;
+    QLabel *nhanLichSuPlaceholder; // New: History Placeholder
     
     // Dữ liệu hiện tại
     PTRDG docGiaHienTai;

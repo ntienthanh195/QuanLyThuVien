@@ -1,0 +1,75 @@
+9786040000644|Ai Trong Doi Song|733|Pham Thao|2023|Tri Tue Nhan Tao
+9786040000644|Người Đàn Ông Bí Ẩn|500|Nguyễn Văn Ánh|2025|Tiểu Thuyết
+9786040000675|Cô Gái Đến Từ Hôm Qua|320|Trần Thị Bích|2024|Tình Cảm
+9786040000392|Lập Trình Đỉnh Cao|450|Lê Quốc Cường|2023|Công Nghệ
+9786040000491|Dữ Liệu Lớn|600|Phạm Thị Dung|2022|Khoa Học
+9786040001023|Thế Giới Số|700|Võ Minh Đức|2021|Công Nghệ
+9786040000675|An Ninh Mạng|858|Nguyễn Thanh|2021|An Toàn Thông Tin
+9786040000392|An Toàn Thông Tin|363|Bùi Thị Lan|2008|An Toàn Thông Tin
+9786040000491|An Toàn Thông Tin|133|Bùi Thị Lan|2018|An Toàn Thông Tin
+9786040001023|Attack On Titan|850|Hajime Isayama|2009|Nhật Bản
+9786040000590|Bảo Mật Mạng|518|Ngô Đức Mạnh|2023|An Toàn Thông Tin
+9786040000613|Blockchain Cơ Bản|603|Nguyễn Hải|2020|Blockchain
+9786040000422|Cấu Trúc Dữ Liệu|474|Đỗ Quang|2011|Cấu Trúc Dữ Liệu
+9786040000842|Cấu Trúc Máy Tính|640|Ngô Thanh|2023|Kiến Trúc Máy Tính
+9898798767656|Cha Ơi|436|Chăm Rốch Thi|2025|Gia Đình
+9786048679456|Chào Mừng Ngày Mới|542|Chăm Rốch Thi|2025|Cuộc Sống
+9786040001016|Chí Phèo|200|Nam Cao|1941|Việt Nam
+9786043450224|Chúng Ta Của Hiện Tại|435|Chăm Rốch Thi|2025|Cuộc Sống
+9786046414759|Chúng Ta Của Tương Lai|435|Chăm Rốch Thi|2025|Cuộc Sống
+9786040001009|Cổ Kiếm Kỳ Đàm|500|Thương Hải|2010|Kiếm Hiệp
+9786040000453|Cơ Sở Dữ Liệu|585|Hoàng Anh|2014|Cơ Sở Dữ Liệu
+9786040000781|Công Nghệ IoT|400|Nguyễn Văn C|2022|IoT
+9786048369156|Cuộc Gặp Gỡ Sau Khi Xa Nhau|426|Chăm Rốch Thi|2025|Cuộc Sống
+9878798767|Cuộc Sống Mới|234|Chăm Rốch Thi|2025|Cuộc Sống
+9786044548159|Cuộc Sống Sinh Viên|648|Chăm Rốch Thi|2025|Cuộc Sống
+9786040000729|Deep Learning|160|Trần Thị Mai|2021|Học Máy
+9786040000750|Điện Toán Biên|280|Phan Trung|2024|Điện Toán
+9786040000606|Điện Toán Đám Mây|562|Hoàng Yến|2024|Điện Toán Đám Mây
+9786040000699|Điện Toán Hiệu Năng Cao|942|Đinh Văn Sơn|2023|Điện Toán
+9786040000804|Điện Toán Tương Lai|480|Phạm Long|2024|Điện Toán
+9786040000859|Điện Toán Xanh|680|Nguyễn Văn Nam|2024|Điện Toán
+9786040001054|Dragon Ball|700|Akira Toriyama|1984|Nhật Bản
+9786040000439|Giải Thuật Thực Hành|511|Đặng Khoa|2012|Thuật Toán
+9786040001047|God Of Highschool|900|Yongje Park|2011|Hàn Quốc
+9786040000446|Hệ Điều Hành|548|Lê Hoàng|2013|Hệ Điều Hành
+9786040000811|Học Máy Thực Hành|520|Nguyễn Khánh|2020|Học Máy
+9786040000552|Học Sâu|355|Lê Thanh Bình|2024|Học Máy
+9786040000521|Khoa Học Máy Tính|245|Trần Đình Quang|2021|Khoa Học Máy Tính
+9786040001030|Kiếm Lai|600|Phong Ngữ|2015|Kiếm Hiệp
+9786040000705|Kỹ Thuật Ảo Hóa|985|Nguyễn Văn Hiệp|2024|Ảo Hóa
+9786040000569|Kỹ Thuật Lập Trình|398|Nguyễn Văn Tùng|2020|Lập Trình
+9786040000651|Kỹ Thuật Số|774|Nguyễn Hoàng|2024|Kỹ Thuật Số
+9786040000415|Lập Trình C Cơ Bản|437|Phạm Minh Đức|2010|Lập Trình
+9786040000668|Lập Trình Di Động|815|Lê Văn Khánh|2020|Lập Trình
+9786040000514|Lập Trình Python|210|Nguyễn Thị Hoa|2020|Lập Trình
+9786040000798|Mã Hóa Và Giải Mã|440|Lê Minh|2023|Mật Mã Học
+9786040000538|Mạng Không Dây|278|Phạm Minh Tú|2022|Mạng Máy Tính
+9786040000460|Mạng Máy Tính|622|Phan Tuấn|2015|Mạng Máy Tính
+9786040000507|Máy Học Ứng Dụng|170|Nguyễn Văn An|2019|Học Máy
+9786040000408|Máy Học Ứng Dụng|400|Nguyễn Văn An|2009|Học Máy
+9786040000637|Ngôn Ngữ Java|689|Đỗ Thị Nhung|2022|Lập Trình
+9786040000767|Nguyên Lý Máy Tính|320|Nguyễn Quốc Anh|2020|Khoa Học Máy Tính
+9878767656545|Nhớ|243|Chăm Rốch Thi|2025|Tình Yêu
+9789876543210|Những Người Khốn Khổ|500|Victor Hugo|1862|Tiểu Thuyết
+9786040000385|Phần Mềm Hướng Đối Tượng|326|Vũ Thanh Hải|2007|Lập Trình Hướng Đối Tượng
+9786040000484|Phần Mềm Hướng Đối Tượng|696|Vũ Thanh Hải|2017|Lập Trình Hướng Đối Tượng
+9786040000545|Phân Tích Dữ Liệu|312|Đỗ Thảo|2023|Khoa Học Dữ Liệu
+9786040000828|Phân Tích Log|560|Trần Hữu|2021|An Toàn Thông Tin
+9786040000743|Phân Tích Mạng Xã Hội|240|Nguyễn Hoài An|2023|Khoa Học Dữ Liệu
+9786040000682|Phát Triển Game|901|Phạm Ngọc|2022|Lập Trình Game
+9786040000583|Phát Triển Ứng Dụng Web|476|Trần Quốc Huy|2022|Lập Trình Web
+9780306406157|Sống Hết Đời Thanh Xuân|235|Chăm Rốch Thi|2025|Cuộc Sống
+9786041219403|Sống Thế Nào Cho Đáng Giá|762|Chăm Rốch Thi|2025|Cuộc Sống
+9876067873676|Sống Thế Nào Cho Trọn Vẹn|451|Chăm Rốch Thi|2025|Cuộc Sống
+9876045324|Thế Giới Có Em|342|Chăm Rốch Thi|2025|Tình Yêu
+9786040000576|Thuật Toán Nâng Cao|432|Phạm Thu Hằng|2021|Thuật Toán
+9786040000835|Thuật Toán Ứng Dụng|600|Phạm Hùng|2022|Thuật Toán
+9786040000712|Thực Tập An Ninh|120|Ngô Hoài Nam|2020|An Toàn Thông Tin
+9786040000477|Trí Tuệ Nhân Tạo|659|Trần Thị B|2016|Trí Tuệ Nhân Tạo
+9786040000378|Trí Tuệ Nhân Tạo|289|Trần Thị B|2006|Trí Tuệ Nhân Tạo
+9786040000774|Trí Tuệ Nhân Tạo Nâng Cao|360|Trần Thị Hà|2021|Trí Tuệ Nhân Tạo
+9876046789465|Trong Những Năm Qua|736|Chăm Rốch Thi|2025|Cuộc Sống
+9786040793225|Vì Em|453|Chăm Rốch Thi|2025|Tình Yêu
+9786040000620|Xử Lý Ảnh|645|Trần Văn Lộc|2021|Xử Lý Ảnh
+9786040000736|Xử Lý Ngôn Ngữ Tự Nhiên|200|Đỗ Văn Cường|2022|NLP

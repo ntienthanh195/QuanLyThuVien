@@ -123,6 +123,38 @@ private:
     // Lấy thông tin chi tiết cho cảnh báo
     QString layThongTinSachQuaHanNhieuNhat();
     QString layThongTinDocGiaQuaHan();
+
+public slots:
+    void capNhatNgonNgu();
+
+private:
+    // Section Headers
+    QLabel *lblHeaderCanhBao = nullptr;
+    QLabel *lblHeaderSoLieu = nullptr;
+    QLabel *lblHeaderTacVu = nullptr;
+    
+    // Quick Button Labels (stored for easier access)
+    QLabel *lblBtnThemSach = nullptr;
+    QLabel *lblBtnDangKy = nullptr;
+    QLabel *lblBtnTaoPhieu = nullptr;
+    QLabel *lblBtnSaoLuu = nullptr;
+    QLabel *lblBtnThongTin = nullptr;
+    QLabel *lblBtnDetailsQuaHan = nullptr;
+    QLabel *lblBtnDetailsSapHet = nullptr;
+
+    // Stat Card Title Labels
+    QLabel *lblTitleTongSach = nullptr;
+    QLabel *lblTitleDocGia = nullptr;
+    QLabel *lblTitleDangMuon = nullptr;
+    QLabel *lblTitleLuotMuon = nullptr;
+
+    // Warning Card Title Labels
+    QLabel *lblTitleSachQuaHan = nullptr;
+    QLabel *lblTitleTheSapHet = nullptr;
+    
+    // Demo labels (optional)
+    QLabel *lblBtnDemoUI = nullptr;
+    QLabel *lblBtnDemoTable = nullptr;
 };
 
 #endif // WIDGETBANGDIEUKHIEN_H

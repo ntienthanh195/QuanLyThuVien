@@ -1,4 +1,4 @@
-QT += core gui widgets printsupport charts sql concurrent
+QT += core gui widgets printsupport charts sql concurrent svg
 
 CONFIG += c++17
 
@@ -34,16 +34,19 @@ SOURCES += \
     src/models/QuanLySach.cpp \
     src/models/KiemTraDuLieu.cpp \
     src/models/ThaoTacFile.cpp \
-    src/models/NhapLieu.cpp
+    src/models/NhapLieu.cpp \
+    src/models/UserManager.cpp
 
 HEADERS += \
     include/Constants.h \
     include/models/DauSach.h \
     include/models/DocGia.h \
+    include/models/MuonTra.h \
     include/models/QuanLySach.h \
     include/models/KiemTraDuLieu.h \
     include/models/ThaoTacFile.h \
-    include/models/NhapLieu.h
+    include/models/NhapLieu.h \
+    include/models/UserManager.h
 
 # Utils Backend (GIỮ NGUYÊN MỘT SỐ)
 SOURCES += \
@@ -57,12 +60,19 @@ SOURCES += \
     src/utils/Utf8Helper.cpp \
     src/utils/DatabaseManager.cpp \
     src/utils/AutoSaveManager.cpp \
+    src/utils/LanguageManager.cpp \
     src/utils/PrintHelper.cpp \
+    src/utils/CustomPrintDialog.cpp \
+    src/utils/SearchableListWidget.cpp \
     src/utils/QrCodeGenerator.cpp \
     src/utils/TransactionLogger.cpp \
     src/utils/PrintQueueManager.cpp \
     src/utils/DBBatcher.cpp \
-    src/qrcode/qrcodegen.cpp
+    src/qrcode/qrcodegen.cpp \
+    src/utils/AuditLogger.cpp \
+    src/utils/SettingsManager.cpp \
+    src/utils/GlobalScannerFilter.cpp \
+    src/utils/ToastNotification.cpp
 
 HEADERS += \
     include/utils/NgayThang.h \
@@ -75,11 +85,18 @@ HEADERS += \
     include/utils/Utf8Helper.h \
     include/utils/DatabaseManager.h \
     include/utils/AutoSaveManager.h \
+    include/utils/LanguageManager.h \
     include/utils/PrintHelper.h \
+    include/utils/CustomPrintDialog.h \
+    include/utils/SearchableListWidget.h \
     include/utils/QrCodeGenerator.h \
     include/utils/TransactionLogger.h \
     include/utils/PrintQueueManager.h \
-    include/qrcode/qrcodegen.hpp
+    include/qrcode/qrcodegen.hpp \
+    include/utils/AuditLogger.h \
+    include/utils/SettingsManager.h \
+    include/utils/GlobalScannerFilter.h \
+    include/utils/ToastNotification.h
 
 # ============================================
 # GIAO DIỆN MỚI - UI với tên tiếng Việt
@@ -113,12 +130,13 @@ SOURCES += \
     nguon/giao_dien/hop_thoai/HopThoaiThemBanSao.cpp \
     nguon/giao_dien/hop_thoai/HopThoaiThongKe.cpp \
     nguon/giao_dien/hop_thoai/HopThoaiTop10.cpp \
-    nguon/giao_dien/hop_thoai/HopThoaiIn.cpp \
     nguon/giao_dien/hop_thoai/HopThoaiInAn.cpp \
     nguon/giao_dien/hop_thoai/HopThoaiQuetMaVach.cpp \
     nguon/giao_dien/hop_thoai/HopThoaiHangDoiIn.cpp \
     nguon/giao_dien/hop_thoai/HopThoaiCauHinhIn.cpp \
-    src/views/dialogs/ManHinhChiTietSach.cpp
+    src/views/dialogs/ManHinhChiTietSach.cpp \
+    src/views/dialogs/ManHinhChiTietDocGia.cpp \
+    nguon/giao_dien/hop_thoai/HopThoaiThanhToan.cpp
 
 HEADERS += \
     bao_gom/giao_dien/hop_thoai/HopThoaiThemSach.h \
@@ -128,23 +146,30 @@ HEADERS += \
     bao_gom/giao_dien/hop_thoai/HopThoaiThemBanSao.h \
     bao_gom/giao_dien/hop_thoai/HopThoaiThongKe.h \
     bao_gom/giao_dien/hop_thoai/HopThoaiTop10.h \
-    bao_gom/giao_dien/hop_thoai/HopThoaiIn.h \
     bao_gom/giao_dien/hop_thoai/HopThoaiInAn.h \
     bao_gom/giao_dien/hop_thoai/HopThoaiQuetMaVach.h \
     bao_gom/giao_dien/hop_thoai/HopThoaiHangDoiIn.h \
     bao_gom/giao_dien/hop_thoai/HopThoaiCauHinhIn.h \
-    include/views/dialogs/ManHinhChiTietSach.h
+    include/views/dialogs/ManHinhChiTietSach.h \
+    include/views/dialogs/ManHinhChiTietDocGia.h \
+    bao_gom/giao_dien/hop_thoai/HopThoaiThanhToan.h \
+    bao_gom/giao_dien/WidgetQuanLyNguoiDung.h \
+    bao_gom/giao_dien/hop_thoai/HopThoaiCaiDat.h
 
 # Tiện ích UI mới (animation, responsive helpers)
 SOURCES += \
     src/utils/ResponsiveHelper.cpp \
     src/utils/AnimationHelper.cpp \
-    src/utils/ConfirmationDialog.cpp
+    src/utils/ConfirmationDialog.cpp \
+    nguon/giao_dien/hop_thoai/ManHinhDangNhap.cpp \
+    nguon/giao_dien/WidgetQuanLyNguoiDung.cpp \
+    nguon/giao_dien/hop_thoai/HopThoaiCaiDat.cpp
 
 HEADERS += \
     include/utils/ResponsiveHelper.h \
     include/utils/AnimationHelper.h \
-    include/utils/ConfirmationDialog.h
+    include/utils/ConfirmationDialog.h \
+    bao_gom/giao_dien/hop_thoai/ManHinhDangNhap.h
 
 # ============================================
 # TÀI NGUYÊN
@@ -180,9 +205,29 @@ DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000
 
 # Windows icon (nếu có)
 # win32: RC_ICONS = tai_nguyen/bieu_tuong/app_icon.ico
+win32: RC_ICONS = resources/app_icon.ico
 
 # ============================================
 # CHỈ DÙNG 1 THƯ MỤC data/ DUY NHẤT
 # ============================================
 # Không copy data/ vào build output
 # App sẽ đọc/ghi trực tiếp từ thư mục data/ ở root project (FilePathManager xử lý khi cần)
+
+# ManHinhQuanLyIn
+SOURCES += nguon/giao_dien/hop_thoai/ManHinhQuanLyIn.cpp
+SOURCES += src/utils/ClipboardHelper.cpp
+SOURCES += src/views/dialogs/ManHinhCauHinh.cpp
+
+HEADERS += bao_gom/giao_dien/hop_thoai/ManHinhQuanLyIn.h
+HEADERS += include/utils/ClipboardHelper.h
+HEADERS += include/views/dialogs/ManHinhCauHinh.h
+HEADERS += include/views/dialogs/ManHinhGioiThieu.h
+
+SOURCES += src/views/dialogs/ManHinhGioiThieu.cpp
+
+SOURCES += src/views/dialogs/ManHinhPreviewImport.cpp
+SOURCES += src/utils/ImportManager.cpp
+HEADERS += include/views/dialogs/ManHinhPreviewImport.h
+HEADERS += include/utils/ImportManager.h
+SOURCES += src/qrcode/Code128.cpp
+HEADERS += include/qrcode/Code128.h

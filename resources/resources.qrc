@@ -9,6 +9,7 @@
     </qresource>
     <qresource prefix="/fonts">
         <file>fonts/LibreBarcode128Text-Regular.ttf</file>
+        <file>fonts/Siemreap-Regular.ttf</file>
     </qresource>
     <!-- Tạm thời comment out icons cho đến khi có file thật -->
     <!--

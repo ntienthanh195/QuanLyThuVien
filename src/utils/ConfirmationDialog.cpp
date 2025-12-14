@@ -2,7 +2,11 @@
 #include "utils/AnimationHelper.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QKeyEvent>
+#include <QFile>
+#include <QPixmap>
 
 ConfirmationDialog::ConfirmationDialog(QWidget *parent)
     : QDialog(parent)
@@ -143,9 +147,17 @@ void ConfirmationDialog::setDetailedInfo(const QString &details) {
 }
 
 void ConfirmationDialog::setType(Type type) {
-    iconLabel->setText(getIconForType(type));
+    QString iconPath = getIconForType(type);
+    if (!iconPath.isEmpty() && QFile::exists(iconPath)) {
+        iconLabel->setText("");
+        QPixmap pixmap(iconPath);
+        iconLabel->setPixmap(pixmap.scaled(48, 48, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    } else {
+        // Fallback or empty
+        iconLabel->setText("");
+    }
+    
     QString color = getColorForType(type);
-    iconLabel->setStyleSheet(QString("color: %1; background: transparent;").arg(color));
     
     // Change confirm button color based on type
     if (type == Type::Delete) {
@@ -193,14 +205,14 @@ void ConfirmationDialog::setCancelButtonText(const QString &text) {
 QString ConfirmationDialog::getIconForType(Type type) const {
     switch (type) {
         case Type::Delete:
-            return "🗑";
+            return ":/icons/trash.png";
         case Type::Warning:
-            return "⚠";
+            return ":/icons/warning.png";
         case Type::Info:
-            return "ℹ";
+            return ":/icons/info.png";
         case Type::Question:
         default:
-            return "❓";
+            return ":/icons/help.png";
     }
 }
 

@@ -114,7 +114,7 @@ std::string BoDauVaThuong(const std::string& chuoi) {
         "d"
     };
     
-    const int soKyTu = 69; // Tong so cap ky tu co dau -> khong dau
+    const int soKyTu = sizeof(coDau) / sizeof(coDau[0]); // Tu dong tinh kich thuoc an toan
     
     // Thay the tung ky tu co dau
     for (int i = 0; i < soKyTu; ++i) {
