@@ -1,0 +1,88 @@
+
+# 1. Không đẩy thư mục thư viện bên ngoài lên GitHub
+lib/
+
+# 2. Không đẩy các file cấu hình, dữ liệu tạm
+*.json      # File cấu hình JSON
+*.jon       # File cấu hình JON
+
+# 3. Không đẩy file build, binary, output directories
+build/      # Thư mục build
+debug/      # Thư mục debug output
+debug_v2/   # Thư mục debug v2
+release/    # Thư mục release output
+release_v2/ # Thư mục release v2
+*.exe       # File thực thi
+*.dll       # Thư viện động
+*.obj       # Object file
+*.o         # Object file
+
+# 4. Không đẩy file/thư mục của VS Code
+.vscode/
+
+# 5. Không đẩy file log, file tạm
+*.log
+run_debug.log
+
+# 6. Không đẩy file swap, file user
+*.swp
+*.user
+
+# 7. Không đẩy file backup (chỉ giữ data/ duy nhất)
+data/backup/
+data/backup_archives/
+data/*.dat
+main
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+DerivedData/
+.DS_Store
+.vs/
+
+# 8. Không đẩy file dự án/giải pháp Visual Studio
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+
+# 9. Không đẩy file database/cache của Visual Studio
+*.sdf
+*.opensdf
+.VC.db
+.VC.VC.opendb
+
+# 10. Không đẩy file user/cá nhân của Visual Studio
+*.suo
+*.ncb
+*.pdb
+*.ipch
+*.tlog
+
+# 11. Không đẩy file kết quả test
+TestResults/
+*.trx
+
+# 12. Không đẩy file cấu hình Makefile và Qt build
+Makefile
+Makefile.Debug
+Makefile.Release
+.qmake.stash
+*.pro.user
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+app
+
+bin/
+# Không đẩy file PDF, QR code, tài liệu cá nhân, file tạm
+data/PDF/
+data/qrcodes/
+files/*.docx
+files/*.xlsx
+files/*.csv
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.tmp

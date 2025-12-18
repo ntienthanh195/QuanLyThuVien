@@ -1,0 +1,481 @@
+Top colors by occurrence (total unique: 427)
+
+#FFFFFF - 71 occurrences
+  - docs\archive\MODERN_PRINT_DIALOG.md:237
+  - include\utils\KieuBangDuLieu.h:116
+  - nguon\giao_dien\BangDieuKhien.cpp:362
+  - nguon\giao_dien\BangDieuKhien.cpp:775
+  - nguon\giao_dien\WidgetMuonTraSach.cpp:996
+  - ... and 66 more
+
+#ffffff - 60 occurrences
+  - nguon\giao_dien\BangDieuKhien.cpp:1043
+  - nguon\giao_dien\hop_thoai\HopThoaiCaiDat.cpp:40
+  - nguon\giao_dien\hop_thoai\HopThoaiInAn.cpp:108
+  - nguon\giao_dien\hop_thoai\HopThoaiInAn.cpp:153
+  - nguon\giao_dien\hop_thoai\HopThoaiQuetMaVach.cpp:62
+  - ... and 55 more
+
+#E0E0E0 - 56 occurrences
+  - nguon\giao_dien\BangDieuKhien.cpp:1005
+  - nguon\giao_dien\BangDieuKhien.cpp:1253
+  - nguon\giao_dien\BangDieuKhien.cpp:1346
+  - nguon\giao_dien\CuaSoChinh.cpp:427
+  - nguon\giao_dien\CuaSoChinh.cpp:818
+  - ... and 51 more
+
+#3E3E42 - 56 occurrences
+  - nguon\giao_dien\CuaSoChinh.cpp:478
+  - nguon\giao_dien\WidgetQuanLyDocGia.cpp:200
+  - nguon\giao_dien\WidgetQuanLyDocGia.cpp:201
+  - nguon\giao_dien\WidgetQuanLyDocGia.cpp:409
+  - nguon\giao_dien\WidgetQuanLyNguoiDung.cpp:44
+  - ... and 51 more
+
+#3498db - 52 occurrences
+  - nguon\giao_dien\hop_thoai\HopThoaiHangDoiIn.cpp:35
+  - nguon\giao_dien\hop_thoai\HopThoaiHangDoiIn.cpp:79
+  - src\views\WidgetQuanLyDocGia.cpp:1190
+  - src\views\dialogs\ManHinhBackup.cpp:46
+  - src\views\dialogs\ManHinhBackup.cpp:57
+  - ... and 47 more
+
+#3B82F6 - 49 occurrences
+  - docs\archive\MODERN_PRINT_DIALOG.md:21
+  - docs\archive\MODERN_PRINT_DIALOG.md:82
+  - docs\archive\MODERN_PRINT_DIALOG.md:83
+  - docs\archive\MODERN_PRINT_DIALOG.md:107
+  - docs\archive\MODERN_PRINT_DIALOG.md:170
+  - ... and 44 more
+
+#e74c3c - 49 occurrences
+  - nguon\giao_dien\hop_thoai\HopThoaiHangDoiIn.cpp:77
+  - resources\modern-dashboard.qss:413
+  - src\views\WidgetQuanLyDocGia.cpp:886
+  - src\views\WidgetQuanLyDocGia.cpp:1194
+  - src\views\WidgetQuanLySach.cpp:1034
+  - ... and 44 more
+
+#E2E8F0 - 45 occurrences
+  - include\utils\KieuBangDuLieu.h:108
+  - include\utils\KieuBangDuLieu.h:124
+  - resources\enterprise-theme.qss:213
+  - resources\enterprise-theme.qss:363
+  - resources\enterprise-theme.qss:567
+  - ... and 40 more
+
+#323248 - 44 occurrences
+  - nguon\giao_dien\BangDieuKhien.cpp:1871
+  - nguon\giao_dien\BangDieuKhien.cpp:1872
+  - nguon\giao_dien\hop_thoai\HopThoaiInAn.cpp:100
+  - nguon\giao_dien\hop_thoai\HopThoaiInAn.cpp:131
+  - nguon\giao_dien\hop_thoai\HopThoaiInAn.cpp:145
+  - ... and 39 more
+
+#2563EB - 39 occurrences
+  - docs\archive\MODERN_PRINT_DIALOG.md:21
+  - docs\archive\MODERN_PRINT_DIALOG.md:83
+  - docs\archive\MODERN_PRINT_DIALOG.md:170
+  - docs\archive\MODERN_PRINT_DIALOG.md:174
+  - docs\archive\MODERN_PRINT_DIALOG.md:212
+  - ... and 34 more
+
+#1e1e2d - 36 occurrences
+  - nguon\giao_dien\BangDieuKhien.cpp:1861
+  - nguon\giao_dien\WidgetQuanLyNguoiDung.cpp:87
+  - nguon\giao_dien\hop_thoai\HopThoaiCaiDat.cpp:40
+  - nguon\giao_dien\hop_thoai\HopThoaiInAn.cpp:131
+  - nguon\giao_dien\hop_thoai\HopThoaiInAn.cpp:134
+  - ... and 31 more
+
+#2b2b40 - 36 occurrences
+  - nguon\giao_dien\BangDieuKhien.cpp:1870
+  - nguon\giao_dien\hop_thoai\HopThoaiInAn.cpp:144
+  - nguon\giao_dien\hop_thoai\HopThoaiQuetMaVach.cpp:83
+  - nguon\giao_dien\hop_thoai\HopThoaiSuaDocGia.cpp:169
+  - nguon\giao_dien\hop_thoai\HopThoaiSuaSach.cpp:184
+  - ... and 31 more
+
+#27ae60 - 36 occurrences
+  - nguon\giao_dien\hop_thoai\HopThoaiHangDoiIn.cpp:76
+  - src\views\WidgetQuanLyDocGia.cpp:886
+  - src\views\WidgetQuanLyDocGia.cpp:1193
+  - src\views\WidgetQuanLySach.cpp:1035
+  - src\views\dialogs\ManHinhBackup.cpp:77
+  - ... and 31 more
+
+#3699FF - 34 occurrences
+  - nguon\giao_dien\BangDieuKhien.cpp:407
+  - nguon\giao_dien\BangDieuKhien.cpp:426
+  - nguon\giao_dien\BangDieuKhien.cpp:430
+  - nguon\giao_dien\CuaSoChinh.cpp:320
+  - nguon\giao_dien\CuaSoChinh.cpp:328
+  - ... and 29 more
+
+#5D9CEC - 34 occurrences
+  - nguon\giao_dien\WidgetMuonTraSach.cpp:1003
+  - nguon\giao_dien\hop_thoai\HopThoaiSuaDocGia.cpp:60
+  - nguon\giao_dien\hop_thoai\HopThoaiSuaDocGia.cpp:80
+  - nguon\giao_dien\hop_thoai\HopThoaiSuaDocGia.cpp:83
+  - nguon\giao_dien\hop_thoai\HopThoaiSuaDocGia.cpp:152
+  - ... and 29 more
+
+#475569 - 33 occurrences
+  - nguon\giao_dien\BangDieuKhien.cpp:1061
+  - nguon\giao_dien\hop_thoai\ManHinhDangNhap.cpp:91
+  - resources\modern-dashboard.qss:736
+  - resources\modern-dashboard.qss:757
+  - resources\modern-dashboard.qss:781
+  - ... and 28 more
+
+#7f8c8d - 33 occurrences
+  - src\views\dialogs\ManHinhBackup.cpp:155
+  - src\views\dialogs\ManHinhBackup.cpp:169
+  - src\views\dialogs\ManHinhBackup.cpp:182
+  - src\views\dialogs\ManHinhBaoCaoQuaHan.cpp:269
+  - src\views\dialogs\ManHinhBaoCaoQuaHan.cpp:281
+  - ... and 28 more
+
+#2D2D30 - 31 occurrences
+  - nguon\giao_dien\WidgetQuanLyDocGia.cpp:195
+  - nguon\giao_dien\WidgetQuanLyDocGia.cpp:200
+  - nguon\giao_dien\WidgetQuanLyDocGia.cpp:202
+  - nguon\giao_dien\WidgetQuanLyDocGia.cpp:210
+  - nguon\giao_dien\WidgetQuanLyDocGia.cpp:213
+  - ... and 26 more
+
+#1E293B - 30 occurrences
+  - docs\archive\MODERN_PRINT_DIALOG.md:19
+  - docs\archive\MODERN_PRINT_DIALOG.md:58
+  - docs\archive\MODERN_PRINT_DIALOG.md:58
+  - docs\archive\MODERN_PRINT_DIALOG.md:151
+  - include\utils\KieuBangDuLieu.h:103
+  - ... and 25 more
+
+#F1F5F9 - 25 occurrences
+  - docs\archive\MODERN_PRINT_DIALOG.md:22
+  - include\utils\KieuBangDuLieu.h:122
+  - resources\styles.qss:123
+  - resources\styles.qss:167
+  - resources\styles.qss:200
+  - ... and 20 more
+
+#c0392b - 25 occurrences
+  - nguon\giao_dien\hop_thoai\HopThoaiHangDoiIn.cpp:78
+  - nguon\giao_dien\hop_thoai\HopThoaiInAn.cpp:120
+  - nguon\giao_dien\hop_thoai\HopThoaiQuetMaVach.cpp:131
+  - nguon\giao_dien\hop_thoai\HopThoaiQuetMaVach.cpp:131
+  - src\views\dialogs\ManHinhBackup.cpp:159
+  - ... and 20 more
+
+#1E1E2D - 24 occurrences
+  - nguon\giao_dien\CuaSoChinh.cpp:279
+  - nguon\giao_dien\CuaSoChinh.cpp:305
+  - nguon\giao_dien\CuaSoChinh.cpp:410
+  - nguon\giao_dien\CuaSoChinh.cpp:802
+  - nguon\giao_dien\CuaSoChinh.cpp:850
+  - ... and 19 more
+
+#B5B5C3 - 24 occurrences
+  - nguon\giao_dien\CuaSoChinh.cpp:280
+  - nguon\giao_dien\WidgetMuonTraSach.cpp:1208
+  - nguon\giao_dien\hop_thoai\HopThoaiSuaDocGia.cpp:130
+  - nguon\giao_dien\hop_thoai\HopThoaiThemDocGia.cpp:163
+  - nguon\giao_dien\hop_thoai\HopThoaiThemSach.cpp:237
+  - ... and 19 more
+
+#353b4a - 22 occurrences
+  - resources\enterprise-theme.qss:37
+  - resources\enterprise-theme.qss:43
+  - resources\enterprise-theme.qss:49
+  - resources\enterprise-theme.qss:118
+  - resources\enterprise-theme.qss:125
+  - ... and 17 more
+
+#95a5a6 - 22 occurrences
+  - src\views\WidgetQuanLyDocGia.cpp:1219
+  - src\views\dialogs\ManHinhBackup.cpp:182
+  - src\views\dialogs\ManHinhBackup.cpp:187
+  - src\views\dialogs\ManHinhBackup.cpp:203
+  - src\views\dialogs\ManHinhBaoCaoQuaHan.cpp:281
+  - ... and 17 more
+
+#94A3B8 - 21 occurrences
+  - docs\archive\MODERN_PRINT_DIALOG.md:238
+  - include\utils\KieuBangDuLieu.h:110
+  - resources\enterprise-theme.qss:518
+  - resources\enterprise-theme.qss:523
+  - resources\modern-dashboard.qss:903
+  - ... and 16 more
+
+#10B981 - 21 occurrences
+  - include\utils\KieuNutBam.h:119
+  - nguon\giao_dien\BangDieuKhien.cpp:233
+  - nguon\giao_dien\BangDieuKhien.cpp:284
+  - resources\styles.qss:8
+  - resources\styles.qss:62
+  - ... and 16 more
+
+#DC2626 - 20 occurrences
+  - include\utils\KieuNutBam.h:116
+  - resources\modern-dashboard.qss:380
+  - resources\styles.qss:10
+  - resources\styles.qss:78
+  - src\utils\ConfirmationDialog.cpp:174
+  - ... and 15 more
+
+#bdc3c7 - 20 occurrences
+  - src\views\dialogs\ManHinhBackup.cpp:154
+  - src\views\dialogs\ManHinhBackup.cpp:168
+  - src\views\dialogs\ManHinhChiTietSach.cpp:100
+  - src\views\dialogs\ManHinhChiTietSach.cpp:509
+  - src\views\dialogs\ManHinhQuaHan.cpp:632
+  - ... and 15 more
+
+#F59E0B - 19 occurrences
+  - include\utils\KieuNutBam.h:123
+  - nguon\giao_dien\BangDieuKhien.cpp:234
+  - nguon\giao_dien\BangDieuKhien.cpp:285
+  - resources\styles.qss:9
+  - resources\styles.qss:70
+  - ... and 14 more
+
+#0078D4 - 19 occurrences
+  - nguon\giao_dien\CuaSoChinh.cpp:375
+  - nguon\giao_dien\WidgetQuanLyDocGia.cpp:183
+  - nguon\giao_dien\WidgetQuanLyDocGia.cpp:186
+  - nguon\giao_dien\WidgetQuanLyDocGia.cpp:201
+  - nguon\giao_dien\WidgetQuanLyDocGia.cpp:209
+  - ... and 14 more
+
+#1b1b29 - 19 occurrences
+  - nguon\giao_dien\hop_thoai\HopThoaiInAn.cpp:131
+  - nguon\giao_dien\hop_thoai\HopThoaiSuaDocGia.cpp:77
+  - nguon\giao_dien\hop_thoai\HopThoaiSuaDocGia.cpp:84
+  - nguon\giao_dien\hop_thoai\HopThoaiSuaDocGia.cpp:177
+  - nguon\giao_dien\hop_thoai\HopThoaiSuaSach.cpp:89
+  - ... and 14 more
+
+#ecf0f1 - 19 occurrences
+  - src\views\dialogs\ManHinhQuaHan.cpp:202
+  - src\views\dialogs\ManHinhSuaDocGia.cpp:64
+  - src\views\dialogs\ManHinhSuaDocGia.cpp:126
+  - src\views\dialogs\ManHinhSuaSach.cpp:61
+  - src\views\dialogs\ManHinhSuaSach.cpp:132
+  - ... and 14 more
+
+#1BC5BD - 18 occurrences
+  - nguon\giao_dien\BangDieuKhien.cpp:426
+  - nguon\giao_dien\CuaSoChinh.cpp:914
+  - nguon\giao_dien\WidgetMuonTraSach.cpp:781
+  - nguon\giao_dien\WidgetMuonTraSach.cpp:962
+  - nguon\giao_dien\WidgetMuonTraSach.cpp:1165
+  - ... and 13 more
+
+#EF4444 - 17 occurrences
+  - include\utils\KieuNutBam.h:115
+  - nguon\giao_dien\BangDieuKhien.cpp:235
+  - nguon\giao_dien\BangDieuKhien.cpp:286
+  - src\utils\ConfirmationDialog.cpp:166
+  - src\utils\ConfirmationDialog.cpp:222
+  - ... and 12 more
+
+#F64E60 - 17 occurrences
+  - nguon\giao_dien\CuaSoChinh.cpp:928
+  - nguon\giao_dien\WidgetMuonTraSach.cpp:781
+  - nguon\giao_dien\WidgetMuonTraSach.cpp:783
+  - nguon\giao_dien\WidgetMuonTraSach.cpp:962
+  - nguon\giao_dien\WidgetMuonTraSach.cpp:964
+  - ... and 12 more
+
+#4A90E2 - 16 occurrences
+  - nguon\giao_dien\WidgetQuanLyDocGia.cpp:292
+  - nguon\giao_dien\WidgetQuanLyDocGia.cpp:302
+  - nguon\giao_dien\WidgetQuanLyDocGia.cpp:332
+  - nguon\giao_dien\WidgetQuanLySach.cpp:340
+  - nguon\giao_dien\WidgetQuanLySach.cpp:359
+  - ... and 11 more
+
+#5ba3f5 - 15 occurrences
+  - nguon\giao_dien\WidgetQuanLyDocGia.cpp:316
+  - nguon\giao_dien\WidgetQuanLySach.cpp:393
+  - resources\enterprise-theme.qss:63
+  - resources\enterprise-theme.qss:114
+  - resources\enterprise-theme.qss:190
+  - ... and 10 more
+
+#424959 - 15 occurrences
+  - resources\enterprise-theme.qss:38
+  - resources\enterprise-theme.qss:44
+  - resources\enterprise-theme.qss:50
+  - resources\enterprise-theme.qss:103
+  - resources\enterprise-theme.qss:150
+  - ... and 10 more
+
+#2C5D78 - 15 occurrences
+  - resources\modern-dashboard.qss:599
+  - resources\modern-dashboard.qss:677
+  - resources\modern-dashboard.qss:715
+  - resources\modern-dashboard.qss:717
+  - resources\modern-dashboard.qss:746
+  - ... and 10 more
+
+#2980b9 - 15 occurrences
+  - src\views\dialogs\ManHinhBackup.cpp:145
+  - src\views\dialogs\ManHinhBaoCaoQuaHan.cpp:248
+  - src\views\dialogs\ManHinhBaoCaoQuaHan.cpp:264
+  - src\views\dialogs\ManHinhQuaHan.cpp:297
+  - src\views\dialogs\ManHinhQuaHan.cpp:308
+  - ... and 10 more
+
+#64748B - 14 occurrences
+  - docs\archive\MODERN_PRINT_DIALOG.md:24
+  - resources\modern-dashboard.qss:742
+  - resources\styles.qss:86
+  - resources\styles.qss:189
+  - resources\styles.qss:260
+  - ... and 9 more
+
+#FFA800 - 14 occurrences
+  - nguon\giao_dien\BangDieuKhien.cpp:430
+  - nguon\giao_dien\CuaSoChinh.cpp:921
+  - nguon\giao_dien\WidgetMuonTraSach.cpp:783
+  - nguon\giao_dien\WidgetMuonTraSach.cpp:964
+  - nguon\giao_dien\WidgetMuonTraSach.cpp:1167
+  - ... and 9 more
+
+#334155 - 14 occurrences
+  - nguon\giao_dien\BangDieuKhien.cpp:952
+  - nguon\giao_dien\BangDieuKhien.cpp:1050
+  - nguon\giao_dien\BangDieuKhien.cpp:1773
+  - nguon\giao_dien\hop_thoai\ManHinhDangNhap.cpp:78
+  - nguon\giao_dien\hop_thoai\ManHinhDangNhap.cpp:213
+  - ... and 9 more
+
+#CCCCCC - 14 occurrences
+  - nguon\giao_dien\CuaSoChinh.cpp:389
+  - nguon\giao_dien\WidgetQuanLyDocGia.cpp:331
+  - nguon\giao_dien\WidgetQuanLySach.cpp:374
+  - nguon\giao_dien\WidgetQuanLySach.cpp:376
+  - nguon\giao_dien\WidgetQuanLySach.cpp:415
+  - ... and 9 more
+
+#071233 - 14 occurrences
+  - nguon\giao_dien\WidgetQuanLyDocGia.cpp:126
+  - nguon\giao_dien\WidgetQuanLyDocGia.cpp:126
+  - resources\enterprise-theme.qss:528
+  - resources\enterprise-theme.qss:546
+  - resources\enterprise-theme.qss:612
+  - ... and 9 more
+
+#2c3e50 - 14 occurrences
+  - resources\modern-dashboard.qss:248
+  - src\views\MainWindow.cpp:216
+  - src\views\WidgetQuanLyDocGia.cpp:1188
+  - src\views\dialogs\ManHinhBackup.cpp:48
+  - src\views\dialogs\ManHinhSuaDocGia.cpp:51
+  - ... and 9 more
+
+#0F172A - 13 occurrences
+  - docs\archive\MODERN_PRINT_DIALOG.md:19
+  - docs\archive\MODERN_PRINT_DIALOG.md:58
+  - docs\archive\MODERN_PRINT_DIALOG.md:151
+  - docs\archive\MODERN_PRINT_DIALOG.md:151
+  - include\utils\KieuBangDuLieu.h:111
+  - ... and 8 more
+
+#059669 - 13 occurrences
+  - include\utils\KieuNutBam.h:120
+  - resources\styles.qss:66
+  - src\utils\KieuNutBam.cpp:209
+  - src\utils\KieuNutBam.cpp:220
+  - src\views\WidgetBangDieuKhien.cpp:662
+  - ... and 8 more
+
+#047857 - 13 occurrences
+  - include\utils\KieuNutBam.h:121
+  - src\utils\KieuNutBam.cpp:209
+  - src\utils\KieuNutBam.cpp:220
+  - src\utils\KieuNutBam.cpp:224
+  - src\views\WidgetBangDieuKhien.cpp:1058
+  - ... and 8 more
+
+#2B2B40 - 13 occurrences
+  - nguon\giao_dien\CuaSoChinh.cpp:281
+  - nguon\giao_dien\hop_thoai\HopThoaiThemBanSao.cpp:75
+  - nguon\giao_dien\hop_thoai\HopThoaiTop10.cpp:85
+  - resources\modern-dashboard.qss:100
+  - resources\modern-dashboard.qss:211
+  - ... and 8 more
+
+#565674 - 13 occurrences
+  - nguon\giao_dien\hop_thoai\HopThoaiSuaDocGia.cpp:90
+  - nguon\giao_dien\hop_thoai\HopThoaiSuaSach.cpp:99
+  - nguon\giao_dien\hop_thoai\HopThoaiThemDocGia.cpp:210
+  - nguon\giao_dien\hop_thoai\HopThoaiThemSach.cpp:127
+  - nguon\giao_dien\hop_thoai\HopThoaiThemSach.cpp:287
+  - ... and 8 more
+
+#08314f - 13 occurrences
+  - resources\enterprise-theme.qss:324
+  - resources\enterprise-theme.qss:427
+  - resources\enterprise-theme.qss:460
+  - resources\enterprise-theme.qss:484
+  - resources\enterprise-theme.qss:529
+  - ... and 8 more
+
+#6C6C80 - 12 occurrences
+  - nguon\giao_dien\CuaSoChinh.cpp:935
+  - nguon\giao_dien\WidgetQuanLySach.cpp:894
+  - nguon\giao_dien\hop_thoai\HopThoaiThemBanSao.cpp:60
+  - nguon\giao_dien\hop_thoai\HopThoaiThemBanSao.cpp:65
+  - nguon\giao_dien\hop_thoai\HopThoaiThemDocGia.cpp:79
+  - ... and 7 more
+
+#E06D6D - 12 occurrences
+  - nguon\giao_dien\hop_thoai\HopThoaiSuaDocGia.cpp:229
+  - nguon\giao_dien\hop_thoai\HopThoaiSuaDocGia.cpp:240
+  - nguon\giao_dien\hop_thoai\HopThoaiSuaSach.cpp:249
+  - nguon\giao_dien\hop_thoai\HopThoaiSuaSach.cpp:259
+  - nguon\giao_dien\hop_thoai\HopThoaiSuaSach.cpp:289
+  - ... and 7 more
+
+#f0f4f8 - 12 occurrences
+  - resources\enterprise-theme.qss:55
+  - resources\enterprise-theme.qss:106
+  - resources\enterprise-theme.qss:113
+  - resources\enterprise-theme.qss:149
+  - resources\enterprise-theme.qss:188
+  - ... and 7 more
+
+#f39c12 - 12 occurrences
+  - resources\modern-dashboard.qss:409
+  - src\views\dialogs\ManHinhBackup.cpp:173
+  - src\views\dialogs\ManHinhBackup.cpp:178
+  - src\views\dialogs\ManHinhQuaHan.cpp:63
+  - src\views\dialogs\ManHinhSuaDocGia.cpp:203
+  - ... and 7 more
+
+#2D2D3F - 12 occurrences
+  - resources\modern-dashboard.qss:779
+  - resources\modern-dashboard.qss:816
+  - resources\modern-dashboard.qss:853
+  - resources\modern-dashboard.qss:877
+  - resources\modern-dashboard.qss:891
+  - ... and 7 more
+
+#1E40AF - 11 occurrences
+  - docs\archive\MODERN_PRINT_DIALOG.md:214
+  - resources\styles.qss:52
+  - resources\styles.qss:345
+  - src\utils\ConfirmationDialog.cpp:118
+  - src\utils\KieuNutBam.cpp:122
+  - ... and 6 more
+
+#1e2230 - 11 occurrences
+  - nguon\giao_dien\BangDieuKhien.cpp:182
+  - nguon\giao_dien\BangDieuKhien.cpp:301
+  - nguon\giao_dien\BangDieuKhien.cpp:810
+  - nguon\giao_dien\BangDieuKhien.cpp:872
+  - nguon\giao_dien\BangDieuKhien.cpp:988
+  - ... and 6 more

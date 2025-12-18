@@ -1,0 +1,32 @@
+=== DOC_GIA checks ===
+Total doc_gia rows: 3
+Rows with missing ho/ten: 0
+Rows with NULL ma_the: 0
+Duplicate ma_the counts: []
+
+=== DAU_SACH checks ===
+Total dau_sach rows: 64
+Missing ISBN: 0
+Missing title: 0
+Invalid ISBN (by checksum/format): 8
+Duplicate ISBNs: []
+Sample invalid ISBN rows:
+{'id': 4, 'isbn': '9898798767656', 'ten_sach': 'Cha Ơi', 'tac_gia': 'Chăm Rốch Thi'}
+{'id': 5, 'isbn': '9786048679456', 'ten_sach': 'Chào Mừng Ngày Mới', 'tac_gia': 'Chăm Rốch Thi'}
+{'id': 10, 'isbn': '9878798767', 'ten_sach': 'Cuộc Sống Mới', 'tac_gia': 'Chăm Rốch Thi'}
+{'id': 42, 'isbn': '9878767656545', 'ten_sach': 'Nhớ', 'tac_gia': 'Chăm Rốch Thi'}
+{'id': 43, 'isbn': '9789876543210', 'ten_sach': 'Những Người Khốn Khổ', 'tac_gia': 'Victor Hugo'}
+{'id': 52, 'isbn': '9876067873676', 'ten_sach': 'Sống Thế Nào Cho Trọn Vẹn', 'tac_gia': 'Chăm Rốch Thi'}
+{'id': 56, 'isbn': '9876045324', 'ten_sach': 'Thế Giới Có Em', 'tac_gia': 'Chăm Rốch Thi'}
+{'id': 59, 'isbn': '9876046789465', 'ten_sach': 'Trong Những Năm Qua', 'tac_gia': 'Chăm Rốch Thi'}
+
+=== BAN_SAO checks ===
+Total ban_sao rows: 212
+Missing ma_sach: 0
+Missing dau_sach_id: 0
+ban_sao with non-existent dau_sach_id: 0
+
+=== MUON_TRA checks ===
+Total muon_tra rows: 2
+Borrow rows with missing/invalid reader ref: 0
+Borrow rows with missing/invalid ban_sao ref: 0
