@@ -1,5 +1,6 @@
 #include "utils/CustomPrintDialog.h"
 #include "utils/PrintHelper.h"
+#include "utils/FilePathManager.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGridLayout>
@@ -138,6 +139,29 @@ void CustomPrintDialog::setupUI() {
     );
     leftLayout->addWidget(m_btnCancel);
     
+    leftLayout->addSpacing(30);
+    
+    // Zoom Controls (Phase 10)
+    QLabel* lblZoom = new QLabel("Phóng to/Thu nhỏ:");
+    lblZoom->setStyleSheet("color: #999; font-size: 11px;");
+    leftLayout->addWidget(lblZoom);
+    
+    QHBoxLayout* zoomLayout = new QHBoxLayout();
+    m_zoomSlider = new QSlider(Qt::Horizontal);
+    m_zoomSlider->setRange(10, 300); // 10% to 300%
+    m_zoomSlider->setValue(100);
+    m_zoomSlider->setStyleSheet(
+        "QSlider::groove:horizontal { background: #252530; height: 4px; border-radius: 2px; }"
+        "QSlider::handle:horizontal { background: #5D9CEC; border: none; width: 14px; height: 14px; margin: -5px 0; border-radius: 7px; }"
+    );
+    
+    m_zoomLabel = new QLabel("100%");
+    m_zoomLabel->setStyleSheet("color: #E0E0E0; font-size: 11px; min-width: 30px;");
+    
+    zoomLayout->addWidget(m_zoomSlider);
+    zoomLayout->addWidget(m_zoomLabel);
+    leftLayout->addLayout(zoomLayout);
+    
     leftLayout->addStretch();
     
     // Right panel - Preview
@@ -149,6 +173,22 @@ void CustomPrintDialog::setupUI() {
     
     // Preview widget
     m_printer = new QPrinter(QPrinter::HighResolution);
+    
+    // Apply Settings to Printer for Preview Accuracy
+    PrintHelper::PrintConfig cfg = PrintHelper::getCauHinh();
+    
+    // Page Size
+    QPageSize::PageSizeId paperId = QPageSize::A4;
+    QString ps = cfg.pageSize.toUpper();
+    if (ps == "A3") paperId = QPageSize::A3;
+    else if (ps == "A5") paperId = QPageSize::A5;
+    else if (ps == "LETTER") paperId = QPageSize::Letter;
+    else if (ps == "LEGAL") paperId = QPageSize::Legal;
+    m_printer->setPageSize(QPageSize(paperId));
+    
+    // Orientation
+    m_printer->setPageOrientation(cfg.orientation.toLower() == "landscape" ? QPageLayout::Landscape : QPageLayout::Portrait);
+    
     m_previewWidget = new QPrintPreviewWidget(m_printer);
     m_previewWidget->setStyleSheet("background-color: #2b2b40; border: 1px solid #3E3E42; border-radius: 4px;");
     
@@ -172,6 +212,7 @@ void CustomPrintDialog::setupConnections() {
             this, &CustomPrintDialog::onPrinterChanged);
     connect(m_previewWidget, &QPrintPreviewWidget::paintRequested,
             this, &CustomPrintDialog::updatePreview);
+    connect(m_zoomSlider, &QSlider::valueChanged, this, &CustomPrintDialog::onZoomChanged);
 }
 
 void CustomPrintDialog::populatePrinters() {
@@ -199,6 +240,18 @@ void CustomPrintDialog::onPrinterChanged(int index) {
     
     QString printerName = m_printerCombo->itemText(index);
     m_printer->setPrinterName(printerName);
+    
+    // Re-apply settings because setting printer name can sometimes reset printer state
+    PrintHelper::PrintConfig cfg = PrintHelper::getCauHinh();
+    QPageSize::PageSizeId paperId = QPageSize::A4;
+    QString ps = cfg.pageSize.toUpper();
+    if (ps == "A3") paperId = QPageSize::A3;
+    else if (ps == "A5") paperId = QPageSize::A5;
+    else if (ps == "LETTER") paperId = QPageSize::Letter;
+    else if (ps == "LEGAL") paperId = QPageSize::Legal;
+    m_printer->setPageSize(QPageSize(paperId));
+    m_printer->setPageOrientation(cfg.orientation.toLower() == "landscape" ? QPageLayout::Landscape : QPageLayout::Portrait);
+
     m_previewWidget->updatePreview();
 }
 
@@ -226,7 +279,7 @@ void CustomPrintDialog::onPdfClicked() {
     if (!cfg.pdfOutputDir.isEmpty()) {
         defaultDir = cfg.pdfOutputDir;
     } else {
-        defaultDir = QApplication::applicationDirPath() + "/data/pdf";
+        defaultDir = FilePathManager::getFilePath("pdf");
     }
     
     // Use suggested filename if provided, otherwise generate generic one
@@ -246,6 +299,13 @@ void CustomPrintDialog::onPdfClicked() {
     if (!m_exportPath.isEmpty()) {
         done(PDF_EXPORT);
     }
+}
+
+void CustomPrintDialog::onZoomChanged(int value) {
+    if (!m_previewWidget) return;
+    double factor = value / 100.0;
+    m_previewWidget->setZoomFactor(factor);
+    m_zoomLabel->setText(QString("%1%").arg(value));
 }
 
 QString CustomPrintDialog::selectedPrinterName() const {

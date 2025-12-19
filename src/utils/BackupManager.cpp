@@ -1,4 +1,5 @@
 #include "utils/BackupManager.h"
+#include "utils/FilePathManager.h"
 #include "models/ThaoTacFile.h"
 #include "utils/NgayThang.h"
 #include <fstream>
@@ -20,7 +21,7 @@
 
 // Lay thu muc backup mac dinh
 std::string LayThuMucBackupMacDinh() {
-    return "data/backup";
+    return FilePathManager::getFilePath("backup").toStdString();
 }
 
 // Tao ten file backup theo format
@@ -96,7 +97,9 @@ std::string TaoBackup(const std::string& thuMucBackup) {
     }
     
     // Backup only the SQLite DB (single source of truth)
-    std::string dbFile = "data/files/library.db";
+    std::string dbFile = FilePathManager::getLibraryDbPathStd();
+    if (dbFile.empty()) dbFile = FilePathManager::getFilePath("files/library.db").toStdString();
+    
     std::string loai = "library";
 
     std::string tenBackup = TaoTenFileBackup(loai);
@@ -139,9 +142,9 @@ std::string PhucHoiBackup(const std::string& duongDanBackup) {
     // Xac dinh file dich
     std::string fileDich;
     if (loaiFile == "library") {
-        fileDich = "data/library.db";
+        fileDich = FilePathManager::getFilePath("files/library.db").toStdString();
     } else {
-        fileDich = "data/" + loaiFile + ".txt";
+        fileDich = FilePathManager::getFilePath(QString::fromStdString(loaiFile + ".txt")).toStdString();
     }
 
     // Sao chep file backup ve file goc
@@ -285,7 +288,7 @@ int XoaBackupCu(int soLuongGiuLai, const std::string& thuMucBackup) {
 // ---------------------- Archiving utilities -----------------------------
 
 static std::string LayThuMucArchiveMacDinh() {
-    return "data/backup_archives";
+    return FilePathManager::getFilePath("backup_archives").toStdString();
 }
 
 // Ensure archive dir exists

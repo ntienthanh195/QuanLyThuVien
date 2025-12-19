@@ -1,4 +1,12 @@
+/**
+ * @file ThongBao.cpp
+ * @path src/utils/ThongBao.cpp
+ * @description Tiện ích hiển thị các hộp thoại thông báo (Message Boxes).
+ * Đồng nhất cách hiển thị thông báo thành công, lỗi, cảnh báo và câu hỏi xác nhận trên toàn bộ ứng dụng.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #include "utils/ThongBao.h"
+
 
 void thongBao(std::ostream& out, const std::string& msg, LoaiThongBao loai) {
     const char* tienTo[] = {"Loi: ", "Thong tin: ", "Canh bao: "};

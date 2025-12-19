@@ -74,23 +74,26 @@ void HopThoaiCauHinhIn::setupUi() {
     h1->addWidget(new QLabel(LanguageManager::instance().getText("LBL_BARCODE_PRESETS")));
     cbPresets = new QComboBox(this);
     cbPresets->addItem(LanguageManager::instance().getText("PRESET_CUSTOM"));
-    cbPresets->addItem(LanguageManager::instance().getText("PRESET_A4_3COL"));
-    cbPresets->addItem(LanguageManager::instance().getText("PRESET_A4_4COL"));
-    cbPresets->addItem(LanguageManager::instance().getText("PRESET_SINGLE"));
+    cbPresets->addItem("Mặc định thư viện - 38x20mm");
+    cbPresets->addItem("Mẫu phổ thông - 37x12mm");
+    cbPresets->addItem("Tiêu chuẩn (Gọn) - 35x15mm");
+    cbPresets->addItem("Nhãn đơn lẻ");
     h1->addWidget(cbPresets, 1);
     barcodeLayout->addLayout(h1);
 
-    // Row 2: W/H
+    // Row 2: W/H (in mm)
     QHBoxLayout *h2 = new QHBoxLayout();
     h2->addWidget(new QLabel(LanguageManager::instance().getText("LBL_BARCODE_WIDTH")));
     sbLabelWidth = new QSpinBox(this);
-    sbLabelWidth->setRange(50, 500);
+    sbLabelWidth->setRange(20, 80);  // mm (changed from px)
+    sbLabelWidth->setSuffix(" mm");  // Show unit
     h2->addWidget(sbLabelWidth);
     
     h2->addSpacing(20);
     h2->addWidget(new QLabel(LanguageManager::instance().getText("LBL_BARCODE_HEIGHT")));
     sbLabelHeight = new QSpinBox(this);
-    sbLabelHeight->setRange(30, 300);
+    sbLabelHeight->setRange(15, 50);  // mm (changed from px)
+    sbLabelHeight->setSuffix(" mm");  // Show unit
     h2->addWidget(sbLabelHeight);
     barcodeLayout->addLayout(h2);
 
@@ -98,7 +101,7 @@ void HopThoaiCauHinhIn::setupUi() {
     QHBoxLayout *h3 = new QHBoxLayout();
     h3->addWidget(new QLabel(LanguageManager::instance().getText("LBL_BARCODE_COLS")));
     sbLabelCols = new QSpinBox(this);
-    sbLabelCols->setRange(1, 10);
+    sbLabelCols->setRange(2, 6);  // Realistic range for A4
     h3->addWidget(sbLabelCols);
     
     cbShowLibName = new QCheckBox(LanguageManager::instance().getText("CB_SHOW_LIB_NAME"));
@@ -176,8 +179,28 @@ void HopThoaiCauHinhIn::setupUi() {
 
         // Save Paths
         SettingsManager::instance().set("Print/LogoPath", m_config.duongDanLogo, "string");
-        SettingsManager::instance().set("Print/QrPath", m_config.qrOutputDir, "string"); // Fix: Match PrintHelper key
-        SettingsManager::instance().set("Print/PdfPath", m_config.pdfOutputDir, "string"); // Fix: Match PrintHelper key
+        SettingsManager::instance().set("Print/QrPath", m_config.qrOutputDir, "string");
+        SettingsManager::instance().set("Print/PdfPath", m_config.pdfOutputDir, "string");
+        
+        // ═══ SAVE NEW CONFIG FIELDS ═══
+        // Label settings
+        SettingsManager::instance().set("Print/LabelGapMm", m_config.labelGapMm, "int");
+        
+        // Card settings (if dialog has these fields in future)
+        SettingsManager::instance().set("Print/CardCols", m_config.cardCols, "int");
+        SettingsManager::instance().set("Print/CardWidth", m_config.cardWidth, "double");
+        SettingsManager::instance().set("Print/CardHeight", m_config.cardHeight, "double");
+        SettingsManager::instance().set("Print/CardGapMm", m_config.cardGapMm, "int");
+        SettingsManager::instance().set("Print/CardValidityMonths", m_config.cardValidityMonths, "int");
+        
+        // Barcode settings
+        SettingsManager::instance().set("Print/BarcodeDPI", m_config.barcodeDPI, "int");
+        SettingsManager::instance().set("Print/BarcodeModuleWidthMm", m_config.barcodeModuleWidthMm, "double");
+        SettingsManager::instance().set("Print/BarcodeQuietZoneMm", m_config.barcodeQuietZoneMm, "double");
+        
+        // Report settings
+        SettingsManager::instance().set("Print/ReportShowSummary", m_config.reportShowSummary, "bool");
+        SettingsManager::instance().set("Print/LoiChao", m_config.loiChao, "string");
 
         // Đồng bộ ngược lại PrintHelper toàn cục ngay lập tức
         PrintHelper::setCauHinh(m_config);
@@ -226,40 +249,62 @@ void HopThoaiCauHinhIn::updatePreview() {
     QString title = "Tên Sách Mẫu (Sample Book Title)";
     QString isbn = "9786040000644";
     
-    int w = sbLabelWidth->value();
-    int h = sbLabelHeight->value();
+    // Scaling Factor: 1mm = 3px for visual preview (adjust as needed for visibility)
+    const float scale = 3.0f;
     
-    QString borderStyle = cbShowBorder->isChecked() ? "1px solid #000" : "none";
+    // GET VALUES IN MM from spinboxes (already mm!)
+    int w_mm = sbLabelWidth->value();
+    int h_mm = sbLabelHeight->value();
     
-    QString html = QString(
-        "<div style='width:%1px; height:%2px; border:%3; background:#fff; color:#000; text-align:center; font-family:Arial; padding:5px; box-sizing:border-box;'>"
-    ).arg(w).arg(h).arg(borderStyle);
+    int w_px = static_cast<int>(w_mm * scale);
+    int h_px = static_cast<int>(h_mm * scale);
+    
+    QString borderStyle = cbShowBorder->isChecked() ? "1px solid #000" : "1px dashed #ccc";
+    
+    // Wrapper to center the label in the preview box
+    QString html = "<div style='display: flex; justify-content: center; padding: 10px; background: #1e1e2d;'>";
+    
+    // The Label itself
+    html += QString(
+        "<div style='width:%1px; height:%2px; border:%3; background:#fff; color:#000; "
+        "text-align:center; font-family:Arial; padding:%4px; box-sizing:border-box; "
+        "display: flex; flex-direction: column; justify-content: space-between;'>"
+    ).arg(w_px).arg(h_px).arg(borderStyle).arg(1 * scale);
     
     if (cbShowLibName->isChecked()) {
-        html += QString("<div style='font-size:7pt; font-weight:bold; border-bottom:1px solid #ddd; padding-bottom:2px; margin-bottom:2px;'>%1</div>").arg(libName);
+        html += QString("<div style='font-size:%1pt; font-weight:bold; border-bottom:1px solid #ddd; padding-bottom:1px;'>%2</div>")
+            .arg(static_cast<int>(2.5 * scale)).arg(libName);
     }
     
     if (cbShowBookTitle->isChecked()) {
-        html += QString("<div style='font-size:8pt; font-weight:bold; height:24px; overflow:hidden;'>%1</div>").arg(title);
+        html += QString("<div style='font-size:%1pt; font-weight:bold; overflow:hidden; margin: 1px 0;'>%2</div>")
+            .arg(static_cast<int>(2.8 * scale)).arg(title);
     }
     
-    // Use Real Barcode Base64
-    // We request a high-res image (e.g. 100px high) and let CSS scale it to fit the container or look good.
-    // The user sets Width/Height for the LABEL, but valid header/footer space eats into it.
-    // Let's assume barcode takes up remaining space or a fixed proportion. Usually 30-50px height is good for preview.
+    // Calculate barcode height in mm (remaining space in label)
+    double barcodeHeightMm = h_mm - 8.0; // Subtract header/footer space
+    if (barcodeHeightMm < 5.0) barcodeHeightMm = 5.0; // Minimum height
     
-    QString base64 = PrintHelper::generateBarcodeBase64(isbn, 100);
+    // Barcode Base64 - NOW USES MM AND DPI!
+    QString base64 = PrintHelper::generateBarcodeBase64(isbn, barcodeHeightMm, 300);
     
-    // Scale image in preview to look proportional
-    html += QString("<img src='data:image/png;base64,%1' style='display:block; margin:5px auto; width:80%; height:35px; image-rendering: pixelated;' />").arg(base64);
+    // Barcode Container
+    html += QString(
+        "  <div style='flex-grow: 1; display: flex; align-items: center; justify-content: center; overflow: hidden;'>"
+        "    <img src='data:image/png;base64,%1' style='height: 100%; max-width: 95%; image-rendering: pixelated;' />"
+        "  </div>"
+    ).arg(base64);
     
-    html += QString("<div style='font-size:7pt; font-weight:bold; letter-spacing:1px;'>%1</div>").arg(isbn);
+    // ISBN Label
+    html += QString("<div style='font-size:%1pt; font-weight: bold; letter-spacing: 1px;'>%2</div>")
+        .arg(static_cast<int>(2.5 * scale)).arg(isbn);
     
     if (cbShowPrice->isChecked()) {
-        html += "<div style='font-size:7pt; color:red; margin-top:2px;'>Giá: 150,000đ</div>";
+        html += QString("<div style='font-size:%1pt; color:red; font-weight:bold;'>150,000đ</div>")
+            .arg(static_cast<int>(2.5 * scale));
     }
     
-    html += "</div>";
+    html += "</div></div>";
     
     lblPreview->setText(html);
 }
@@ -267,19 +312,24 @@ void HopThoaiCauHinhIn::updatePreview() {
 void HopThoaiCauHinhIn::applyPreset(int index) {
     if (index == 0) return; // Custom
     
-    if (index == 1) { // A4 3-Col
-        sbLabelWidth->setValue(140);
-        sbLabelHeight->setValue(88);
-        sbLabelCols->setValue(3);
-        cbShowBorder->setChecked(true);
-    } else if (index == 2) { // A4 4-Col
-        sbLabelWidth->setValue(110);
-        sbLabelHeight->setValue(75);
+    if (index == 1) { // Library Default
+        sbLabelWidth->setValue(38);   
+        sbLabelHeight->setValue(20);  
         sbLabelCols->setValue(4);
         cbShowBorder->setChecked(true);
-    } else if (index == 3) { // Single Single
-        sbLabelWidth->setValue(180);
-        sbLabelHeight->setValue(100);
+    } else if (index == 2) { // Universal
+        sbLabelWidth->setValue(37);   
+        sbLabelHeight->setValue(12);  
+        sbLabelCols->setValue(4);
+        cbShowBorder->setChecked(true);
+    } else if (index == 3) { // Standard Compact
+        sbLabelWidth->setValue(35);   
+        sbLabelHeight->setValue(15);  
+        sbLabelCols->setValue(4);
+        cbShowBorder->setChecked(true);
+    } else if (index == 4) { // Single
+        sbLabelWidth->setValue(30);   
+        sbLabelHeight->setValue(10);  
         sbLabelCols->setValue(1);
         cbShowBorder->setChecked(false);
     }

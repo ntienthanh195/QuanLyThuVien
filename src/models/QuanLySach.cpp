@@ -1,4 +1,12 @@
-﻿#include "models/QuanLySach.h"
+﻿/**
+ * @file QuanLySach.cpp
+ * @path src/models/QuanLySach.cpp
+ * @description Triển khai logic quản lý sách và đầu sách.
+ * Xử lý: danh sách tuyến tính các đầu sách, danh sách liên kết đơn các bản sao sách, và thuật toán tìm kiếm/sắp xếp sách.
+ * @project Library Management System (QuanLyThuVien)
+ */
+#include "models/QuanLySach.h"
+
 #include <mutex>
 #include "utils/ThongBao.h"
 #include "models/KiemTraDuLieu.h"
@@ -257,7 +265,7 @@ PTRDMS timDanhMucTheoMaSach(const std::string &ma, PTRDS ds[], int n, std::ostre
 // them dau sach moi vao mang
 // them dau sach moi vao mang
 bool themDauSach(PTRDS ds[], int &n, const std::string &isbn, const std::string &ten, int trang,
-                 const std::string &tg, int nam, const std::string &tl, bool anLang, long long giaTien) {
+                 const std::string &tg, int nam, const std::string &tl, bool anLang, long long giaTien, const std::string& nhaXuatBan) {
     
     if (n >= MAX_DAUSACH) {                                    // kiem tra gioi han
         if (!anLang) thongBao(std::cout, "Gioi han dau sach!", LOI);
@@ -322,8 +330,10 @@ bool themDauSach(PTRDS ds[], int &n, const std::string &isbn, const std::string 
     node->tacGia = ChuyenThanhTitleCase(tg);                   // gan tac gia
     node->namXuatBan = nam;                                    // gan nam XB
     node->theLoai = ChuyenThanhTitleCase(tl);                  // gan the loai
+    node->theLoai = ChuyenThanhTitleCase(tl);                  // gan the loai
     node->soLuotMuon = 0;                                      // khoi tao so luot muon
     node->giaTien = giaTien;                                   // gan gia tien
+    node->NhaXuatBan = nhaXuatBan;                             // gan NXB (Phase 2)
     node->dms = nullptr;                                       // chua co ban sao
     node->tongBanSao = 0;                                      // tong = 0
 
@@ -797,7 +807,7 @@ bool XoaSachTheoMaSach(PTRDS ds[], int n, const std::string &ma, std::ostream &o
 
 // cap nhat dau sach
 std::string CapNhatDauSach(PTRDS ds[], int n, const std::string &isbn, const std::string &ten, 
-                          int trang, const std::string &tg, int nam, const std::string &tl, const std::string &viTri, long long giaTien = -1) {
+                          int trang, const std::string &tg, int nam, const std::string &tl, const std::string &viTri, long long giaTien, const std::string& nhaXuatBan) {
     PTRDS d = TimDauSachTheoISBN(ds, n, isbn);                // tim dau sach
     if (!d) return "Loi: Khong tim thay ISBN!";               // khong tim thay
     
@@ -828,6 +838,7 @@ std::string CapNhatDauSach(PTRDS ds[], int n, const std::string &isbn, const std
     d->namXuatBan = nam;                                       // cap nhat nam
     d->theLoai = ChuyenThanhTitleCase(tl);                    // cap nhat the loai
     if (giaTien != -1) d->giaTien = giaTien;                   // cap nhat gia tien
+    if (!nhaXuatBan.empty()) d->NhaXuatBan = nhaXuatBan;       // cap nhat NXB
     
     // cap nhat vi tri cho tat ca ban sao (neu co)
     if (!viTriChuan.empty()) {
@@ -918,21 +929,25 @@ bool KiemTraCoTheXoaDauSach(PTRDS dauSach) {
 // DATABASE INTEGRATION
 // ==========================================
 
+#include <QDebug>
+#include <QSqlError>
+
 void NapDanhSachTuDB() {
     // Clean up old memory
     GiaiPhongToanBoDauSach(dsDauSach, soLuongDauSach);
     
     QSqlDatabase db = DatabaseManager::instance().database();
     if (!db.isOpen()) {
-        std::cout << "[DB DEBUG] Database is NOT open in NapDanhSachTuDB!\n";
+        qWarning() << "[DB DEBUG] Database is NOT open in NapDanhSachTuDB!";
         return;
     }
     
-    std::cout << "[DB DEBUG] NapDanhSachTuDB: Starting load from " << db.databaseName().toStdString() << "\n";
+    qDebug() << "[DB DEBUG] NapDanhSachTuDB: Starting load from" << db.databaseName();
 
     // 1. Load Dau Sach
     QSqlQuery q(db);
-    if (q.exec("SELECT id, isbn, ten_sach, so_trang, tac_gia, nam_xuat_ban, the_loai, so_luot_muon, gia_tien FROM dau_sach ORDER BY id")) {
+    // Added nha_xuat_ban to SELECT
+    if (q.exec("SELECT id, isbn, ten_sach, so_trang, tac_gia, nam_xuat_ban, the_loai, so_luot_muon, gia_tien, nha_xuat_ban FROM dau_sach ORDER BY id")) {
         while (q.next()) {
             int id = q.value(0).toInt();
             Q_UNUSED(id);
@@ -944,26 +959,22 @@ void NapDanhSachTuDB() {
             std::string tl = q.value(6).toString().toStdString();
             int luotMuon = q.value(7).toInt();
             long long gia = q.value(8).toLongLong();
+            std::string nxb = q.value(9).toString().toStdString(); // New column
 
-            themDauSach(dsDauSach, soLuongDauSach, isbn, ten, trang, tg, nam, tl, true, gia);
+            themDauSach(dsDauSach, soLuongDauSach, isbn, ten, trang, tg, nam, tl, true, gia, nxb);
             
             // Update soLuotMuon
             PTRDS p = TimDauSachTheoISBN(dsDauSach, soLuongDauSach, isbn);
             if (p) p->soLuotMuon = luotMuon;
         }
     } else {
-        std::cout << "[DB DEBUG] Failed to execute query: " << q.lastError().text().toStdString() << "\n";
+        qCritical() << "[DB DEBUG] Failed to execute query:" << q.lastError().text();
     }
     
     // 2. Load Ban Sao
     if (q.exec("SELECT ma_sach, dau_sach_id, trang_thai, vi_tri FROM ban_sao")) {
         while (q.next()) {
             std::string ma = q.value(0).toString().toStdString();
-            // We need to link back to the book.
-            // Since we ordered by ID in DauSach query, and we are processing BanSao...
-            // Wait, we need the ISBN. The legacy way used ISBN from file or looked up by ISBN.
-            // Here we have dau_sach_id. We can't map ID->ptr easily without a map.
-            // But we can query the ISBN for this ID.
             int dauId = q.value(1).toInt();
             int tt = q.value(2).toInt();
             std::string vt = q.value(3).toString().toStdString();
@@ -975,7 +986,6 @@ void NapDanhSachTuDB() {
                 std::string isbn = q2.value(0).toString().toStdString();
                 PTRDS ds = TimDauSachTheoISBN(dsDauSach, soLuongDauSach, isbn);
                 if (ds) {
-                    // Use low-level linked list insertion (like legacy NapDanhMucSach)
                      ChenNodeDMSVaoDauSach(ds, ma, tt, vt);
                 }
             }
@@ -984,8 +994,9 @@ void NapDanhSachTuDB() {
     
     CapNhatTongBanSao(dsDauSach, soLuongDauSach);
     sapXepDauSachTheoTen(dsDauSach, 0, soLuongDauSach - 1);
-    std::cout << "[DB DEBUG] Finished loading. Total books: " << soLuongDauSach << "\n";
-}    
+    qDebug() << "[DB DEBUG] Finished loading. Total books:" << soLuongDauSach;
+}
+    
 
 
 
@@ -1098,7 +1109,7 @@ ThongTinDauSach LayThongTinDauSach(const std::string& isbn) {
 // them dau sach + ban sao (all-in-one, tu dong sap xep)
 std::string ThemDauSachMoi(const std::string& isbn, const std::string& ten, int trang,
                            const std::string& tg, int nam, const std::string& tl, 
-                           int soLuongBanSao, const std::string& viTri, long long giaTien) {
+                           int soLuongBanSao, const std::string& viTri, long long giaTien, const std::string& nhaXuatBan) {
     // validation so luong ban sao
     if (soLuongBanSao <= 0) {
         return "Loi: So luong ban sao phai lon hon 0!";
@@ -1108,7 +1119,7 @@ std::string ThemDauSachMoi(const std::string& isbn, const std::string& ten, int 
     }
     
     // goi backend them dau sach
-    bool ok = themDauSach(dsDauSach, soLuongDauSach, isbn, ten, trang, tg, nam, tl, true, giaTien);
+    bool ok = themDauSach(dsDauSach, soLuongDauSach, isbn, ten, trang, tg, nam, tl, true, giaTien, nhaXuatBan);
     if (!ok) {
         return "Loi: Khong them duoc dau sach (Backend error)!";
     }
@@ -1137,7 +1148,7 @@ std::string ThemDauSachMoi(const std::string& isbn, const std::string& ten, int 
     
     // --- DB SYNC ---
     QSqlQuery q(DatabaseManager::instance().database());
-    q.prepare("INSERT INTO dau_sach (isbn, ten_sach, so_trang, tac_gia, nam_xuat_ban, the_loai, gia_tien) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    q.prepare("INSERT INTO dau_sach (isbn, ten_sach, so_trang, tac_gia, nam_xuat_ban, the_loai, gia_tien, nha_xuat_ban) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     q.addBindValue(QString::fromStdString(isbn));
     q.addBindValue(QString::fromStdString(ChuyenThanhTitleCase(ten)));
     q.addBindValue(trang);
@@ -1145,6 +1156,7 @@ std::string ThemDauSachMoi(const std::string& isbn, const std::string& ten, int 
     q.addBindValue(nam);
     q.addBindValue(QString::fromStdString(ChuyenThanhTitleCase(tl)));
     q.addBindValue((qint64)giaTien);
+    q.addBindValue(QString::fromStdString(nhaXuatBan));
     
     int newBookId = -1;
     if (q.exec()) {
@@ -1263,9 +1275,9 @@ std::string ThemBanSaoMoi(const std::string& isbn, int soLuong, const std::strin
 // cap nhat thong tin dau sach (tu dong sap xep neu ten doi)
 std::string CapNhatThongTinDauSach(const std::string& isbn, const std::string& ten, int trang,
                                    const std::string& tg, int nam, const std::string& tl, 
-                                   const std::string& viTri, long long giaTien) {
+                                   const std::string& viTri, long long giaTien, const std::string& nhaXuatBan) {
     // goi backend cap nhat
-    std::string loi = CapNhatDauSach(dsDauSach, soLuongDauSach, isbn, ten, trang, tg, nam, tl, viTri, giaTien);
+    std::string loi = CapNhatDauSach(dsDauSach, soLuongDauSach, isbn, ten, trang, tg, nam, tl, viTri, giaTien, nhaXuatBan);
     
     if (loi.empty()) {
         // tu dong sap xep sau khi cap nhat (phong truong hop ten thay doi)
@@ -1275,21 +1287,28 @@ std::string CapNhatThongTinDauSach(const std::string& isbn, const std::string& t
         // --- DB SYNC ---
         QSqlQuery q(DatabaseManager::instance().database());
         if (giaTien != -1) {
-            q.prepare("UPDATE dau_sach SET ten_sach=?, so_trang=?, tac_gia=?, nam_xuat_ban=?, the_loai=?, gia_tien=? WHERE isbn=?");
+            q.prepare("UPDATE dau_sach SET ten_sach=?, so_trang=?, tac_gia=?, nam_xuat_ban=?, the_loai=?, gia_tien=?, nha_xuat_ban=? WHERE isbn=?");
             q.addBindValue(QString::fromStdString(ChuyenThanhTitleCase(ten)));
             q.addBindValue(trang);
             q.addBindValue(QString::fromStdString(ChuyenThanhTitleCase(tg)));
             q.addBindValue(nam);
             q.addBindValue(QString::fromStdString(ChuyenThanhTitleCase(tl)));
             q.addBindValue((qint64)giaTien);
+            q.addBindValue(QString::fromStdString(nhaXuatBan)); // New field
             q.addBindValue(QString::fromStdString(isbn));
         } else {
-            q.prepare("UPDATE dau_sach SET ten_sach=?, so_trang=?, tac_gia=?, nam_xuat_ban=?, the_loai=? WHERE isbn=?");
+            // Need careful handling if giaTien not provided but NXB is?
+            // Assuming this branch only updates standard fields.
+            // Let's add NXB update here too if it's not empty?
+            // For now, keep as is or assume NXB also optional?
+            // Safer to just update NXB if available
+             q.prepare("UPDATE dau_sach SET ten_sach=?, so_trang=?, tac_gia=?, nam_xuat_ban=?, the_loai=?, nha_xuat_ban=? WHERE isbn=?");
             q.addBindValue(QString::fromStdString(ChuyenThanhTitleCase(ten)));
             q.addBindValue(trang);
             q.addBindValue(QString::fromStdString(ChuyenThanhTitleCase(tg)));
             q.addBindValue(nam);
             q.addBindValue(QString::fromStdString(ChuyenThanhTitleCase(tl)));
+            q.addBindValue(QString::fromStdString(nhaXuatBan));
             q.addBindValue(QString::fromStdString(isbn));
         }
         q.exec();

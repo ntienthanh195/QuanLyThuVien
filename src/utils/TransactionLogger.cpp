@@ -1,8 +1,9 @@
 #include "utils/TransactionLogger.h"
+#include "utils/FilePathManager.h"
 #include <QDir>
 #include <QDebug>
 
-const QString TransactionLogger::LOG_FILE_PATH = "data/muontralogs.txt";
+// Removed hardcoded LOG_FILE_PATH (static const)
 
 bool TransactionLogger::ghiLogMuon(PTRDG docGia, const QString& isbn, const QString& tenSach, bool thanhCong) {
     return ghiLog(MUON, docGia, isbn, tenSach, thanhCong);
@@ -23,16 +24,11 @@ bool TransactionLogger::ghiLog(LoaiGiaoDich loai, PTRDG docGia, const QString& m
         return false;
     }
     
-    // Tạo thư mục data nếu chưa tồn tại
-    QDir dir;
-    if (!dir.exists("data")) {
-        dir.mkpath("data");
-    }
-    
-    // Mở file ở chế độ append
-    QFile file(LOG_FILE_PATH);
+    // Mở file ở chế độ append (Phase 11: Dynamic Path)
+    QString logPath = FilePathManager::getFilePath("muontralogs.txt");
+    QFile file(logPath);
     if (!file.open(QIODevice::Append | QIODevice::Text)) {
-        qWarning() << "Không thể mở file log:" << LOG_FILE_PATH;
+        qWarning() << "Không thể mở file log:" << logPath;
         return false;
     }
     
@@ -71,9 +67,10 @@ QString TransactionLogger::loaiGiaoDichToString(LoaiGiaoDich loai) {
 }
 
 QString TransactionLogger::docLichSu() {
-    QFile file(LOG_FILE_PATH);
+    QString logPath = FilePathManager::getFilePath("muontralogs.txt");
+    QFile file(logPath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qWarning() << "Không thể đọc file log:" << LOG_FILE_PATH;
+        qWarning() << "Không thể đọc file log:" << logPath;
         return QString();
     }
     
@@ -88,7 +85,8 @@ QString TransactionLogger::docLichSu() {
 QStringList TransactionLogger::docLichSuDocGia(int maThe) {
     QStringList result;
     
-    QFile file(LOG_FILE_PATH);
+    QString logPath = FilePathManager::getFilePath("muontralogs.txt");
+    QFile file(logPath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         return result;
     }

@@ -44,6 +44,12 @@ private:
     QSpinBox *oSoLanGiaHanToiDa; 
     QSpinBox *oSoSachMuonToiDa;
     
+    // New Settings (Phase 8)
+    QLabel *lblThoiHanThe;
+    QLabel *lblPhiMatSach;
+    QSpinBox *oThoiHanThe; // Thoi han the (thang)
+    QSpinBox *oPhiMatSach; // Phi mat sach (vnd)
+    
     // Printing Config
     QLabel *lblCheDoIn;
     QLabel *lblMayInReceipt;

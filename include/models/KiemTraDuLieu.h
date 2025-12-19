@@ -1,4 +1,11 @@
+/**
+ * @file KiemTraDuLieu.h
+ * @path include/models/KiemTraDuLieu.h
+ * @description Header định nghĩa các hàm kiểm tra dữ liệu (Validation).
+ * @project Library Management System (QuanLyThuVien)
+ */
 #ifndef KIEMTRADULIEU_H
+
 #define KIEMTRADULIEU_H
 
 #include <string>

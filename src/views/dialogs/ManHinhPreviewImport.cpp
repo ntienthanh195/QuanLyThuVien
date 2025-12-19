@@ -1,4 +1,12 @@
+/**
+ * @file ManHinhPreviewImport.cpp
+ * @path src/views/dialogs/ManHinhPreviewImport.cpp
+ * @description Giao diện xem trước và xác nhận dữ liệu trước khi nhập (Import) từ file.
+ * Giúp người dùng kiểm tra lại dữ liệu hợp lệ/lỗi trước khi chính thức ghi vào cơ sở dữ liệu.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #include "views/dialogs/ManHinhPreviewImport.h"
+
 #include "utils/LanguageManager.h"
 #include <QInputDialog>
 #include <QVBoxLayout>

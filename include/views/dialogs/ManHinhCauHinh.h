@@ -1,4 +1,11 @@
+/**
+ * @file ManHinhCauHinh.h
+ * @path include/views/dialogs/ManHinhCauHinh.h
+ * @description Header của màn hình Cấu hình hệ thống.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #ifndef MANHINHCAUHINH_H
+
 #define MANHINHCAUHINH_H
 
 #include <QDialog>
@@ -45,6 +52,13 @@ private:
     QSpinBox *spinHanMuon;
     QSpinBox *spinTienPhat;
     QSpinBox *spinSoLanGiaHan;
+    
+    // Barcode & Label Settings
+    QSpinBox *spinBarcodeWidth;
+    QSpinBox *spinBarcodeHeight;
+    QCheckBox *checkShowPrice;
+    QCheckBox *checkShowHeader;
+    QCheckBox *checkShowTitle;
     
     void thietLapGiaoDien();
     void taiCauHinh();

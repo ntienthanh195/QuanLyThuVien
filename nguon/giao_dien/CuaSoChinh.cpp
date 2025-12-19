@@ -1,4 +1,12 @@
+/**
+ * @file CuaSoChinh.cpp
+ * @path nguon/giao_dien/CuaSoChinh.cpp
+ * @description Lớp Cửa sổ chính (MainWindow) của ứng dụng Library Management V2.
+ * Quản lý thanh điều hướng (Sidebar), khu vực nội dung (StackedWidget) và các hiệu ứng chuyển trang.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #include "giao_dien/CuaSoChinh.h"
+
 #include "views/dialogs/ManHinhGioiThieu.h" // Custom About Dialog
 #include "giao_dien/WidgetQuanLyNguoiDung.h" // Include header
 #include "giao_dien/BangDieuKhien.h"
@@ -407,27 +415,26 @@ void CuaSoChinh::thieLapMenuBen() {
     danhSachMenu->setObjectName("MenuList");
     danhSachMenu->setStyleSheet(QString(
         "QListWidget#MenuList {"
-        "    background: #1E1E2D;" /* Solid background for cleaner look */
+        "    background: #1E1E2D;"
         "    border: none;"
         "    outline: none;"
         "    border-right: 1px solid rgba(255, 255, 255, 0.05);"
         "}"
         "QListWidget#MenuList::item {"
-        "    padding: 12px 15px;"       /* More breathing room */
-        "    margin: 4px 12px;"         /* Floating effect (spaced from edges) */
+        "    padding: %1px 15px;"
+        "    margin: 4px 12px;"
         "    color: #9CA3AF;"
-        "    border: none;"             /* Remove old border-left */
-        "    border-radius: 10px;"      /* Soft rounded corners */
+        "    border: none;"
+        "    border-radius: 10px;"
         "    font-size: %2px;"
         "    font-weight: 500;"
-        "    transition: background 0.2s;" /* (Note: Qt Widgets doesn't support CSS transition property natively, but we mimic logic elsewhere) */
         "}"
         "QListWidget#MenuList::item:hover {"
         "    background-color: rgba(255, 255, 255, 0.05);"
         "    color: #E0E0E0;"
         "}"
         "QListWidget#MenuList::item:selected {"
-        "    background-color: rgba(54, 153, 255, 0.15);" /* Floating Blue Pill */
+        "    background-color: rgba(54, 153, 255, 0.15);"
         "    color: #3699FF;"
         "    font-weight: 700;"
         "}"

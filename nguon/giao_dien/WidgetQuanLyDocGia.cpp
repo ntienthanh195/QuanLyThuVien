@@ -1,4 +1,13 @@
+/**
+ * @file WidgetQuanLyDocGia.cpp
+ * @path nguon/giao_dien/WidgetQuanLyDocGia.cpp
+ * @description Widget quản lý hồ sơ học viên (độc giả) (Phiên bản V2). 
+ * Cung cấp giao diện thêm, sửa, xóa, tìm kiếm và phân loại học viên.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #include "giao_dien/WidgetQuanLyDocGia.h"
+
+#include <vector>
 #include "utils/LanguageManager.h"
 #include "giao_dien/hop_thoai/HopThoaiThemDocGia.h"
 #include "giao_dien/hop_thoai/HopThoaiSuaDocGia.h"
@@ -63,22 +72,20 @@ public:
             case 1: return QString::number(dg.MaThe);
             case 2: return QString::fromStdString(dg.Ho);
             case 3: return QString::fromStdString(dg.Ten);
-            case 4: return dg.Phai ? LanguageManager::instance().getText("GENDER_FEMALE") : LanguageManager::instance().getText("GENDER_MALE");
-            case 5: return dg.TrangThai == 1 ? LanguageManager::instance().getText("STATUS_ACTIVE") : LanguageManager::instance().getText("STATUS_LOCKED");
+            case 4: return QString::fromStdString(dg.Lop); // Was Phai
+            case 5: return QString::fromStdString(dg.SDT); // Was TrangThai (shifted) -> NO, I will swap columns logic
             case 6: {
                 int maxSach = SettingsManager::instance().getInt("SO_SACH_MUON_TOI_DA", 3);
                 return QString("%1 / %2").arg(dg.soSachDangMuon).arg(maxSach);
             }
-            case 7: {
-                int soNgay = TinhSoNgayQuaHanLonNhat(dgptr);
-                return soNgay > 0 ? QString("%1 ngày").arg(soNgay) : QStringLiteral("—");
-            }
+            case 7: return dg.TrangThai == 1 ? LanguageManager::instance().getText("STATUS_ACTIVE") : LanguageManager::instance().getText("STATUS_LOCKED");
             case 8: {
-                int tong = 0; MUONTRA mt = dg.dsmt; while (mt) { tong++; mt = mt->next; }
-                return QString::number(tong);
+                 int soNgay = TinhSoNgayQuaHanLonNhat(dgptr);
+                 return soNgay > 0 ? LanguageManager::instance().getText("LBL_DAYS_COUNT").arg(soNgay) : QStringLiteral("—");
             }
             }
-        }
+            }
+
 
         if (role == Qt::UserRole) {
             // expose MaThe for quick lookup
@@ -92,15 +99,15 @@ public:
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override {
         if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
             switch (section) {
-            case 0: return QStringLiteral("STT");
+            case 0: return LanguageManager::instance().getText("TABLE_HEADER_STT");
             case 1: return LanguageManager::instance().getText("TABLE_HEADER_CODE");
             case 2: return LanguageManager::instance().getText("TABLE_HEADER_LASTNAME");
             case 3: return LanguageManager::instance().getText("TABLE_HEADER_FIRSTNAME");
-            case 4: return LanguageManager::instance().getText("TABLE_HEADER_GENDER");
-            case 5: return LanguageManager::instance().getText("TABLE_HEADER_STATUS");
-            case 6: return QString("Sách Đang Mượn"); // TODO: Add key
-            case 7: return QString("Quá Hạn"); // TODO: Add key
-            case 8: return QString("Tổng Mượn"); // TODO: Add key
+            case 4: return LanguageManager::instance().getText("TABLE_HEADER_CLASS"); // New Key
+            case 5: return LanguageManager::instance().getText("TABLE_HEADER_PHONE"); // New Key
+            case 6: return LanguageManager::instance().getText("TABLE_HEADER_BORROWED");
+            case 7: return LanguageManager::instance().getText("TABLE_HEADER_STATUS");
+            case 8: return LanguageManager::instance().getText("TABLE_HEADER_OVERDUE");
             }
         }
         return QAbstractTableModel::headerData(section, orientation, role);
@@ -142,6 +149,9 @@ WidgetQuanLyDocGia::WidgetQuanLyDocGia(QWidget *cha)
 
     // Refresh when global data changes (e.g. background loader finished)
     connect(&EventBus::instance(), &EventBus::dataChanged, this, [this]() { this->taiLaiDanhSach(); });
+    
+    // Refresh when Settings change (e.g. max borrowed books limit)
+    connect(&EventBus::instance(), &EventBus::settingsUpdated, this, [this]() { this->taiLaiDanhSach(); });
 
     // Language
     connect(&LanguageManager::instance(), &LanguageManager::languageChanged, this, &WidgetQuanLyDocGia::capNhatNgonNgu);
@@ -206,20 +216,20 @@ void WidgetQuanLyDocGia::thieLapGiaoDien() {
         };
 
         // assign header buttons to member variables
-        nutThemDocGia = createButton(":/icons/plus.svg", "Thêm Độc Giả", "#0078D4");
-        nutNhapFile = createButton(":/icons/import.svg", "Nhập Excel", "#2D2D30");
+        nutThemDocGia = createButton(":/icons/plus.svg", LanguageManager::instance().getText("BTN_ADD_READER"), "#0078D4");
+        nutNhapFile = createButton(":/icons/import.svg", LanguageManager::instance().getText("BTN_IMPORT_EXCEL"), "#2D2D30");
         
         // header In and Chi Tiết
-        nutHeaderIn = createButton(":/icons/print.svg", "In", "#2D2D30");
-        nutSuaDocGia = createButton(":/icons/edit.svg", "Sửa", "#2D2D30");
-        nutHeaderChiTiet = createButton(":/icons/info.svg", "Chi Tiết", "#2D2D30");
+        nutHeaderIn = createButton(":/icons/print.svg", LanguageManager::instance().getText("BTN_PRINT"), "#2D2D30");
+        nutSuaDocGia = createButton(":/icons/edit.svg", LanguageManager::instance().getText("BTN_EDIT"), "#2D2D30");
+        nutHeaderChiTiet = createButton(":/icons/info.svg", LanguageManager::instance().getText("BTN_DETAILS"), "#2D2D30");
         
         // Add header lock/unlock/history buttons
-        nutHeaderKhoa = createButton(":/icons/lock.svg", "Khóa Thẻ", "#2D2D30");
-        nutHeaderMoKhoa = createButton(":/icons/unlock.svg", "Mở Khóa", "#2D2D30");
-        nutHeaderLichSu = createButton(":/icons/history.svg", "Lịch Sử", "#2D2D30");
+        nutHeaderKhoa = createButton(":/icons/lock.svg", LanguageManager::instance().getText("BTN_LOCK_CARD"), "#2D2D30");
+        nutHeaderMoKhoa = createButton(":/icons/unlock.svg", LanguageManager::instance().getText("BTN_UNLOCK_CARD"), "#2D2D30");
+        nutHeaderLichSu = createButton(":/icons/history.svg", LanguageManager::instance().getText("BTN_HISTORY"), "#2D2D30");
         
-        nutXoaDocGia = createButton(":/icons/delete.svg", "Xóa", "#C42B1C");
+        nutXoaDocGia = createButton(":/icons/delete.svg", LanguageManager::instance().getText("BTN_DELETE"), "#C42B1C");
 
         hLayout->addWidget(nutThemDocGia);
         hLayout->addWidget(nutNhapFile);
@@ -249,7 +259,7 @@ void WidgetQuanLyDocGia::thieLapGiaoDien() {
         
         // Header: Chi Tiết -> open NEW ManHinhChiTietDocGia
         connect(nutHeaderChiTiet, &QPushButton::clicked, this, [this]() {
-            if (!docGiaDangChon) { QMessageBox::warning(this, "Chi Tiết", "Vui lòng chọn một độc giả!"); return; }
+            if (!docGiaDangChon) { QMessageBox::warning(this, LanguageManager::instance().getText("BTN_DETAILS"), LanguageManager::instance().getText("MSG_SELECT_READER_FIRST")); return; }
             ManHinhChiTietDocGia *dialog = new ManHinhChiTietDocGia(docGiaDangChon, this);
             dialog->exec();
             delete dialog;
@@ -277,7 +287,7 @@ void WidgetQuanLyDocGia::thieLapTimKiem() {
     layout->setSpacing(10);
 
     oNhapTimKiem = new QLineEdit();
-    oNhapTimKiem->setPlaceholderText("Nhập mã thẻ, họ, tên...");
+    oNhapTimKiem->setPlaceholderText(LanguageManager::instance().getText("PLACEHOLDER_SEARCH_READER_FULL"));
     oNhapTimKiem->setFixedHeight(36);
     oNhapTimKiem->setStyleSheet(
         "QLineEdit {"
@@ -295,7 +305,9 @@ void WidgetQuanLyDocGia::thieLapTimKiem() {
     );
 
     hopChonTrangThai = new QComboBox();
-    hopChonTrangThai->addItems({"Tất cả", "Hoạt động", "Bị khóa"});
+    hopChonTrangThai->addItem(LanguageManager::instance().getText("FILTER_ALL"));
+    hopChonTrangThai->addItem(LanguageManager::instance().getText("FILTER_ACTIVE"));
+    hopChonTrangThai->addItem(LanguageManager::instance().getText("FILTER_LOCKED"));
     hopChonTrangThai->setFixedHeight(36);
     hopChonTrangThai->setStyleSheet(
         "QComboBox { background-color: #1a1d23; color: #E0E0E0; border: 1px solid #151820; border-radius: 5px; padding: 0 12px; font-size: 13px; }"
@@ -304,11 +316,13 @@ void WidgetQuanLyDocGia::thieLapTimKiem() {
     );
 
     hopChonGioiTinh = new QComboBox();
-    hopChonGioiTinh->addItems({"Tất cả giới tính", "Nam", "Nữ"});
+    hopChonGioiTinh->addItem(LanguageManager::instance().getText("FILTER_ALL_GENDER"));
+    hopChonGioiTinh->addItem(LanguageManager::instance().getText("GENDER_MALE"));
+    hopChonGioiTinh->addItem(LanguageManager::instance().getText("GENDER_FEMALE"));
     hopChonGioiTinh->setFixedHeight(36);
     hopChonGioiTinh->setStyleSheet(hopChonTrangThai->styleSheet());
 
-    nutTimKiem = new QPushButton("Tìm");
+    nutTimKiem = new QPushButton(LanguageManager::instance().getText("BTN_SEARCH"));
     nutTimKiem->setFixedHeight(36);
     nutTimKiem->setFixedWidth(72);
     nutTimKiem->setStyleSheet(
@@ -324,7 +338,7 @@ void WidgetQuanLyDocGia::thieLapTimKiem() {
         "QPushButton:pressed { background-color: #3d7dc4; }"
     );
 
-    nutLamMoi = new QPushButton("Làm mới");
+    nutLamMoi = new QPushButton(LanguageManager::instance().getText("BTN_REFRESH"));
     nutLamMoi->setFixedHeight(36);
     nutLamMoi->setFixedWidth(86);
     nutLamMoi->setStyleSheet(
@@ -375,10 +389,11 @@ void WidgetQuanLyDocGia::thieLapBangDocGia() {
     bangDocGia->setColumnWidth(1, 80);   // Mã Thẻ
     bangDocGia->setColumnWidth(2, 120);  // Họ
     bangDocGia->setColumnWidth(3, 100);  // Tên
-    bangDocGia->setColumnWidth(4, 90);   // Giới Tính
-    bangDocGia->setColumnWidth(5, 120);  // Trạng Thái
+    bangDocGia->setColumnWidth(4, 90);   // Lop
+    bangDocGia->setColumnWidth(5, 120);  // SDT
     bangDocGia->setColumnWidth(6, 130);  // Sách Đang Mượn
-    bangDocGia->setColumnWidth(7, 100);  // Quá Hạn
+    bangDocGia->setColumnWidth(7, 120);  // Trang Thai
+    bangDocGia->setColumnWidth(8, 100);  // Qua Han
     bangDocGia->horizontalHeader()->setStretchLastSection(true);
     // Row height similar to screenshot
     bangDocGia->verticalHeader()->setDefaultSectionSize(45);
@@ -386,7 +401,8 @@ void WidgetQuanLyDocGia::thieLapBangDocGia() {
     boTriChinh->addWidget(bangDocGia, 1);
     
     // Hint label
-    QLabel *hintLabel = new QLabel("Mẹo: Nhấp đúp vào độc giả để xem chi tiết & in thẻ");
+    // Hint label
+    QLabel *hintLabel = new QLabel(LanguageManager::instance().getText("LBL_HINT_READER_DBLCLICK"));
     hintLabel->setStyleSheet("color: #666; font-style: italic; font-size: 11px; margin-top: 2px;");
     hintLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     boTriChinh->addWidget(hintLabel);
@@ -411,21 +427,21 @@ void WidgetQuanLyDocGia::thieLapBangDocGia() {
             "QMenu::item:selected { background-color: #0078D4; }"
         );
 
-        QAction *actChiTiet = contextMenu.addAction(QIcon(":/icons/info.svg"), "Xem Chi Tiết");
-        QAction *actSua = contextMenu.addAction(QIcon(":/icons/edit.svg"), "Sửa Độc Giả");
+        QAction *actChiTiet = contextMenu.addAction(QIcon(":/icons/info.svg"), LanguageManager::instance().getText("CTX_VIEW_DETAILS"));
+        QAction *actSua = contextMenu.addAction(QIcon(":/icons/edit.svg"), LanguageManager::instance().getText("CTX_EDIT_READER"));
         contextMenu.addSeparator();
-        QAction *actInThe = contextMenu.addAction(QIcon(":/icons/card.svg"), "In Thẻ TV");
+        QAction *actInThe = contextMenu.addAction(QIcon(":/icons/card.svg"), LanguageManager::instance().getText("CTX_PRINT_CARD"));
         contextMenu.addSeparator();
         // Check lock status to show correct action
         if (docGiaDangChon && docGiaDangChon->data.TrangThai == 1) {
-            QAction *actKhoa = contextMenu.addAction(QIcon(":/icons/lock.svg"), "Khóa Thẻ");
+            QAction *actKhoa = contextMenu.addAction(QIcon(":/icons/lock.svg"), LanguageManager::instance().getText("BTN_LOCK_CARD"));
             connect(actKhoa, &QAction::triggered, this, &WidgetQuanLyDocGia::xuLyNutKhoaThe);
         } else {
-            QAction *actMo = contextMenu.addAction(QIcon(":/icons/unlock.svg"), "Mở Khóa");
+            QAction *actMo = contextMenu.addAction(QIcon(":/icons/unlock.svg"), LanguageManager::instance().getText("BTN_UNLOCK_CARD"));
             connect(actMo, &QAction::triggered, this, &WidgetQuanLyDocGia::xuLyNutMoKhoaThe);
         }
         
-        QAction *actXoa = contextMenu.addAction(QIcon(":/icons/delete.svg"), "Xóa Độc Giả");
+        QAction *actXoa = contextMenu.addAction(QIcon(":/icons/delete.svg"), LanguageManager::instance().getText("CTX_DELETE_READER"));
 
         connect(actChiTiet, &QAction::triggered, this, [this](){
             if (nutHeaderChiTiet && nutHeaderChiTiet->isEnabled()) nutHeaderChiTiet->click();
@@ -453,7 +469,7 @@ void WidgetQuanLyDocGia::xuLyNutThemDocGia() {
     connect(hopThoai, &HopThoaiThemDocGia::docGiaDaThem, this, [this]() {
         // Dữ liệu đã được đồng bộ SQL bên trong backend
         taiLaiDanhSach();
-        emit thongBaoCapNhat("Đã thêm độc giả mới thành công!");
+        emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_ADD_READER_SUCCESS"));
         emit duLieuThayDoi();
     });
 
@@ -463,7 +479,7 @@ void WidgetQuanLyDocGia::xuLyNutThemDocGia() {
 
 void WidgetQuanLyDocGia::xuLyNutSuaDocGia() {
     if (!docGiaDangChon) {
-        QMessageBox::warning(this, "Cảnh Báo", "Vui lòng chọn một độc giả!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"), LanguageManager::instance().getText("MSG_SELECT_READER_FIRST"));
         return;
     }
 
@@ -472,7 +488,7 @@ void WidgetQuanLyDocGia::xuLyNutSuaDocGia() {
     connect(hopThoai, &HopThoaiSuaDocGia::docGiaDaSua, this, [this]() {
         // Dữ liệu đã được đồng bộ SQL bên trong backend
         taiLaiDanhSach();
-        emit thongBaoCapNhat("Đã cập nhật thông tin độc giả!");
+        emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_UPDATE_READER_SUCCESS"));
         emit duLieuThayDoi();
     });
 
@@ -481,14 +497,14 @@ void WidgetQuanLyDocGia::xuLyNutSuaDocGia() {
 }
 void WidgetQuanLyDocGia::xuLyNutXoaDocGia() {
     if (!docGiaDangChon) {
-        QMessageBox::warning(this, "Cảnh Báo", "Vui lòng chọn một độc giả!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"), LanguageManager::instance().getText("MSG_SELECT_READER_FIRST"));
         return;
     }
     
     // Kiểm tra điều kiện xóa
     if (docGiaDangChon->data.soSachDangMuon > 0) {
-        QMessageBox::warning(this, "Không Thể Xóa",
-            QString("Không thể xóa độc giả này!\n\nĐộc giả đang mượn %1 cuốn sách.\nVui lòng trả hết sách trước khi xóa.")
+        QMessageBox::warning(this, LanguageManager::instance().getText("MSG_CANNOT_DELETE"),
+            LanguageManager::instance().getText("MSG_CANNOT_DELETE_HAS_BOOKS")
                 .arg(docGiaDangChon->data.soSachDangMuon));
         return;
     }
@@ -514,11 +530,17 @@ void WidgetQuanLyDocGia::xuLyNutXoaDocGia() {
             .arg(QString::fromStdString(docGiaDangChon->data.Ho))
             .arg(QString::fromStdString(docGiaDangChon->data.Ten))
             .arg(docGiaDangChon->data.MaThe),
-        chiTiet
+        LanguageManager::instance().getText("MSG_DELETE_CONFIRM_DETAILS")
+            .arg(QString::fromStdString(docGiaDangChon->data.Ho))
+            .arg(QString::fromStdString(docGiaDangChon->data.Ten))
+            .arg(docGiaDangChon->data.MaThe)
+            .arg(docGiaDangChon->data.TrangThai == 1 ? LanguageManager::instance().getText("LBL_STATUS_ACTIVE_LONG") : LanguageManager::instance().getText("STATUS_LOCKED"))
+            .arg(docGiaDangChon->data.Phai ? LanguageManager::instance().getText("GENDER_FEMALE") : LanguageManager::instance().getText("GENDER_MALE"))
+            .arg(docGiaDangChon->data.soSachDangMuon)
     );
     
     if (xacNhan) {
-        extern PTRDG rootDocGia;
+        // extern declaration removed, available via header
         
         // Xóa khỏi cây AVL
         int maThe = docGiaDangChon->data.MaThe;
@@ -528,34 +550,34 @@ void WidgetQuanLyDocGia::xuLyNutXoaDocGia() {
         // Dữ liệu đã được đồng bộ SQL bên trong backend
         emit duLieuThayDoi();
         
-        QMessageBox::information(this, "Thành Công", "Đã xóa độc giả thành công!");
+        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), LanguageManager::instance().getText("MSG_DELETE_SUCCESS"));
         docGiaDangChon = nullptr;
         maTheDangChon = -1;
         taiLaiDanhSach();
-        emit thongBaoCapNhat("Đã xóa độc giả!");
+        emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_DELETE_SUCCESS"));
     }
 }
 
 void WidgetQuanLyDocGia::xuLyNutKhoaThe() {
     if (!docGiaDangChon) {
-        QMessageBox::warning(this, "Cảnh Báo", "Vui lòng chọn một độc giả!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"), LanguageManager::instance().getText("MSG_SELECT_READER_FIRST"));
         return;
     }
     
     if (docGiaDangChon->data.TrangThai == 0) {
-        QMessageBox::information(this, "Thông Báo", "Thẻ độc giả này đã bị khóa rồi!");
+        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_INFO"), LanguageManager::instance().getText("MSG_ALREADY_LOCKED"));
         return;
     }
     
-    QMessageBox::StandardButton xacNhan = QMessageBox::question(this, "Xác Nhận Khóa Thẻ",
-        QString("Bạn có chắc muốn khóa thẻ độc giả:\n%1 %2 (Mã: %3)?\n\nĐộc giả sẽ không thể mượn sách sau khi bị khóa.")
+    QMessageBox::StandardButton xacNhan = QMessageBox::question(this, LanguageManager::instance().getText("TITLE_CONFIRM_LOCK"),
+        LanguageManager::instance().getText("MSG_CONFIRM_LOCK")
             .arg(QString::fromStdString(docGiaDangChon->data.Ho))
             .arg(QString::fromStdString(docGiaDangChon->data.Ten))
             .arg(docGiaDangChon->data.MaThe),
         QMessageBox::Yes | QMessageBox::No);
     
     if (xacNhan == QMessageBox::Yes) {
-        extern PTRDG rootDocGia;
+        // extern declaration removed, available via header
         
         // Tạo struct mới với trạng thái khóa
         TheDocGia dataCapNhat = docGiaDangChon->data;
@@ -565,32 +587,32 @@ void WidgetQuanLyDocGia::xuLyNutKhoaThe() {
         
         // Dữ liệu đã được đồng bộ SQL bên trong backend
         
-        QMessageBox::information(this, "Thành Công", "Đã khóa thẻ độc giả!");
+        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), LanguageManager::instance().getText("MSG_LOCK_SUCCESS"));
         taiLaiDanhSach();
-        emit thongBaoCapNhat("Đã khóa thẻ độc giả!");
+        emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_LOCK_SUCCESS"));
     }
 }
 
 void WidgetQuanLyDocGia::xuLyNutMoKhoaThe() {
     if (!docGiaDangChon) {
-        QMessageBox::warning(this, "Cảnh Báo", "Vui lòng chọn một độc giả!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"), LanguageManager::instance().getText("MSG_SELECT_READER_FIRST"));
         return;
     }
     
     if (docGiaDangChon->data.TrangThai == 1) {
-        QMessageBox::information(this, "Thông Báo", "Thẻ độc giả này đang hoạt động bình thường!");
+        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_INFO"), LanguageManager::instance().getText("MSG_ALREADY_ACTIVE"));
         return;
     }
     
-    QMessageBox::StandardButton xacNhan = QMessageBox::question(this, "Xác Nhận Mở Khóa",
-        QString("Bạn có chắc muốn mở khóa thẻ độc giả:\n%1 %2 (Mã: %3)?")
+    QMessageBox::StandardButton xacNhan = QMessageBox::question(this, LanguageManager::instance().getText("TITLE_CONFIRM_UNLOCK"),
+        LanguageManager::instance().getText("MSG_CONFIRM_UNLOCK")
             .arg(QString::fromStdString(docGiaDangChon->data.Ho))
             .arg(QString::fromStdString(docGiaDangChon->data.Ten))
             .arg(docGiaDangChon->data.MaThe),
         QMessageBox::Yes | QMessageBox::No);
     
     if (xacNhan == QMessageBox::Yes) {
-        extern PTRDG rootDocGia;
+        // extern declaration removed, available via header
         
         // Tạo struct mới với trạng thái hoạt động
         TheDocGia dataCapNhat = docGiaDangChon->data;
@@ -600,36 +622,35 @@ void WidgetQuanLyDocGia::xuLyNutMoKhoaThe() {
         
         // Dữ liệu đã được đồng bộ SQL bên trong backend
         
-        QMessageBox::information(this, "Thành Công", "Đã mở khóa thẻ độc giả!");
+        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), LanguageManager::instance().getText("MSG_UNLOCK_SUCCESS"));
         taiLaiDanhSach();
-        emit thongBaoCapNhat("Đã mở khóa thẻ độc giả!");
+        emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_UNLOCK_SUCCESS"));
     }
 }
 
 void WidgetQuanLyDocGia::xuLyNutXemLichSu() {
     if (!docGiaDangChon) {
-        QMessageBox::warning(this, "Cảnh Báo", "Vui lòng chọn một độc giả!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"), LanguageManager::instance().getText("MSG_SELECT_READER_FIRST"));
         return;
     }
-    QMessageBox::information(this, "Lịch Sử", "Chức năng xem lịch sử đang được phát triển...");
+    QMessageBox::information(this, LanguageManager::instance().getText("TITLE_HISTORY"), LanguageManager::instance().getText("MSG_FEATURE_DEVELOPING"));
 }
 
 void WidgetQuanLyDocGia::xuLyNutXemSachDangMuon() {
     if (!docGiaDangChon) {
-        QMessageBox::warning(this, "Cảnh Báo", "Vui lòng chọn một độc giả!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"), LanguageManager::instance().getText("MSG_SELECT_READER_FIRST"));
         return;
     }
-    QMessageBox::information(this, "Sách Đang Mượn", 
-        QString("Độc giả %1 %2 đang mượn %3 cuốn sách.\n\nChức năng xem chi tiết đang được phát triển...")
+    QMessageBox::information(this, LanguageManager::instance().getText("TITLE_BORROWED_BOOKS"), 
+        LanguageManager::instance().getText("MSG_READER_BORROWING_INFO")
             .arg(QString::fromStdString(docGiaDangChon->data.Ho))
             .arg(QString::fromStdString(docGiaDangChon->data.Ten))
             .arg(docGiaDangChon->data.soSachDangMuon));
 }
 
 void WidgetQuanLyDocGia::xuLyTimKiem(const QString &tuKhoa) {
-    extern PTRDG rootDocGia;
     if (!rootDocGia) {
-        emit thongBaoCapNhat("Chưa có độc giả nào");
+        emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_NO_READERS"));
         return;
     }
 
@@ -641,7 +662,7 @@ void WidgetQuanLyDocGia::xuLyTimKiem(const QString &tuKhoa) {
         return;
     }
 
-    PTRDG ketQua[1000];
+    std::vector<PTRDG> ketQua(1000);
     int soKetQua = 0;
 
     // Kiểm tra xem có phải mã thẻ không (số nguyên)
@@ -657,13 +678,13 @@ void WidgetQuanLyDocGia::xuLyTimKiem(const QString &tuKhoa) {
         }
     } else {
         // Tìm theo Họ + Tên (backend hỗ trợ tìm kiếm không phân biệt hoa/thường)
-        soKetQua = TimDocGiaTheoHoTen(rootDocGia, tuKhoaTrimmed.toStdString(), ketQua, 1000);
+        soKetQua = TimDocGiaTheoHoTen(rootDocGia, tuKhoaTrimmed.toStdString(), ketQua.data(), (int)ketQua.size());
     }
 
     // Hiển thị kết quả với bộ lọc
-    hienThiKetQuaTimKiem(ketQua, soKetQua);
+    hienThiKetQuaTimKiem(ketQua.data(), soKetQua);
 
-    emit thongBaoCapNhat(QString("Tìm thấy %1 kết quả cho '%2'").arg(soKetQua).arg(tuKhoaTrimmed));
+    emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_SEARCH_RESULT").arg(soKetQua).arg(tuKhoaTrimmed));
 }
 
 void WidgetQuanLyDocGia::xuLyLocTrangThai(int chiSo) {
@@ -696,12 +717,12 @@ void WidgetQuanLyDocGia::xuLyChonDong(int dong, int) {
     QModelIndex maTheIdx = modelDocGia->index(dong, 1);
     int maThe = modelDocGia->data(maTheIdx, Qt::UserRole).toInt();
 
-    extern PTRDG rootDocGia;
+    // extern removed
     docGiaDangChon = timDocGia(rootDocGia, maThe);
     maTheDangChon = maThe;
 
     if (docGiaDangChon) {
-        emit thongBaoCapNhat(QString("Đã chọn: %1 %2 (Mã: %3)")
+        emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_SELECTED_READER")
             .arg(QString::fromStdString(docGiaDangChon->data.Ho))
             .arg(QString::fromStdString(docGiaDangChon->data.Ten))
             .arg(maThe));
@@ -729,22 +750,23 @@ void WidgetQuanLyDocGia::xuLyChonDong(int dong, int) {
 
 void WidgetQuanLyDocGia::xuLyLocKetHopToanBo() {
     // Build filtered list and notify model (model-backed view)
-    extern PTRDG rootDocGia;
+    // extern removed
     danhSachDocGia.clear();
     if (!rootDocGia) {
-        emit thongBaoCapNhat("Chưa có độc giả nào");
+        emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_NO_READERS"));
         if (modelDocGia) { if (auto m = dynamic_cast<DocGiaTableModel*>(modelDocGia)) m->refresh(); }
         return;
     }
 
-    PTRDG tmp[1000];
+    std::vector<PTRDG> tmp;
     int dem = 0;
 #if defined(__has_include) && __has_include("utils/DBBatcher.h")
     std::vector<PTRDG> _tmp = DBBatcher::snapshotDocGia();
-    dem = static_cast<int>(std::min<size_t>(_tmp.size(), 1000));
-    for (int i = 0; i < dem; ++i) tmp[i] = _tmp[i];
+    tmp = _tmp;
+    dem = (int)tmp.size();
 #else
-    DuyetCayRaMang(rootDocGia, tmp, dem);
+    DuyetCayRaVector(rootDocGia, tmp);
+    dem = (int)tmp.size();
 #endif
 
     int trangThaiLoc = hopChonTrangThai->currentIndex();
@@ -761,7 +783,7 @@ void WidgetQuanLyDocGia::xuLyLocKetHopToanBo() {
     }
 
     if (modelDocGia) { if (auto m = dynamic_cast<DocGiaTableModel*>(modelDocGia)) m->refresh(); }
-    emit thongBaoCapNhat(QString("Đã tải %1 độc giả").arg((int)danhSachDocGia.size()));
+    emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_LOADED_READERS").arg((int)danhSachDocGia.size()));
 }
 
 void WidgetQuanLyDocGia::hienThiKetQuaTimKiem(PTRDG ketQua[], int soKetQua) {
@@ -782,13 +804,13 @@ void WidgetQuanLyDocGia::hienThiKetQuaTimKiem(PTRDG ketQua[], int soKetQua) {
     if (modelDocGia) { if (auto m = dynamic_cast<DocGiaTableModel*>(modelDocGia)) m->refresh(); }
 }
 void WidgetQuanLyDocGia::xuLyNhapDuLieuTu() {
-    QString file = QFileDialog::getOpenFileName(this, tr("Chọn file Excel để nhập"), QDir::currentPath(), tr("Excel Files (*.xlsx);;All Files (*)"));
+    QString file = QFileDialog::getOpenFileName(this, LanguageManager::instance().getText("TITLE_SELECT_EXCEL"), QDir::currentPath(), LanguageManager::instance().getText("FILTER_EXCEL_FILES"));
     if (file.isEmpty()) return;
 
     ImportManager importer(this);
     if (!importer.ensureDependencies(this)) return;
 
-    QProgressDialog progress(tr("Đang xử lý tập tin Excel..."), QString(), 0, 0, this);
+    QProgressDialog progress(LanguageManager::instance().getText("MSG_PROCESSING_EXCEL"), QString(), 0, 0, this);
     progress.setWindowModality(Qt::WindowModal);
     progress.setMinimumDuration(0);
     progress.show();

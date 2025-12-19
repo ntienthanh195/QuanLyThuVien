@@ -53,15 +53,17 @@ private:
     void datKieuTruong(QLineEdit *truong, bool hopLe);
     
     // Form fields - responsive
+    // Form fields - responsive
     QLineEdit *oNhapISBN;
     QLineEdit *oNhapTenSach;
     QLineEdit *oNhapTacGia;
-    QComboBox *hopChonTheLoai;
-    QSpinBox *soNamXuatBan;
-    QSpinBox *soSoTrang;
-    QSpinBox *soSoBanSao;
+    QLineEdit *oNhapTheLoai; // Changed from QComboBox
+    QSpinBox *oNhapNamXB;
+    QSpinBox *oNhapSoTrang;
+    QSpinBox *oNhapSoBanSao;
     QLineEdit *oNhapViTri;
-    QDoubleSpinBox *soGiaTien; // Using DoubleSpinBox for currency (allows large numbers)
+    QDoubleSpinBox *oNhapGiaTien; // Using DoubleSpinBox for currency
+    QLineEdit *oNhapNhaXuatBan; // Phase 2 Requirement
     
     // Buttons
     QPushButton *nutLuu;

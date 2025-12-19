@@ -1,5 +1,6 @@
 #include "giao_dien/hop_thoai/HopThoaiThemDocGia.h"
 #include "models/DocGia.h"
+#include "utils/LanguageManager.h"
 #include "utils/ResponsiveHelper.h"
 #include "utils/XuLyChuoi.h"
 #include "utils/EventBus.h"
@@ -11,13 +12,14 @@
 #include <QGroupBox>
 #include <QMessageBox>
 #include <QDateTime>
+#include <QScrollArea>
 #include <QTimer>
 #include <QTimer>
 #include <functional>
 #include <QKeyEvent>
 
 HopThoaiThemDocGia::HopThoaiThemDocGia(QWidget *cha) : QDialog(cha), maDuocTao(0) {
-    setWindowTitle("Thêm Độc Giả Mới");
+    setWindowTitle(LanguageManager::instance().getText("DIALOG_ADD_READER_TITLE"));
     ResponsiveHelper::ScreenSize screenSize = ResponsiveHelper::detectScreenSize();
     setMinimumWidth(ResponsiveHelper::getScaledWidth(550, screenSize));
     
@@ -54,13 +56,27 @@ void HopThoaiThemDocGia::thieLapGiaoDien() {
     
     // Title
     int titleSize = ResponsiveHelper::getScaledFontSize(20, screenSize);
-    QLabel *tieuDe = new QLabel("THÊM ĐỘC GIẢ MỚI");
+    QLabel *tieuDe = new QLabel(LanguageManager::instance().getText("DIALOG_ADD_READER_TITLE").toUpper());
     tieuDe->setStyleSheet(QString("font-size: %1px; font-weight: bold; color: #FFFFFF; background: transparent;").arg(titleSize));
     tieuDe->setAlignment(Qt::AlignCenter);
     boTriChinh->addWidget(tieuDe);
     
+    // Scroll Area Setup
+    QScrollArea *scrollArea = new QScrollArea(this);
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setFrameShape(QFrame::NoFrame);
+    scrollArea->setStyleSheet("QScrollArea { background: transparent; } QScrollBar:vertical { width: 8px; background: #1b1b29; } QScrollBar::handle:vertical { background: #565674; border-radius: 4px; }");
+
+    QWidget *scrollContent = new QWidget();
+    scrollContent->setStyleSheet("background: transparent;");
+    QVBoxLayout *scrollLayout = new QVBoxLayout(scrollContent);
+    scrollLayout->setContentsMargins(0, 0, 10, 0); // Right padding for scrollbar
+    scrollLayout->setSpacing(spacing);
+
+    // MOVE CONTENT INTO SCROLL LAYOUT
+    
     // Mã thẻ
-    QGroupBox *nhomMa = new QGroupBox("Mã Thẻ Độc Giả", this);
+    QGroupBox *nhomMa = new QGroupBox(LanguageManager::instance().getText("GROUP_READER_CODE"), this);
     int fontSize = ResponsiveHelper::getScaledFontSize(14, screenSize);
     nhomMa->setStyleSheet(QString(
         "QGroupBox {"
@@ -93,14 +109,14 @@ void HopThoaiThemDocGia::thieLapGiaoDien() {
     nhanMaThe->setStyleSheet(QString("font-size: %1px; font-weight: bold; color: #5D9CEC; padding: 15px; background-color: #1b1b29; border-radius: 8px; border: 1px dashed #323248;").arg(maSize));
     boTriMa->addWidget(nhanMaThe);
     
-    QLabel *chuThich = new QLabel("* Mã thẻ được tạo tự động");
+    QLabel *chuThich = new QLabel(LanguageManager::instance().getText("LBL_AUTO_CODE_HINT"));
     chuThich->setStyleSheet("color: #6C6C80; font-style: italic; font-size: 11px;");
     chuThich->setAlignment(Qt::AlignCenter);
     boTriMa->addWidget(chuThich);
-    boTriChinh->addWidget(nhomMa);
+    scrollLayout->addWidget(nhomMa);
     
     // Form
-    QGroupBox *nhomForm = new QGroupBox("Thông Tin Độc Giả", this);
+    QGroupBox *nhomForm = new QGroupBox(LanguageManager::instance().getText("GROUP_READER_INFO"), this);
     nhomForm->setStyleSheet(QString(
         "QGroupBox {"
         "   background-color: #1e1e2d;"
@@ -147,45 +163,91 @@ void HopThoaiThemDocGia::thieLapGiaoDien() {
     ).arg(fontSize).arg(fieldHeight);
     
     oNhapHo = new QLineEdit();
-    oNhapHo->setPlaceholderText("Nhập họ đệm...");
+    oNhapHo->setPlaceholderText(LanguageManager::instance().getText("PLACEHOLDER_HO"));
     oNhapHo->setStyleSheet(kieuTruong);
     connect(oNhapHo, &QLineEdit::textChanged, this, &HopThoaiThemDocGia::kiemTraDuLieu);
     connect(oNhapHo, &QLineEdit::textChanged, this, &HopThoaiThemDocGia::capNhatPreviewHoTen);
     
     oNhapTen = new QLineEdit();
-    oNhapTen->setPlaceholderText("Nhập tên...");
+    oNhapTen->setPlaceholderText(LanguageManager::instance().getText("PLACEHOLDER_TEN"));
     oNhapTen->setStyleSheet(kieuTruong);
     connect(oNhapTen, &QLineEdit::textChanged, this, &HopThoaiThemDocGia::kiemTraDuLieu);
     connect(oNhapTen, &QLineEdit::textChanged, this, &HopThoaiThemDocGia::capNhatPreviewHoTen);
     
     hopChonGioiTinh = new QComboBox();
-    hopChonGioiTinh->addItem("Nam", 0);
-    hopChonGioiTinh->addItem("Nữ", 1);
+    hopChonGioiTinh->addItem(LanguageManager::instance().getText("GENDER_MALE"), 0);
+    hopChonGioiTinh->addItem(LanguageManager::instance().getText("GENDER_FEMALE"), 1);
     hopChonGioiTinh->setStyleSheet(kieuTruong);
     
-    QLabel *nhanHo = new QLabel("Họ đệm *:");
+    // Phase 2 New Fields
+    hopChonLoaiDocGia = new QComboBox();
+    hopChonLoaiDocGia->addItem(LanguageManager::instance().getText("READER_TYPE_STUDENT"), 0);
+    hopChonLoaiDocGia->addItem(LanguageManager::instance().getText("READER_TYPE_TEACHER"), 1);
+    hopChonLoaiDocGia->setStyleSheet(kieuTruong);
+
+    oNhapLop = new QLineEdit();
+    oNhapLop->setPlaceholderText(LanguageManager::instance().getText("PLACEHOLDER_CLASS"));
+    oNhapLop->setStyleSheet(kieuTruong);
+
+    oNhapSDT = new QLineEdit();
+    oNhapSDT->setPlaceholderText(LanguageManager::instance().getText("PLACEHOLDER_PHONE"));
+    oNhapSDT->setStyleSheet(kieuTruong);
+    connect(oNhapSDT, &QLineEdit::textChanged, this, &HopThoaiThemDocGia::kiemTraDuLieu);
+
+    oNhapEmail = new QLineEdit();
+    oNhapEmail->setPlaceholderText(LanguageManager::instance().getText("PLACEHOLDER_EMAIL"));
+    oNhapEmail->setStyleSheet(kieuTruong);
+
+    oNhapNgaySinh = new QDateEdit();
+    oNhapNgaySinh->setDisplayFormat("dd/MM/yyyy");
+    oNhapNgaySinh->setCalendarPopup(true);
+    oNhapNgaySinh->setDate(QDate::currentDate().addYears(-15)); // Default ~15 years old
+    oNhapNgaySinh->setStyleSheet(kieuTruong);
+    
+    QLabel *nhanHo = new QLabel(LanguageManager::instance().getText("LBL_HO_DEM"));
     nhanHo->setStyleSheet("color: #FFFFFF; font-weight: bold; font-size: 12px; min-width: 100px;");
-    QLabel *nhanTen = new QLabel("Tên *:");
+    QLabel *nhanTen = new QLabel(LanguageManager::instance().getText("LBL_TEN"));
     nhanTen->setStyleSheet("color: #FFFFFF; font-weight: bold; font-size: 12px; min-width: 100px;");
-    QLabel *nhanGioiTinh = new QLabel("Giới tính:");
+    QLabel *nhanGioiTinh = new QLabel(LanguageManager::instance().getText("TABLE_HEADER_GENDER") + ":");
     nhanGioiTinh->setStyleSheet("color: #FFFFFF; font-weight: bold; font-size: 12px; min-width: 100px;");
     
+    QLabel *nhanLoai = new QLabel(LanguageManager::instance().getText("LBL_READER_TYPE"));
+    nhanLoai->setStyleSheet("color: #FFFFFF; font-weight: bold; font-size: 12px; min-width: 100px;");
+    QLabel *nhanLop = new QLabel(LanguageManager::instance().getText("LBL_CLASS"));
+    nhanLop->setStyleSheet("color: #FFFFFF; font-weight: bold; font-size: 12px; min-width: 100px;");
+    QLabel *nhanSDT = new QLabel(LanguageManager::instance().getText("LBL_PHONE") + " (*)");
+    nhanSDT->setStyleSheet("color: #FFFFFF; font-weight: bold; font-size: 12px; min-width: 100px;");
+    QLabel *nhanEmail = new QLabel(LanguageManager::instance().getText("LBL_EMAIL"));
+    nhanEmail->setStyleSheet("color: #FFFFFF; font-weight: bold; font-size: 12px; min-width: 100px;");
+    QLabel *nhanNgaySinh = new QLabel(LanguageManager::instance().getText("LBL_DOB"));
+    nhanNgaySinh->setStyleSheet("color: #FFFFFF; font-weight: bold; font-size: 12px; min-width: 100px;");
+
     boTriForm->addRow(nhanHo, oNhapHo);
     boTriForm->addRow(nhanTen, oNhapTen);
+    boTriForm->addRow(nhanLoai, hopChonLoaiDocGia);
+    boTriForm->addRow(nhanLop, oNhapLop);
+    boTriForm->addRow(nhanNgaySinh, oNhapNgaySinh);
     boTriForm->addRow(nhanGioiTinh, hopChonGioiTinh);
-    boTriChinh->addWidget(nhomForm);
+    boTriForm->addRow(nhanSDT, oNhapSDT);
+    boTriForm->addRow(nhanEmail, oNhapEmail);
+    scrollLayout->addWidget(nhomForm);
     
     // Status
     nhanTrangThai = new QLabel("");
     nhanTrangThai->setAlignment(Qt::AlignCenter);
     nhanTrangThai->setStyleSheet("color: #B5B5C3; font-style: italic;");
-    boTriChinh->addWidget(nhanTrangThai);
+    scrollLayout->addWidget(nhanTrangThai);
 
     // Preview normalized name
     nhanPreviewHoTen = new QLabel("");
     nhanPreviewHoTen->setStyleSheet("color: #A1F0E8; font-weight: 600; padding: 6px; background: transparent;");
     nhanPreviewHoTen->setAlignment(Qt::AlignCenter);
-    boTriChinh->addWidget(nhanPreviewHoTen);
+    scrollLayout->addWidget(nhanPreviewHoTen);
+
+    // FINALIZE SCROLL
+    scrollContent->setLayout(scrollLayout);
+    scrollArea->setWidget(scrollContent);
+    boTriChinh->addWidget(scrollArea);
     
     // Buttons
     int buttonHeight = ResponsiveHelper::getScaledHeight(45, screenSize);
@@ -194,7 +256,7 @@ void HopThoaiThemDocGia::thieLapGiaoDien() {
     
     QHBoxLayout *boTriNut = new QHBoxLayout();
     
-    nutXoaForm = new QPushButton("Làm Mới");
+    nutXoaForm = new QPushButton(LanguageManager::instance().getText("BTN_REFRESH"));
     nutXoaForm->setMinimumSize(buttonWidth, buttonHeight);
     nutXoaForm->setCursor(Qt::PointingHandCursor);
     nutXoaForm->setAutoDefault(false); // Enable enter navigation by disabling auto default on this button
@@ -212,7 +274,7 @@ void HopThoaiThemDocGia::thieLapGiaoDien() {
     ).arg(buttonFont));
     connect(nutXoaForm, &QPushButton::clicked, this, &HopThoaiThemDocGia::xoaTatCaTruong);
     
-    nutLuu = new QPushButton("Thêm Độc Giả");
+    nutLuu = new QPushButton(LanguageManager::instance().getText("BTN_ADD_READER"));
     nutLuu->setMinimumSize(buttonWidth, buttonHeight);
     nutLuu->setCursor(Qt::PointingHandCursor);
     nutLuu->setDefault(true); 
@@ -232,7 +294,7 @@ void HopThoaiThemDocGia::thieLapGiaoDien() {
     ).arg(buttonFont));
     connect(nutLuu, &QPushButton::clicked, this, &HopThoaiThemDocGia::xuLyNutLuu);
     
-    nutHuy = new QPushButton("Hủy");
+    nutHuy = new QPushButton(LanguageManager::instance().getText("BTN_CANCEL_DIALOG"));
     nutHuy->setMinimumSize(buttonWidth, buttonHeight);
     nutHuy->setCursor(Qt::PointingHandCursor);
     nutHuy->setStyleSheet(QString(
@@ -277,17 +339,19 @@ void HopThoaiThemDocGia::taoMaDocGia() {
 }
 
 void HopThoaiThemDocGia::kiemTraDuLieu() {
-    bool hopLe = !oNhapHo->text().trimmed().isEmpty() && !oNhapTen->text().trimmed().isEmpty();
+    bool hopLe = !oNhapHo->text().trimmed().isEmpty() && 
+                 !oNhapTen->text().trimmed().isEmpty() &&
+                 !oNhapSDT->text().trimmed().isEmpty();
     nutLuu->setEnabled(hopLe);
     if (hopLe) {
-        nhanTrangThai->setText("✓ Sẵn sàng lưu");
+        nhanTrangThai->setText(LanguageManager::instance().getText("MSG_READY_TO_SAVE"));
         nhanTrangThai->setStyleSheet("color: #78C2AD; font-size: 13px;");
     }
 }
 
 void HopThoaiThemDocGia::xuLyNutLuu() {
-    if (oNhapHo->text().trimmed().isEmpty() || oNhapTen->text().trimmed().isEmpty()) {
-        nhanTrangThai->setText("✕ Vui lòng điền đầy đủ thông tin!");
+    if (oNhapHo->text().trimmed().isEmpty() || oNhapTen->text().trimmed().isEmpty() || oNhapSDT->text().trimmed().isEmpty()) {
+        nhanTrangThai->setText("✕ " + LanguageManager::instance().getText("ERR_FILL_REQUIRED"));
         nhanTrangThai->setStyleSheet("color: #E06D6D; font-weight: bold;");
         return;
     }
@@ -296,9 +360,9 @@ void HopThoaiThemDocGia::xuLyNutLuu() {
     nutLuu->setEnabled(false);
     nutHuy->setEnabled(false);
     nutXoaForm->setEnabled(false);
-    nutLuu->setText("Đang xử lý...");
+    nutLuu->setText(LanguageManager::instance().getText("BTN_PROCESSING"));
     
-    nhanTrangThai->setText("⚙ Đang thêm độc giả...");
+    nhanTrangThai->setText(LanguageManager::instance().getText("MSG_ADD_READER_PROCESSING"));
     nhanTrangThai->setStyleSheet("color: #FFA800; font-weight: bold;");
     QApplication::processEvents();
     
@@ -318,7 +382,7 @@ void HopThoaiThemDocGia::xuLyNutLuu() {
         nutLuu->setEnabled(true);
         nutHuy->setEnabled(true);
         nutXoaForm->setEnabled(true);
-        nutLuu->setText("Lưu");
+        nutLuu->setText(LanguageManager::instance().getText("BTN_ADD_READER"));
         return;
     }
     
@@ -330,7 +394,7 @@ void HopThoaiThemDocGia::xuLyNutLuu() {
         nutLuu->setEnabled(true);
         nutHuy->setEnabled(true);
         nutXoaForm->setEnabled(true);
-        nutLuu->setText("Lưu");
+        nutLuu->setText(LanguageManager::instance().getText("BTN_ADD_READER"));
         return;
     }
     
@@ -340,16 +404,35 @@ void HopThoaiThemDocGia::xuLyNutLuu() {
     // Gọi hàm backend tạo độc giả với dữ liệu đã chuẩn hóa
     PTRDG newReader = taoDocGia(hoChuan, tenChuan, phai, trangThai, rootDocGia);
     if (newReader) {
+        // Phase 2: Set additional fields
+        newReader->data.LoaiDocGia = hopChonLoaiDocGia->currentIndex();
+        // Normalize auxiliary fields
+        std::string lopChuan = ChuanHoaKhoangTrang(oNhapLop->text().trimmed().toStdString());
+        // For class, typically Uppercase is preferred (e.g. 12A1)
+        lopChuan = ChuyenInHoa(lopChuan);
+        
+        std::string emailChuan = ChuanHoaKhoangTrang(oNhapEmail->text().trimmed().toStdString());
+        // Email should be lowercase
+        emailChuan = ChuyenInThuong(emailChuan);
+        
+        std::string sdtChuan = LayChiCacKyTuSo(oNhapSDT->text().trimmed().toStdString());
+
+        newReader->data.LoaiDocGia = hopChonLoaiDocGia->currentIndex();
+        newReader->data.Lop = lopChuan;
+        newReader->data.SDT = sdtChuan;
+        newReader->data.Email = emailChuan;
+        newReader->data.NgaySinh = oNhapNgaySinh->date().toString("dd/MM/yyyy").toStdString();
+        
         InsertDocGia(rootDocGia, newReader);
         // Dữ liệu đã được đồng bộ SQL bên trong backend
         // Global notification
         EventBus::instance().docGiaAdded(newReader->data.MaThe);
         
-        // Auto-Print Card (Silent or Prompt)
-        PrintHelper::inTheDocGiaTuDong(newReader, this);
+        // Auto-Print Card removed per user request (annoying)
+        // PrintHelper::inTheDocGiaTuDong(newReader, this);
     }
     
-    nhanTrangThai->setText(QString("✓ Đã thêm độc giả: %1 %2")
+    nhanTrangThai->setText(LanguageManager::instance().getText("MSG_ADD_READER_SUCCESS_LBL")
                           .arg(QString::fromStdString(hoChuan))
                           .arg(QString::fromStdString(tenChuan)));
     nhanTrangThai->setStyleSheet("color: #78C2AD; font-weight: bold; font-size: 13px;");
@@ -357,7 +440,7 @@ void HopThoaiThemDocGia::xuLyNutLuu() {
     emit docGiaDaThem();
     
     // Show Toast
-    ToastNotification::show(QString("Đã thêm độc giả '%1 %2' thành công!")
+    ToastNotification::show(LanguageManager::instance().getText("MSG_ADD_READER_SUCCESS_VAR")
                            .arg(QString::fromStdString(hoChuan))
                            .arg(QString::fromStdString(tenChuan)), ToastNotification::SUCCESS);
     
@@ -379,7 +462,12 @@ void HopThoaiThemDocGia::capNhatPreviewHoTen() {
 void HopThoaiThemDocGia::xoaTatCaTruong() {
     oNhapHo->clear();
     oNhapTen->clear();
+    oNhapLop->clear();
+    oNhapSDT->clear();
+    oNhapEmail->clear();
     hopChonGioiTinh->setCurrentIndex(0);
+    hopChonLoaiDocGia->setCurrentIndex(0);
+    oNhapNgaySinh->setDate(QDate::currentDate().addYears(-15));
     nhanTrangThai->clear();
     taoMaDocGia();
     oNhapHo->setFocus();

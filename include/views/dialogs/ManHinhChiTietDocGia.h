@@ -1,4 +1,11 @@
+/**
+ * @file ManHinhChiTietDocGia.h
+ * @path include/views/dialogs/ManHinhChiTietDocGia.h
+ * @description Header của màn hình Chi tiết học viên (Độc giả).
+ * @project Library Management System (QuanLyThuVien)
+ */
 #ifndef MANHINH_CHI_TIET_DOC_GIA_H
+
 #define MANHINH_CHI_TIET_DOC_GIA_H
 
 #include <QDialog>
@@ -20,8 +27,11 @@ public:
         QDate ngayMuon;
         QDate hanTra;
         QString trangThai;
+        int status;
         int soNgayQuaHan;
         MUONTRA nodeMuonTra;
+        long long tienPhat;
+        bool daThanhToan;
     };
 
     explicit ManHinhChiTietDocGia(PTRDG reader, QWidget *parent = nullptr);
@@ -34,6 +44,7 @@ private slots:
     void khiNhanSua(); // Sửa độc giả
     void khiNhanThuHoi(); // Thu hồi sách (Trả sách)
     void khiNhanBaoMat(); // Báo mất sách
+    void khiNhanThanhToan(); // NEW: Thanh toán nợ
     void khiNhanLamMoi();
     void khiNhanDong();
     void khiNhanInThe();
@@ -51,6 +62,7 @@ private:
     QPushButton *nutSua; // New button
     QPushButton *nutThuHoi;
     QPushButton *nutBaoMat;
+    QPushButton *nutThanhToan; // NEW
     QPushButton *nutXoaBanSao;
     QPushButton *nutLamMoi;
     QPushButton *nutInThe;

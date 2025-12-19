@@ -4,7 +4,15 @@
  * @brief Quản lý đa ngôn ngữ (Singleton).
  * @note AI Chú ý: Đây là header chính thức. Bỏ qua file tại src/utils/LanguageManager.h
  */
+/**
+ * @file LanguageManager.h
+ * @path include/utils/LanguageManager.h
+ * @description Header quản lý Đa ngôn ngữ (Singleton). 
+ * Cung cấp hàm getText(key) để lấy chuỗi ký tự theo ngôn ngữ hiện tại.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #ifndef LANGUAGEMANAGER_H
+
 #define LANGUAGEMANAGER_H
 
 #include <QObject>

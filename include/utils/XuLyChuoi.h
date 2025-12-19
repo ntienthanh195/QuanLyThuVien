@@ -1,4 +1,11 @@
+/**
+ * @file XuLyChuoi.h
+ * @path include/utils/XuLyChuoi.h
+ * @description Header các hàm tiện ích xử lý chuỗi và Tiếng Việt.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #ifndef XULYCHUOI_H
+
 #define XULYCHUOI_H
 
 #include <string>

@@ -37,7 +37,8 @@ if (Test-Path $windeployqt) {
 	Write-Host "`nRunning windeployqt..." -ForegroundColor Cyan
 	& $windeployqt $deployExe --release --no-translations --no-system-d3d-compiler --no-opengl-sw
 	Write-Host "[OK] Qt dependencies collected" -ForegroundColor Green
-} else {
+}
+else {
 	Write-Host "[WARN] windeployqt not found at $windeployqt. Please install Qt or set -QtDir accordingly." -ForegroundColor Yellow
 }
 
@@ -49,7 +50,8 @@ foreach ($dll in $mingwDlls) {
 	if (Test-Path $dllPath) {
 		Copy-Item $dllPath $DeployDir
 		Write-Host "  [OK] $dll" -ForegroundColor Green
-	} else {
+	}
+ else {
 		Write-Host "  [WARN] $dll not found in $MingwDir" -ForegroundColor Yellow
 	}
 }
@@ -67,6 +69,13 @@ if (Test-Path "files") {
 	Write-Host "[OK] Files copied" -ForegroundColor Green
 }
 
+# Copy tools (REQUIRED for Excel Import)
+if (Test-Path "tools") {
+	Write-Host "`nCopying tools folder..." -ForegroundColor Cyan
+	Copy-Item -Recurse -Force "tools" (Join-Path $DeployDir "tools")
+	Write-Host "[OK] Tools copied" -ForegroundColor Green
+}
+
 # Optional: create a zip as portable package
 $zipName = "QuanLyThuVien_Portable.zip"
 if (Test-Path $zipName) { Remove-Item $zipName -Force }
@@ -80,11 +89,13 @@ if ($InnoSetupPath -ne "" -and (Test-Path $InnoSetupPath)) {
 	$iss = Join-Path (Split-Path -Parent $PSCommandPath) "installer\QuanLyThuVien.iss"
 	if (-not (Test-Path $iss)) {
 		Write-Host "[ERROR] Inno Setup script not found: $iss" -ForegroundColor Red
-	} else {
+	}
+ else {
 		& $InnoSetupPath $iss
 		Write-Host "[OK] Installer build attempted (check ISCC output)" -ForegroundColor Green
 	}
-} else {
+}
+else {
 	Write-Host "`nSkipping Inno Setup build. To enable installer creation, pass -InnoSetupPath 'C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe'" -ForegroundColor Yellow
 }
 

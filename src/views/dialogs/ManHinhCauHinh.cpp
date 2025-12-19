@@ -1,4 +1,12 @@
+/**
+ * @file ManHinhCauHinh.cpp
+ * @path src/views/dialogs/ManHinhCauHinh.cpp
+ * @description Giao diện cài đặt (Configuration/Settings) của hệ thống.
+ * Cho phép chỉnh sửa quy định thư viện: tiền phạt, số ngày mượn tối đa, số sách tối đa...
+ * @project Library Management System (QuanLyThuVien)
+ */
 #include "views/dialogs/ManHinhCauHinh.h"
+
 #include "utils/AuditLogger.h"
 #include "utils/PrintHelper.h"
 #include "utils/SettingsManager.h"
@@ -140,6 +148,40 @@ void ManHinhCauHinh::thietLapGiaoDien() {
     contentLayout->addWidget(cardPrint);
 
     // ==========================================
+    // SECTION 2.5: BOOK & BARCODE SETTINGS (NEW)
+    // ==========================================
+    contentLayout->addWidget(createSectionHeader(LanguageManager::instance().getText("HEADER_BARCODE_CONFIG")));
+
+    QFrame *cardBarcode = new QFrame();
+    cardBarcode->setObjectName("Card");
+    QFormLayout *layoutBarcode = new QFormLayout(cardBarcode);
+    layoutBarcode->setContentsMargins(20, 20, 20, 20);
+    layoutBarcode->setVerticalSpacing(15);
+    layoutBarcode->setHorizontalSpacing(20);
+
+    // Barcode Dimensions
+    spinBarcodeWidth = new QSpinBox();
+    spinBarcodeWidth->setRange(20, 100);
+    spinBarcodeWidth->setSuffix(" mm");
+    layoutBarcode->addRow(LanguageManager::instance().getText("LBL_BARCODE_WIDTH"), spinBarcodeWidth);
+    
+    spinBarcodeHeight = new QSpinBox();
+    spinBarcodeHeight->setRange(5, 50);
+    spinBarcodeHeight->setSuffix(" mm");
+    layoutBarcode->addRow(LanguageManager::instance().getText("LBL_BARCODE_HEIGHT"), spinBarcodeHeight);
+
+    // Checkboxes for Label Content
+    checkShowPrice = new QCheckBox(LanguageManager::instance().getText("LBL_SHOW_PRICE"));
+    checkShowHeader = new QCheckBox(LanguageManager::instance().getText("LBL_SHOW_HEADER"));
+    checkShowTitle = new QCheckBox(LanguageManager::instance().getText("LBL_SHOW_TITLE"));
+    
+    layoutBarcode->addRow("", checkShowPrice);
+    layoutBarcode->addRow("", checkShowHeader);
+    layoutBarcode->addRow("", checkShowTitle);
+
+    contentLayout->addWidget(cardBarcode);
+
+    // ==========================================
     // SECTION 3: PATHS
     // ==========================================
     contentLayout->addWidget(createSectionHeader(LanguageManager::instance().getText("HEADER_STORAGE_PATHS")));
@@ -264,6 +306,13 @@ void ManHinhCauHinh::taiCauHinh() {
     
     if (!pReceipt.isEmpty()) comboPrinterReceipt->setCurrentText(pReceipt);
     if (!pReport.isEmpty()) comboPrinterReport->setCurrentText(pReport);
+
+    // Load Barcode Settings (2.5)
+    spinBarcodeWidth->setValue(settings.value("Print/BarcodeWidth", cfg.labelWidth).toInt());
+    spinBarcodeHeight->setValue(settings.value("Print/BarcodeHeight", cfg.labelHeight).toInt());
+    checkShowPrice->setChecked(settings.value("Print/ShowPrice", cfg.showPrice).toBool());
+    checkShowHeader->setChecked(settings.value("Print/ShowLibName", cfg.showLibName).toBool());
+    checkShowTitle->setChecked(settings.value("Print/ShowBookTitle", cfg.showBookTitle).toBool());
     
     // Load Loan Rules from DB (SettingsManager)
     // ONLY IF in Full Mode (otherwise widgets don't exist)
@@ -284,7 +333,15 @@ void ManHinhCauHinh::luuCauHinh() {
     settings.setValue("Print/LogoPath", txtLogoPath->text());
     settings.setValue("Print/QrPath", txtQrPath->text());
     settings.setValue("Print/PdfPath", txtPdfPath->text());
+    settings.setValue("Print/PdfPath", txtPdfPath->text());
     settings.setValue("Print/Silent", checkSilentPrint->isChecked());
+    
+    // Save Barcode Settings
+    settings.setValue("Print/BarcodeWidth", spinBarcodeWidth->value());
+    settings.setValue("Print/BarcodeHeight", spinBarcodeHeight->value());
+    settings.setValue("Print/ShowPrice", checkShowPrice->isChecked());
+    settings.setValue("Print/ShowLibName", checkShowHeader->isChecked());
+    settings.setValue("Print/ShowBookTitle", checkShowTitle->isChecked());
     
     QString pReceipt = (comboPrinterReceipt->currentIndex() > 0) ? comboPrinterReceipt->currentText() : "";
     QString pReport = (comboPrinterReport->currentIndex() > 0) ? comboPrinterReport->currentText() : "";
@@ -309,13 +366,20 @@ void ManHinhCauHinh::luuCauHinh() {
     cfg.qrOutputDir = txtQrPath->text();
     cfg.pdfOutputDir = txtPdfPath->text();
     cfg.silentPrint = checkSilentPrint->isChecked();
+    
+    // Apply Barcode Config to Helper
+    cfg.labelWidth = spinBarcodeWidth->value();
+    cfg.labelHeight = spinBarcodeHeight->value();
+    cfg.showPrice = checkShowPrice->isChecked();
+    cfg.showLibName = checkShowHeader->isChecked();
+    cfg.showBookTitle = checkShowTitle->isChecked();
     cfg.printerReceipt = pReceipt;
     cfg.printerReport = pReport;
     
     PrintHelper::setCauHinh(cfg);
     
     // Log Activity
-    AuditLogger::log("Sửa", "CAU_HINH", "", "Cập nhật cấu hình hệ thống");
+    AuditLogger::log(AuditLogger::ACTION_SETTINGS, "CAU_HINH", "", "Cập nhật cấu hình hệ thống (ManHinhCauHinh)");
     
     QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), LanguageManager::instance().getText("MSG_SAVE_CONFIG_SUCCESS"));
     accept();

@@ -1,4 +1,12 @@
+/**
+ * @file SettingsManager.cpp
+ * @path src/utils/SettingsManager.cpp
+ * @description Quản lý cài đặt cấu hình ứng dụng (App Settings).
+ * Xử lý: lưu trữ/truy xuất tham số hệ thống (số ngày mượn tối đa, số sách tối đa, thông tin thư viện) vào Database.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #include "utils/SettingsManager.h"
+
 #include "utils/DatabaseManager.h"
 #include <QSqlQuery>
 #include <QSqlError>
@@ -61,6 +69,9 @@ QString SettingsManager::getString(const QString& key, const QString& defaultVal
     return get(key, defaultValue).toString();
 }
 
+// Include EventBus
+#include "utils/EventBus.h"
+
 void SettingsManager::set(const QString& key, const QVariant& value, const QString& type) {
     QSqlDatabase db = DatabaseManager::instance().database();
     if (!db.isOpen()) return;
@@ -79,4 +90,7 @@ void SettingsManager::set(const QString& key, const QVariant& value, const QStri
     if (!q.exec()) {
         qWarning() << "[SettingsManager] Set failed:" << q.lastError().text();
     }
+    
+    // 3. Notify system
+    EventBus::instance().settingsUpdated();
 }

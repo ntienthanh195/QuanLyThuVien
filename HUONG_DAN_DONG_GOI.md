@@ -46,14 +46,18 @@ copy C:\Qt\Tools\mingw1310_64\bin\libstdc++-6.dll release\
 copy C:\Qt\Tools\mingw1310_64\bin\libwinpthread-1.dll release\
 ```
 
-### Bước 4: Copy Dữ Liệu và Resources
+### Bước 4: Copy Dữ Liệu và Công cụ (Tools)
 
-Copy thư mục `data/` (chứa dữ liệu) vào thư mục release:
+Để ứng dụng chạy đầy đủ tính năng, bạn cần copy thư mục `data/` và thư mục `tools/` (chứa các script Python hỗ trợ Import Excel) vào thư mục release:
 
 ```powershell
-# Copy thư mục data
+# Copy thư mục data & tools
 xcopy /E /I data release\data
+xcopy /E /I tools release\tools
 ```
+
+> [!IMPORTANT]
+> Tính năng **Import Excel** yêu cầu máy tính người dùng phải có **Python**. Ứng dụng sẽ tự động tải thư viện cần thiết nếu lần đầu sử dụng trên máy mới.
 
 ### Bước 5: Tạo Cấu Trúc Thư Mục Cuối Cùng
 

@@ -1,4 +1,12 @@
-﻿#include "models/DocGia.h"
+﻿/**
+ * @file DocGia.cpp
+ * @path src/models/DocGia.cpp
+ * @description Triển khai các hàm xử lý dữ liệu học viên (Độc giả).
+ * Bao gồm: quản lý danh sách học viên (cây nhị phân search), tìm kiếm, và các thao tác liên quan đến thẻ học viên.
+ * @project Library Management System (QuanLyThuVien)
+ */
+#include "models/DocGia.h"
+
 #include "models/MuonTra.h"
 #include "utils/FilePathManager.h"
 #include "utils/BackupManager.h"
@@ -21,7 +29,7 @@
 #include <QVariant>
 #include <QDate>
 #include <functional>
-#include "utils/AuditLogger.h" // Added AuditLogger
+#include "utils/AuditLogger.h"
 // Cần thêm thư viện QuanLySach.h nếu sử dụng TimDanhMucSachTuMaSach
 // #include "QuanLySach.h" 
 
@@ -163,13 +171,21 @@ void InsertDocGia(PTRDG &root, PTRDG node, bool syncDB) {
     
     // --- DB SYNC ---
     if (syncDB && node) {
-        QSqlQuery q(DatabaseManager::instance().database());
-        q.prepare("INSERT INTO doc_gia (ma_the, ho, ten, phai, trang_thai) VALUES (?, ?, ?, ?, ?)");
+     QSqlQuery q(DatabaseManager::instance().database());
+        q.prepare("INSERT INTO doc_gia (ma_the, ho, ten, phai, trang_thai, so_dien_thoai, lop, email, ngay_sinh, loai_doc_gia, so_sach_dang_muon) "
+                  "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         q.addBindValue(node->data.MaThe);
         q.addBindValue(QString::fromStdString(node->data.Ho));
         q.addBindValue(QString::fromStdString(node->data.Ten));
         q.addBindValue(node->data.Phai ? 1 : 0);
         q.addBindValue(node->data.TrangThai);
+        // Phase 2 New Fields
+        q.addBindValue(QString::fromStdString(node->data.SDT));
+        q.addBindValue(QString::fromStdString(node->data.Lop));
+        q.addBindValue(QString::fromStdString(node->data.Email));
+        q.addBindValue(QString::fromStdString(node->data.NgaySinh));
+        q.addBindValue(node->data.LoaiDocGia);
+        q.addBindValue(0); // so_sach_dang_muon default
         q.exec();
         
         // [AUDIT LOG]
@@ -201,13 +217,32 @@ std::string ThanhToanPhat(PTRDG docGia, const std::string& maSach) {
                 
                 // Sync DB
                 QSqlQuery q(DatabaseManager::instance().database());
-                q.prepare("UPDATE muon_tra SET da_thanh_toan=1 WHERE ma_the=? AND ngay_muon=?");
+                q.prepare("UPDATE muon_tra SET da_thanh_toan=1 WHERE ma_the=? AND ma_sach=? AND ngay_muon=?");
                 q.addBindValue(docGia->data.MaThe);
+                q.addBindValue(QString::fromStdString(currentMa));
                 q.addBindValue(QString::fromStdString(p->data.NgayMuon));
                 
                 if (q.exec()) {
                     AuditLogger::log(AuditLogger::ACTION_UPDATE, "MUON_TRA", QString::number(docGia->data.MaThe), 
-                                     QString("Thanh toan phat: %1").arg(QString::fromStdString(maSach)));
+                                     QString("Thanh toan phat: %1").arg(QString::fromStdString(currentMa)));
+                    
+                    // [NEW] Feature: Auto-Unlock Reader if All Debts Cleared
+                    // Use helper TinhTongNo (Memory Based) for immediate check
+                    long long totalDebt = TinhTongNo(docGia);
+                    if (totalDebt == 0 && docGia->data.TrangThai == 0) {
+                        // 1. Unlock in Memory
+                        docGia->data.TrangThai = 1; // Hoat dong
+                        
+                        // 2. Unlock in DB
+                        QSqlQuery qUnlock(DatabaseManager::instance().database());
+                        qUnlock.prepare("UPDATE doc_gia SET trang_thai=1 WHERE ma_the=?");
+                        qUnlock.addBindValue(docGia->data.MaThe);
+                        if (qUnlock.exec()) {
+                             AuditLogger::log(AuditLogger::ACTION_UPDATE, "DOC_GIA", QString::number(docGia->data.MaThe), 
+                                              "Tu dong MO KHOA the (da thanh toan het no)");
+                        }
+                    }
+
                     return "";
                 } else {
                     return "Lỗi DB: " + q.lastError().text().toStdString();
@@ -261,7 +296,7 @@ void NapDocGiaTuDB(PTRDG &root, PTRDS dsDauSach[], int soLuongDS) {
     }
     
     // 2. Load Muon Tra
-    if (q.exec("SELECT ma_the, ma_sach, ngay_muon, ngay_tra, trang_thai, so_lan_gia_han, da_thanh_toan FROM muon_tra")) {
+    if (q.exec("SELECT ma_the, ma_sach, ngay_muon, ngay_tra, trang_thai, so_lan_gia_han, da_thanh_toan, tien_phat FROM muon_tra")) {
         while (q.next()) {
             int maThe = q.value(0).toInt();
             std::string maSach = q.value(1).toString().toStdString();
@@ -270,6 +305,7 @@ void NapDocGiaTuDB(PTRDG &root, PTRDS dsDauSach[], int soLuongDS) {
             int tt = q.value(4).toInt();
             int giaHan = q.value(5).toInt();
             bool thanhToan = q.value(6).toBool();
+            long long tienPhat = q.value(7).toLongLong(); // Load tien_phat
             
             PTRDG dg = timDocGia(root, maThe);
             if (dg) {
@@ -290,6 +326,7 @@ void NapDocGiaTuDB(PTRDG &root, PTRDS dsDauSach[], int soLuongDS) {
                  // Feature 4
                  mt.soLanGiaHan = giaHan;
                  mt.daThanhToan = thanhToan;
+                 mt.tienPhat = tienPhat; // Assign loaded fine
 
                  themMuonTra(dg, mt);
                  
@@ -314,8 +351,48 @@ PTRDG taoDocGia(std::string ho, std::string ten, bool phai, int trangthai, PTRDG
     dg->data.Ten = ChuanHoaHoTen(ten);
     dg->data.Phai = phai;
     dg->data.TrangThai = trangthai;
+    // START PHASE 2 INIT
+    dg->data.SDT = "";
+    dg->data.Lop = "";
+    dg->data.Email = "";
+    dg->data.NgaySinh = "";
+    dg->data.LoaiDocGia = 0; // Default Student
+    // END PHASE 2 INIT
     dg->data.dsmt = nullptr;
     dg->data.soSachDangMuon = 0; 
+    dg->data.soSachDangMuon = 0; 
+
+    // Auto-set Dates
+    std::string today = layNgayHienTai();
+    dg->data.NgayLapThe = today;
+
+    // Calculate Expiry
+    int validityMonths = SettingsManager::instance().getInt("THOI_HAN_THE_THANG", 6);
+    int d, m, y;
+    if (phanTichNgay(today, d, m, y)) {
+        m += validityMonths;
+        while (m > 12) {
+            m -= 12;
+            y++;
+        }
+        // Handle end of month (simple clamp, e.g. 31/02 -> 28/02)
+        // For simplicity in this C++98/Legacy context:
+        if (d > 28) {
+             // Basic check for Feb
+             if (m == 2) {
+                 bool leap = (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0);
+                 d = leap ? 29 : 28;
+             } else if (m == 4 || m == 6 || m == 9 || m == 11) {
+                 if (d > 30) d = 30;
+             }
+        }
+        char buffer[20];
+        sprintf(buffer, "%02d/%02d/%04d", d, m, y);
+        dg->data.NgayHetHan = std::string(buffer);
+    } else {
+        dg->data.NgayHetHan = today; // Fallback
+    }
+
     dg->left = dg->right = nullptr;
     dg->height = 1;
     return dg;
@@ -328,8 +405,44 @@ PTRDG taoDocGia(std::string ho, std::string ten, bool phai, int trangthai, int m
     dg->data.Ten = ChuanHoaHoTen(ten);
     dg->data.Phai = phai;
     dg->data.TrangThai = trangthai;
+     // START PHASE 2 INIT
+    dg->data.SDT = "";
+    dg->data.Lop = "";
+    dg->data.Email = "";
+    dg->data.NgaySinh = "";
+    dg->data.LoaiDocGia = 0;
+    // END PHASE 2 INIT
     dg->data.dsmt = nullptr;
     dg->data.soSachDangMuon = 0; 
+    dg->data.soSachDangMuon = 0; 
+    
+    // Auto-set Dates (Similar logic)
+    std::string today = layNgayHienTai();
+    dg->data.NgayLapThe = today;
+    
+    int validityMonths = SettingsManager::instance().getInt("THOI_HAN_THE_THANG", 6);
+    int d, m, y;
+    if (phanTichNgay(today, d, m, y)) {
+        m += validityMonths;
+        while (m > 12) {
+            m -= 12;
+            y++;
+        }
+        if (d > 28) {
+             if (m == 2) {
+                 bool leap = (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0);
+                 d = leap ? 29 : 28;
+             } else if (m == 4 || m == 6 || m == 9 || m == 11) {
+                 if (d > 30) d = 30;
+             }
+        }
+        char buffer[20];
+        sprintf(buffer, "%02d/%02d/%04d", d, m, y);
+        dg->data.NgayHetHan = std::string(buffer);
+    } else {
+        dg->data.NgayHetHan = today;
+    }
+
     dg->left = dg->right = nullptr;
     dg->height = 1;
     return dg;
@@ -486,19 +599,35 @@ void hieuChinhDocGia(PTRDG root, const TheDocGia& new_data) {
     // Updated: Copy date fields
     if (p->data.NgayLapThe != new_data.NgayLapThe) p->data.NgayLapThe = new_data.NgayLapThe;
     if (p->data.NgayHetHan != new_data.NgayHetHan) p->data.NgayHetHan = new_data.NgayHetHan;
-    // Không cập nhật MaThe, dsmt, soSachDangMuon
+    
+    // Phase 2 Updates: Copy new fields
+    p->data.SDT = new_data.SDT;
+    p->data.Lop = new_data.Lop;
+    p->data.Email = new_data.Email;
+    p->data.NgaySinh = new_data.NgaySinh;
+    p->data.LoaiDocGia = new_data.LoaiDocGia;
     // Emit update event
     try {
         EventBus::instance().docGiaUpdated(new_data.MaThe);
     } catch(...) {}
     
     // --- DB SYNC ---
+    // --- DB SYNC ---
     QSqlQuery q(DatabaseManager::instance().database());
-    q.prepare("UPDATE doc_gia SET ho=?, ten=?, phai=?, trang_thai=? WHERE ma_the=?");
+    q.prepare("UPDATE doc_gia SET ho=?, ten=?, phai=?, trang_thai=?, so_dien_thoai=?, lop=?, email=?, ngay_sinh=?, loai_doc_gia=? WHERE ma_the=?");
     q.addBindValue(QString::fromStdString(p->data.Ho));
     q.addBindValue(QString::fromStdString(p->data.Ten));
     q.addBindValue(p->data.Phai ? 1 : 0);
     q.addBindValue(p->data.TrangThai);
+    // Phase 2 updates
+    // Assume p was updated in memory before (Wait, logic above lines 573 only updated basic fields)
+    // We need to update MEMORY p first! See correction below.
+    q.addBindValue(QString::fromStdString(p->data.SDT));
+    q.addBindValue(QString::fromStdString(p->data.Lop));
+    q.addBindValue(QString::fromStdString(p->data.Email));
+    q.addBindValue(QString::fromStdString(p->data.NgaySinh));
+    q.addBindValue(p->data.LoaiDocGia);
+    
     q.addBindValue(new_data.MaThe);
     q.exec();
     // --- END DB SYNC ---
@@ -841,9 +970,8 @@ bool KiemTraBatDauBang(const std::string& fullString, const std::string& prefix)
 
 // helper de duyet cay va dem
 // helper de duyet cay va dem (Iterative version to prevent Stack Overflow)
-// helper de duyet cay va dem (Iterative version to prevent Stack Overflow)
 static void DemDocGiaIterative(PTRDG root, int& tong, int& hoatDong, int& khoa, 
-                               int& dangMuon, int& tongSachMuon, int& coQuaHan) {
+                               int& dangMuon, int& tongSachMuon, int& coQuaHan_Out) {
                                
     if (!root) return;
 
@@ -851,13 +979,15 @@ static void DemDocGiaIterative(PTRDG root, int& tong, int& hoatDong, int& khoa,
     std::set<PTRDG> visited; // Detect cycles
     s.push(root);
 
+    time_t now = time(nullptr); // Check time once per batch
+
     while (!s.empty()) {
         PTRDG node = s.top();
         s.pop();
 
         // Cycle/Duplicate safety
         if (visited.count(node)) {
-            thongBao(std::cout, "Phat hien cycle hoac duplicate node trong cay Doc Gia. Bo qua.", CANH_BAO);
+            // thongBao(std::cout, "Phat hien cycle hoac duplicate node trong cay Doc Gia. Bo qua.", CANH_BAO);
             continue;
         }
         visited.insert(node);
@@ -872,41 +1002,27 @@ static void DemDocGiaIterative(PTRDG root, int& tong, int& hoatDong, int& khoa,
             khoa++;
         }
         
-        // Dem so sach dang muon
-        int sachDangMuonCuaDocGia = 0;
-        MUONTRA pTemp = node->data.dsmt;
-        bool coSachQuaHan = false;
-        int safety = 0;
+        // Dem so sach dang muon (Using Cached Field O(1))
+        int sachDangMuonCuaDocGia = node->data.soSachDangMuon;
         
-        while (pTemp != nullptr && safety < SO_VONG_LAP_MT_MAX) {
-            if (pTemp->next == pTemp) {
-                thongBao(std::cout, "Phat hien node MUONTRA self-loop. Dung duyet.", CANH_BAO);
-                break;
-            }
-            if (pTemp->data.TrangThai == 0) {  // dang muon
-                sachDangMuonCuaDocGia++;
-
-                // kiem tra qua han
-                std::stringstream dummyStream;
-                int soNgayQuaHan = tinhSoNgayQuaHan(pTemp->data.NgayMuon, dummyStream);
-                if (soNgayQuaHan > 0) {
-                    coSachQuaHan = true;
-                }
-            }
-            pTemp = pTemp->next;
-            ++safety;
-        }
-        if (safety >= SO_VONG_LAP_MT_MAX) {
-            thongBao(std::cout, "Phat hien vong lap vo han MUONTRA.", LOI);
-        }
-        
+        bool hasOverdue = false;
         if (sachDangMuonCuaDocGia > 0) {
             dangMuon++;
             tongSachMuon += sachDangMuonCuaDocGia;
+            
+            // Check Overdue (Using Cached Field O(1))
+            if (node->data.ngayHetHanSomNhat == 0) {
+                // Lazy Load
+                CapNhatNgayHetHanSomNhat(node);
+            }
+            
+            if (node->data.ngayHetHanSomNhat != 0 && node->data.ngayHetHanSomNhat < now) {
+                hasOverdue = true;
+            }
         }
         
-        if (coSachQuaHan) {
-            coQuaHan++;
+        if (hasOverdue) {
+            coQuaHan_Out++;
         }
 
         // Push children to stack
@@ -971,20 +1087,8 @@ static void DemDangMuonIterative(PTRDG root, int& dem) {
         PTRDG node = s.top();
         s.pop();
         
-        // Count if currently borrowing
-        int safety = 0;
-        bool dangMuon = false;
-        MUONTRA p = node->data.dsmt;
-        while (p && safety < SO_VONG_LAP_MT_MAX) {
-            if (p->data.TrangThai == 0) {
-                dangMuon = true;
-                break;
-            }
-            p = p->next;
-            safety++;
-        }
-        
-        if (dangMuon) {
+        // Count if currently borrowing (Using Cache O(1))
+        if (node->data.soSachDangMuon > 0) {
             dem++;
         }
         
@@ -1238,7 +1342,8 @@ void NapDocGiaTuDB_Fixed(PTRDG &root, PTRDS dsDauSach[], int soLuongDS) {
     // 2. Load Doc Gia
     QSqlQuery q(db);
     // Use low-level check
-    if (!q.exec("SELECT ma_the, ho, ten, phai, trang_thai, so_sach_dang_muon FROM doc_gia ORDER BY ma_the")) {
+    // Phase 2: Add SDT, Lop... to select
+    if (!q.exec("SELECT ma_the, ho, ten, phai, trang_thai, so_sach_dang_muon, so_dien_thoai, lop, email, ngay_sinh, loai_doc_gia FROM doc_gia ORDER BY ma_the")) {
          std::cerr << "[DB ERROR] SQL doc_gia: " << q.lastError().text().toStdString() << "\n";
          return;
     }
@@ -1250,10 +1355,23 @@ void NapDocGiaTuDB_Fixed(PTRDG &root, PTRDS dsDauSach[], int soLuongDS) {
         int phaiQ = q.value(3).toInt();
         int trangQ = q.value(4).toInt();
         int soSachDangMuon = q.value(5).toInt();
+        // Phase 2 Columns
+        QString sdt = q.value(6).toString();
+        QString lop = q.value(7).toString();
+        QString email = q.value(8).toString();
+        QString ngaySinh = q.value(9).toString();
+        int loaiDG = q.value(10).toInt();
         
         // Create node
         PTRDG node = taoDocGia(hoQ.toStdString(), tenQ.toStdString(), phaiQ != 0, trangQ, maThe);
         node->data.soSachDangMuon = soSachDangMuon;
+        // Assign new fields
+        node->data.SDT = sdt.toStdString();
+        node->data.Lop = lop.toStdString();
+        node->data.Email = email.toStdString();
+        node->data.NgaySinh = ngaySinh.toStdString();
+        node->data.LoaiDocGia = loaiDG;
+        
         InsertDocGia(root, node, false); // false = no DB sync during load
     }
     
@@ -1327,4 +1445,30 @@ void NapDocGiaTuDB_Fixed(PTRDG &root, PTRDS dsDauSach[], int soLuongDS) {
         recomputeCounts(node->right);
     };
     recomputeCounts(root);
+}
+
+// Duyệt cây InOrder ra vector (Thay thế mảng tĩnh, an toàn bộ nhớ)
+void DuyetCayRaVector(PTRDG root, std::vector<PTRDG>& result) {
+    if (root == nullptr) return;
+
+    std::stack<PTRDG> s;
+    PTRDG curr = root;
+
+    while (curr != nullptr || !s.empty()) {
+        // Reach the left most Node of the curr Node
+        while (curr != nullptr) {
+            s.push(curr);
+            curr = curr->left;
+        }
+
+        // Current must be NULL at this point
+        curr = s.top();
+        s.pop();
+
+        // Add to vector
+        result.push_back(curr);
+
+        // We have visited the node and its left subtree. Now, it's right subtree's turn
+        curr = curr->right;
+    }
 }

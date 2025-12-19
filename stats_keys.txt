@@ -1,0 +1,26 @@
+    m_dictionary["STATS_MAIN_TITLE"] = { {Language::Vietnamese, "THỐNG KÊ TỔNG QUAN THƯ VIỆN"}, {Language::Khmer, "ស្ថិតិបណ្ណាល័យសរុប"}, {Language::English, "LIBRARY STATISTICS OVERVIEW"} };
+    m_dictionary["STATS_BOOKS_GROUP"] = { {Language::Vietnamese, "Thống Kê Sách"}, {Language::Khmer, "ស្ថិតិសៀវភៅ"}, {Language::English, "Book Statistics"} };
+    m_dictionary["STATS_READERS_GROUP"] = { {Language::Vietnamese, "Thống Kê Độc Giả"}, {Language::Khmer, "ស្ថិតិសិស្ស"}, {Language::English, "Reader Statistics"} };
+    
+    // Books
+    m_dictionary["LBL_TOTAL_TITLES"] = { {Language::Vietnamese, "Tổng đầu sách:"}, {Language::Khmer, "ចំនួនសៀវភៅសរុប:"}, {Language::English, "Total Titles:"} };
+    m_dictionary["LBL_TOTAL_COPIES_STAT"] = { {Language::Vietnamese, "Tổng bản sao:"}, {Language::Khmer, "ច្បាប់ចម្លងសរុប:"}, {Language::English, "Total Copies:"} };
+    m_dictionary["LBL_AVAILABLE_STAT"] = { {Language::Vietnamese, "Có thể mượn:"}, {Language::Khmer, "អាចខ្ចីបាន:"}, {Language::English, "Available:"} };
+    m_dictionary["LBL_BORROWED_STAT"] = { {Language::Vietnamese, "Đang mượn:"}, {Language::Khmer, "កំពុងខ្ចី:"}, {Language::English, "Borrowed:"} };
+    m_dictionary["LBL_LIQUIDATED_STAT"] = { {Language::Vietnamese, "Đã thanh lý:"}, {Language::Khmer, "បានលុបចោល:"}, {Language::English, "Liquidated:"} };
+    m_dictionary["LBL_BORROW_RATE"] = { {Language::Vietnamese, "Tỷ lệ cho mượn:"}, {Language::Khmer, "អត្រាការខ្ចី:"}, {Language::English, "Borrow Rate:"} };
+    m_dictionary["LBL_CATEGORIES_STAT"] = { {Language::Vietnamese, "Số thể loại:"}, {Language::Khmer, "ចំនួនប្រភេទ:"}, {Language::English, "Categories:"} };
+    
+    // Readers
+    m_dictionary["LBL_TOTAL_READERS_STAT"] = { {Language::Vietnamese, "Tổng độc giả:"}, {Language::Khmer, "សិស្សសរុប:"}, {Language::English, "Total Readers:"} };
+    m_dictionary["LBL_ACTIVE_STAT"] = { {Language::Vietnamese, "Đang hoạt động:"}, {Language::Khmer, "កំពុងសកម្ម:"}, {Language::English, "Active:"} };
+    m_dictionary["LBL_LOCKED_STAT"] = { {Language::Vietnamese, "Bị khóa thẻ:"}, {Language::Khmer, "បានចាក់សោ:"}, {Language::English, "Locked:"} };
+    m_dictionary["LBL_READERS_BORROWING_STAT"] = { {Language::Vietnamese, "Đang mượn sách:"}, {Language::Khmer, "កំពុងខ្ចីសៀវភៅ:"}, {Language::English, "Borrowing Books:"} };
+    m_dictionary["LBL_TOTAL_BORROWED_BOOKS_STAT"] = { {Language::Vietnamese, "Tổng sách mượn:"}, {Language::Khmer, "ចំនួនសៀវភៅដែលខ្ចី:"}, {Language::English, "Total Borrowed:"} };
+    m_dictionary["LBL_READERS_OVERDUE_STAT"] = { {Language::Vietnamese, "Có sách quá hạn:"}, {Language::Khmer, "មានសៀវភៅហួសកំណត់:"}, {Language::English, "Overdue Readers:"} };
+
+    // Charts
+    m_dictionary["CHART_BOOK_STATUS"] = { {Language::Vietnamese, "Phân Bố Trạng Thái Sách"}, {Language::Khmer, "ការចែកចាយស្ថានភាពសៀវភៅ"}, {Language::English, "Book Status Distribution"} };
+    m_dictionary["CHART_READER_STATUS"] = { {Language::Vietnamese, "Trạng Thái Độc Giả"}, {Language::Khmer, "ស្ថានភាពសិស្ស"}, {Language::English, "Reader Status"} };
+    
+    m_dictionary["BTN_CLOSE"] = { {Language::Vietnamese, "Đóng"}, {Language::Khmer, "បិទ"}, {Language::English, "Close"} };

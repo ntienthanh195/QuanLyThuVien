@@ -1,4 +1,11 @@
+/**
+ * @file AuditLogger.h
+ * @path include/utils/AuditLogger.h
+ * @description Header quản lý Nhật ký hệ thống (Audit Logs).
+ * @project Library Management System (QuanLyThuVien)
+ */
 #ifndef AUDITLOGGER_H
+
 #define AUDITLOGGER_H
 
 #include <QString>
@@ -16,6 +23,13 @@ public:
     static const QString ACTION_UPDATE;
     static const QString ACTION_DELETE;
     static const QString ACTION_RESTORE;
+
+    // Actions for Library Operations
+    static const QString ACTION_BORROW; // "MUON_SACH"
+    static const QString ACTION_RETURN; // "TRA_SACH"
+    static const QString ACTION_LOST;   // "BAO_MAT"
+    static const QString ACTION_SETTINGS; // "CAU_HINH"
+    static const QString ACTION_SYSTEM;   // "HE_THONG"
 
     /**
      * @brief Ghi lại một hành động vào nhật ký

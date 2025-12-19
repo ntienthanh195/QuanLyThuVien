@@ -11,6 +11,8 @@
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QMessageBox>
+#include <QScrollArea>
+#include <QCompleter>
 #include <QDateTime>
 #include <QTimer>
 
@@ -50,14 +52,28 @@ void HopThoaiSuaSach::thieLapGiaoDien() {
     tieuDe->setAlignment(Qt::AlignCenter);
     boTriChinh->addWidget(tieuDe);
     
-    QGroupBox *nhomForm = new QGroupBox(LanguageManager::instance().getText("GROUP_BOOK_INFO"), this);
+    // Scroll Area Setup
+    QScrollArea *scrollArea = new QScrollArea(this);
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setFrameShape(QFrame::NoFrame);
+    scrollArea->setStyleSheet("QScrollArea { background: transparent; } QScrollBar:vertical { width: 8px; background: #1b1b29; } QScrollBar::handle:vertical { background: #565674; border-radius: 4px; }");
+
+    QWidget *scrollContent = new QWidget();
+    scrollContent->setStyleSheet("background: transparent;");
+    QVBoxLayout *scrollLayout = new QVBoxLayout(scrollContent);
+    scrollLayout->setContentsMargins(0, 0, 10, 0); 
+    int spacing = ResponsiveHelper::getScaledSpacing(10, screenSize); // Define spacing variable
+    scrollLayout->setSpacing(spacing);
+
+    // Group Box
+    QGroupBox *nhomForm = new QGroupBox(LanguageManager::instance().getText("GROUP_BOOK_INFO"), scrollContent);
     int fontSize = ResponsiveHelper::getScaledFontSize(14, screenSize);
     nhomForm->setStyleSheet(QString(
         "QGroupBox {"
         "   background-color: #1e1e2d;"
         "   border: 1px solid #323248;"
         "   border-radius: 6px;"
-        "   margin-top: 10px;"
+        "   margin-top: 12px;"
         "   padding-top: 18px;"
         "   font-weight: bold;"
         "   font-size: %1px;"
@@ -74,14 +90,17 @@ void HopThoaiSuaSach::thieLapGiaoDien() {
         "   font-size: 12px;"
         "}"
     ).arg(fontSize));
+    
     QFormLayout *boTriForm = new QFormLayout(nhomForm);
-    boTriForm->setHorizontalSpacing(20);
+    int formSpacing = ResponsiveHelper::getScaledSpacing(12, screenSize);
+    boTriForm->setSpacing(formSpacing);
+    boTriForm->setHorizontalSpacing(15);
     boTriForm->setVerticalSpacing(12);
     boTriForm->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
     
-    int fieldHeight = ResponsiveHelper::getScaledHeight(40, screenSize);
+    int fieldHeight = ResponsiveHelper::getScaledHeight(38, screenSize);
     QString kieuTruong = QString(
-        "QLineEdit, QSpinBox, QComboBox {"
+        "QLineEdit, QSpinBox, QComboBox, QDoubleSpinBox {"
         "   padding: 0 10px;"
         "   border: 1px solid #323248;"
         "   border-radius: 6px;"
@@ -89,71 +108,106 @@ void HopThoaiSuaSach::thieLapGiaoDien() {
         "   background-color: #1b1b29;"
         "   color: #ffffff;"
         "   min-height: %2px;"
-        "   min-width: 300px;"
+        "   selection-background-color: #5D9CEC;"
         "}"
-        "QLineEdit:focus, QSpinBox:focus, QComboBox:focus { border: 1px solid #5D9CEC; background-color: #1b1b29; }"
+        "QLineEdit:focus, QSpinBox:focus, QComboBox:focus, QDoubleSpinBox:focus {"
+        "   border: 1px solid #5D9CEC;"
+        "   background-color: #1b1b29;"
+        "}"
     ).arg(fontSize).arg(fieldHeight);
     
     oNhapISBN = new QLineEdit();
-    oNhapISBN->setReadOnly(true);
+    oNhapISBN->setReadOnly(true); // ISBN cannot be changed
     oNhapISBN->setStyleSheet("background-color: #151521; color: #565674; padding: 0 10px; border: 1px solid #323248; border-radius: 6px; min-height: " + QString::number(fieldHeight) + "px;");
-    QLabel *lblISBN = new QLabel(LanguageManager::instance().getText("LBL_ISBN"));
-    lblISBN->setStyleSheet("font-weight: bold; color: #b5b5c3; font-size: 12px; min-width: 100px;");
-    boTriForm->addRow(lblISBN, oNhapISBN);
+    QLabel *nhanISBN = new QLabel(LanguageManager::instance().getText("TABLE_HEADER_ISBN") + ":");
+    nhanISBN->setStyleSheet("font-weight: bold; color: #FFFFFF; font-size: 12px; min-width: 90px;");
+    boTriForm->addRow(nhanISBN, oNhapISBN);
     
     oNhapTenSach = new QLineEdit();
     oNhapTenSach->setStyleSheet(kieuTruong);
     connect(oNhapTenSach, &QLineEdit::textChanged, this, &HopThoaiSuaSach::kiemTraDuLieu);
-    QLabel *lblTenSach = new QLabel(LanguageManager::instance().getText("LBL_BOOK_NAME") + " *:");
-    lblTenSach->setStyleSheet("font-weight: bold; color: #E0E0E0; font-size: 12px; min-width: 100px;");
-    boTriForm->addRow(lblTenSach, oNhapTenSach);
+    QLabel *nhanTenSach = new QLabel(LanguageManager::instance().getText("TABLE_HEADER_TITLE") + ":");
+    nhanTenSach->setStyleSheet("font-weight: bold; color: #FFFFFF; font-size: 12px; min-width: 90px;");
+    boTriForm->addRow(nhanTenSach, oNhapTenSach);
     
     oNhapTacGia = new QLineEdit();
     oNhapTacGia->setStyleSheet(kieuTruong);
     connect(oNhapTacGia, &QLineEdit::textChanged, this, &HopThoaiSuaSach::kiemTraDuLieu);
-    QLabel *lblTacGia = new QLabel(LanguageManager::instance().getText("LBL_AUTHOR") + " *:");
-    lblTacGia->setStyleSheet("font-weight: bold; color: #E0E0E0; font-size: 12px; min-width: 100px;");
-    boTriForm->addRow(lblTacGia, oNhapTacGia);
+    QLabel *nhanTacGia = new QLabel(LanguageManager::instance().getText("TABLE_HEADER_AUTHOR") + ":");
+    nhanTacGia->setStyleSheet("font-weight: bold; color: #FFFFFF; font-size: 12px; min-width: 90px;");
+    boTriForm->addRow(nhanTacGia, oNhapTacGia);
+
+    // Phase 2: Publisher
+    oNhapNhaXuatBan = new QLineEdit();
+    oNhapNhaXuatBan->setStyleSheet(kieuTruong);
+    QLabel *nhanNXB = new QLabel(LanguageManager::instance().getText("TABLE_HEADER_PUBLISHER") + ":");
+    nhanNXB->setStyleSheet("font-weight: bold; color: #FFFFFF; font-size: 12px; min-width: 90px;");
+    boTriForm->addRow(nhanNXB, oNhapNhaXuatBan);
     
-    hopChonTheLoai = new QComboBox();
-    hopChonTheLoai->setEditable(true);
-    hopChonTheLoai->addItems({"Văn học", "Khoa học", "Công nghệ", "Lịch sử", "Triết học", "Kinh tế", "Tâm lý", "Nghệ thuật", "Thiếu nhi"});
-    hopChonTheLoai->setStyleSheet(kieuTruong);
-    QLabel *lblTheLoai = new QLabel(LanguageManager::instance().getText("LBL_CATEGORY") + " *:");
-    lblTheLoai->setStyleSheet("font-weight: bold; color: #E0E0E0; font-size: 12px; min-width: 100px;");
-    boTriForm->addRow(lblTheLoai, hopChonTheLoai);
+    oNhapTheLoai = new QLineEdit();
+    oNhapTheLoai->setStyleSheet(kieuTruong);
+    connect(oNhapTheLoai, &QLineEdit::textChanged, this, &HopThoaiSuaSach::kiemTraDuLieu);
+    
+    // Auto complete
+    QStringList goiYTheLoai = {"Văn học", "Khoa học", "Công nghệ", "Lịch sử", "Triết học", 
+                              "Kinh tế", "Tâm lý", "Nghệ thuật", "Thiếu nhi", "Giáo dục",
+                              "Y học", "Thể thao", "Du lịch", "Ẩm thực", "Tôn giáo"};
+    QCompleter *completer = new QCompleter(goiYTheLoai, this);
+    completer->setCaseSensitivity(Qt::CaseInsensitive);
+    completer->setFilterMode(Qt::MatchContains);
+    oNhapTheLoai->setCompleter(completer);
+    
+    QLabel *nhanTheLoai = new QLabel(LanguageManager::instance().getText("TABLE_HEADER_CATEGORY") + ":");
+    nhanTheLoai->setStyleSheet("font-weight: bold; color: #FFFFFF; font-size: 12px; min-width: 90px;");
+    boTriForm->addRow(nhanTheLoai, oNhapTheLoai);
     
     soNamXuatBan = new QSpinBox();
-    soNamXuatBan->setRange(1000, QDateTime::currentDateTime().date().year());
-    soNamXuatBan->setSuffix("");
+    soNamXuatBan->setRange(1000, 3000);
     soNamXuatBan->setStyleSheet(kieuTruong);
-    QLabel *lblNam = new QLabel(LanguageManager::instance().getText("LBL_YEAR") + ":");
-    lblNam->setStyleSheet("font-weight: bold; color: #E0E0E0; font-size: 12px; min-width: 100px;");
-    boTriForm->addRow(lblNam, soNamXuatBan);
+    soNamXuatBan->setButtonSymbols(QAbstractSpinBox::NoButtons);
+    QLabel *nhanNam = new QLabel(LanguageManager::instance().getText("TABLE_HEADER_YEAR") + ":");
+    nhanNam->setStyleSheet("font-weight: bold; color: #FFFFFF; font-size: 12px; min-width: 90px;");
+    boTriForm->addRow(nhanNam, nhanNam);
     
     soSoTrang = new QSpinBox();
     soSoTrang->setRange(1, 10000);
-    soSoTrang->setSuffix("");
     soSoTrang->setStyleSheet(kieuTruong);
-    QLabel *lblSoTrang = new QLabel(LanguageManager::instance().getText("LBL_PAGES") + ":");
-    lblSoTrang->setStyleSheet("font-weight: bold; color: #E0E0E0; font-size: 12px; min-width: 100px;");
-    boTriForm->addRow(lblSoTrang, soSoTrang);
+    soSoTrang->setButtonSymbols(QAbstractSpinBox::NoButtons);
+    QLabel *nhanSoTrang = new QLabel(LanguageManager::instance().getText("TABLE_HEADER_PAGES") + ":");
+    nhanSoTrang->setStyleSheet("font-weight: bold; color: #FFFFFF; font-size: 12px; min-width: 90px;");
+    boTriForm->addRow(nhanSoTrang, soSoTrang);
+
+    // Feature: Price Input
+    oNhapGiaTien = new QDoubleSpinBox();
+    oNhapGiaTien->setRange(0, 1000000000); // 1 billion max
+    oNhapGiaTien->setSingleStep(1000);
+    oNhapGiaTien->setDecimals(0);
+    oNhapGiaTien->setSuffix(" VNĐ");
+    oNhapGiaTien->setStyleSheet(kieuTruong);
+    oNhapGiaTien->setButtonSymbols(QAbstractSpinBox::NoButtons);
     
-    soGiaTien = new QDoubleSpinBox();
-    soGiaTien->setRange(0, 1000000000);
-    soGiaTien->setSuffix("");
-    soGiaTien->setSingleStep(1000);
-    soGiaTien->setDecimals(0);
-    soGiaTien->setStyleSheet(kieuTruong);
-    QLabel *lblGiaTien = new QLabel(LanguageManager::instance().getText("LBL_PRICE") + ":", this);
-    lblGiaTien->setStyleSheet("font-weight: bold; color: #E0E0E0; font-size: 12px; min-width: 100px;");
-    boTriForm->addRow(lblGiaTien, soGiaTien);
+    QLabel *lblGia = new QLabel(LanguageManager::instance().getText("LBL_PRICE") + ":");
+    lblGia->setStyleSheet("font-weight: bold; color: #FFFFFF; font-size: 12px; min-width: 90px;");
+    boTriForm->addRow(lblGia, oNhapGiaTien);
+
+    // Location
+    oNhapViTri = new QLineEdit();
+    oNhapViTri->setStyleSheet(kieuTruong);
+    QLabel *lblViTri = new QLabel(LanguageManager::instance().getText("LBL_LOCATION") + ":");
+    lblViTri->setStyleSheet("font-weight: bold; color: #FFFFFF; font-size: 12px; min-width: 90px;");
+    boTriForm->addRow(lblViTri, oNhapViTri);
     
-    boTriChinh->addWidget(nhomForm);
+    scrollLayout->addWidget(nhomForm);
     
     nhanTrangThai = new QLabel("");
     nhanTrangThai->setAlignment(Qt::AlignCenter);
-    boTriChinh->addWidget(nhanTrangThai);
+    nhanTrangThai->setStyleSheet("color: #B5B5C3; font-style: italic;");
+    scrollLayout->addWidget(nhanTrangThai);
+    
+    // FINALIZE SCROLL
+    scrollContent->setLayout(scrollLayout);
+    scrollArea->setWidget(scrollContent);
+    boTriChinh->addWidget(scrollArea);
     
     QHBoxLayout *boTriNut = new QHBoxLayout();
     int buttonHeight = ResponsiveHelper::getScaledHeight(45, screenSize);
@@ -209,10 +263,16 @@ void HopThoaiSuaSach::taiDuLieuSach() {
     oNhapISBN->setText(QString::fromStdString(sachHienTai->ISBN));
     oNhapTenSach->setText(QString::fromStdString(sachHienTai->tenSach));
     oNhapTacGia->setText(QString::fromStdString(sachHienTai->tacGia));
-    hopChonTheLoai->setCurrentText(QString::fromStdString(sachHienTai->theLoai));
+    oNhapTheLoai->setText(QString::fromStdString(sachHienTai->theLoai));
     soNamXuatBan->setValue(sachHienTai->namXuatBan);
     soSoTrang->setValue(sachHienTai->soTrang);
-    soGiaTien->setValue((double)sachHienTai->giaTien);
+    oNhapGiaTien->setValue((double)sachHienTai->giaTien);
+    oNhapNhaXuatBan->setText(QString::fromStdString(sachHienTai->NhaXuatBan));
+    if (sachHienTai->dms && !sachHienTai->dms->viTri.empty()) {
+        oNhapViTri->setText(QString::fromStdString(sachHienTai->dms->viTri));
+    } else {
+        oNhapViTri->clear();
+    }
 }
 
 void HopThoaiSuaSach::kiemTraDuLieu() {
@@ -235,10 +295,12 @@ void HopThoaiSuaSach::xuLyNutLuu() {
     
     std::string tenSach = oNhapTenSach->text().trimmed().toStdString();
     std::string tacGia = oNhapTacGia->text().trimmed().toStdString();
-    std::string theLoai = hopChonTheLoai->currentText().trimmed().toStdString();
+    std::string theLoai = oNhapTheLoai->text().trimmed().toStdString();
     int namXB = soNamXuatBan->value();
     int soTrang = soSoTrang->value();
-    long long giaTien = (long long)soGiaTien->value();
+    long long giaTien = (long long)oNhapGiaTien->value();
+    std::string nhaXuatBan = oNhapNhaXuatBan->text().trimmed().toStdString();
+    std::string viTri = oNhapViTri->text().trimmed().toStdString();
     
     // CHUẨN HÓA DỮ LIỆU
     std::string tenChuan, tacGiaChuan, theLoaiChuan;
@@ -265,9 +327,16 @@ void HopThoaiSuaSach::xuLyNutLuu() {
     
     theLoaiChuan = ChuyenThanhTitleCase(ChuanHoaKhoangTrang(theLoai));
     
+    // Normalize new fields
+    std::string nhaXuatBanChuan;
+    if (!nhaXuatBan.empty()) ChuanHoaTenUnicode(nhaXuatBan, 0, 100, nhaXuatBanChuan);
+    else nhaXuatBanChuan = "";
+    
+    std::string viTriChuan = ChuanHoaViTri(viTri);
+    
     // Sử dụng hàm backend CapNhatThongTinDauSach với dữ liệu đã chuẩn hóa
     std::string ketQua = CapNhatThongTinDauSach(
-        sachHienTai->ISBN, tenChuan, soTrang, tacGiaChuan, namXB, theLoaiChuan, "", giaTien
+        sachHienTai->ISBN, tenChuan, soTrang, tacGiaChuan, namXB, theLoaiChuan, viTriChuan, giaTien, nhaXuatBanChuan
     );
     
     if (ketQua.find("Thành công") != std::string::npos || ketQua.find("thành công") != std::string::npos) {

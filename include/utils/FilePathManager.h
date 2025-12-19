@@ -1,4 +1,11 @@
+/**
+ * @file FilePathManager.h
+ * @path include/utils/FilePathManager.h
+ * @description Header quản lý đường dẫn (Singleton).
+ * @project Library Management System (QuanLyThuVien)
+ */
 #ifndef FILEPATHMANAGER_H
+
 #define FILEPATHMANAGER_H
 
 #include <QString>
@@ -6,6 +13,7 @@
 #include <QFile>
 #include <QCoreApplication>
 #include <QDebug>
+#include <iostream>
 #include "utils/BackupManager.h"
 
 /**
@@ -17,76 +25,85 @@
 class FilePathManager {
 public:
     // Khởi tạo đường dẫn gốc (gọi 1 lần khi khởi động app)
-    // Chỉ gán rootPath và filesDir; không tự động tạo hay copy file.
     static void initialize() {
         if (!isInitialized) {
             QString exePath = QCoreApplication::applicationDirPath();
-            rootPath = exePath;
-
-            // Thay vì luôn dùng exeDir/data, dò lên dần các thư mục cha để tìm file "data/files/library.db"
-            // Mục tiêu: luôn tham chiếu tới 1 file canonical trong repository nếu có.
-            QDir probeDir(exePath);
-            QString foundData;
-            for (int i = 0; i < 12; ++i) { // dò lên tối đa 12 mức để phòng các trường hợp build trong sâu
-                QString candidateDb = probeDir.filePath("data/files/library.db");
-                if (QFile::exists(candidateDb)) {
-                    foundData = probeDir.filePath("data");
-                    rootPath = probeDir.absolutePath(); // Fix: Update rootPath to Project Root
-                    break;
-                }
-                if (!probeDir.cdUp()) break;
+            
+            // Priority 0: APP_SOURCE_DIR (From IDE build)
+            #ifdef APP_SOURCE_DIR
+            QString srcPath = QString(APP_SOURCE_DIR);
+            if (QFile::exists(srcPath + "/data/files/library.db")) {
+                rootPath = srcPath;
+                filesDir = srcPath + "/data";
+                qDebug() << "[Path] Root found via APP_SOURCE_DIR:" << rootPath;
+                isInitialized = true;
+                return;
             }
+            #endif
 
-            if (!foundData.isEmpty()) {
-                filesDir = foundData;
-                qDebug() << "[FilePathManager] Đã tìm thấy data dir tại:" << filesDir;
+            // Priority 1: "data" directory next to exe (Portable mode)
+            QDir exeDir(exePath);
+            QString portableDb = exeDir.absoluteFilePath("data/files/library.db");
+            
+            if (QFile::exists(portableDb)) {
+                rootPath = exeDir.absolutePath();
+                filesDir = exeDir.absolutePath() + "/data";
+                qDebug() << "[Path] Root found (Portable):" << filesDir;
             } else {
-                // Fallback: dùng exeDir/data như trước nhưng log rõ cảnh báo
-                filesDir = QDir(rootPath).filePath("data"); // không tự tạo
-                qWarning() << "[FilePathManager] KHÔNG tìm thấy 'data/files/library.db' khi dò từ exe; đang dùng" << filesDir;
-                qWarning() << "-> Nếu bạn muốn ép buộc dùng file cụ thể, đặt file library.db vào 'data/files' gần exe hoặc chạy ứng dụng từ thư mục gốc dự án.";
+                // Priority 2: Probe upwards (Development mode/Shadow Build)
+                QDir probeDir(exePath);
+                bool found = false;
+                for (int i = 0; i < 6; ++i) { 
+                    QString candDb = probeDir.absoluteFilePath("data/files/library.db");
+                    if (QFile::exists(candDb)) {
+                        rootPath = probeDir.absolutePath();
+                        filesDir = probeDir.absolutePath() + "/data";
+                        found = true;
+                        qDebug() << "[Path] Root found at level" << i << ":" << filesDir;
+                        break;
+                    }
+                    if (!probeDir.cdUp()) break;
+                }
+                
+                if (!found) {
+                    rootPath = exePath;
+                    filesDir = exePath + "/data";
+                    qWarning() << "[Path] Root NOT found, using default:" << filesDir;
+                }
             }
 
-            // Thử gom backup cũ nếu có — lỗi sẽ bị bỏ qua
-            try {
-                int moved = ConsolidateLegacyBackups(rootPath.toStdString());
-                if (moved > 0) qDebug() << "[FilePathManager] Đã hợp nhất" << moved << "backup cũ vào data/backup";
-            } catch(...) {
-                qWarning() << "[FilePathManager] Lỗi khi hợp nhất backup (bỏ qua)";
-            }
+            // Ensure critical directories exist
+            QDir d(filesDir);
+            d.mkpath("files");
+            d.mkpath("logs/receipts");
+            d.mkpath("backup");
 
             isInitialized = true;
         }
     }
 
-    // Lấy đường dẫn đầy đủ của file trong data/
-    static QString getFilePath(const QString& filename) {
+    // Lấy đường dẫn đầy đủ của file/thư mục trong data/
+    static QString getFilePath(const QString& relPath) {
         if (!isInitialized) initialize();
-        return QDir(filesDir).filePath(filename);
+        return QDir(filesDir).absoluteFilePath(relPath);
     }
 
-    // Trả về đường dẫn tới DB chính `data/files/library.db`.
-    // Nếu file không tồn tại, trả về chuỗi rỗng và log cảnh báo — caller phải xử lý.
+    // Trả về đường dẫn TUYỆT ĐỐI tới DB chính
     static QString getLibraryDbPath() {
-        if (!isInitialized) initialize();
-        QDir d(filesDir);
-        QString dbPath = d.filePath("files/library.db");
-        if (!QFile::exists(dbPath)) {
-            qWarning() << "[FilePathManager] KHÔNG tìm thấy file DB tại:" << dbPath;
-            return QString();
-        }
-        return dbPath;
+        return getFilePath("files/library.db");
     }
 
     static std::string getLibraryDbPathStd() { return getLibraryDbPath().toStdString(); }
 
-    // Các helper đường dẫn chuẩn
+    // Các helper đường dẫn chuẩn (Toàn bộ trả về Absolute Path)
     static QString getFilesDirectory() { if (!isInitialized) initialize(); return filesDir; }
     static QString getRootPath() { if (!isInitialized) initialize(); return rootPath; }
+    
     static QString getDauSachPath() { return getFilePath("dausach.txt"); }
     static QString getDanhMucSachPath() { return getFilePath("danhmucsach.txt"); }
     static QString getDocGiaPath() { return getFilePath("docgia.txt"); }
     static QString getMuonTraPath() { return getFilePath("muontra.txt"); }
+    static QString getPrintLogPath() { return getFilePath("logs/receipts"); }
 
     static std::string getDauSachPathStd() { return getDauSachPath().toStdString(); }
     static std::string getDanhMucSachPathStd() { return getDanhMucSachPath().toStdString(); }

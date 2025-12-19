@@ -1,4 +1,12 @@
+/**
+ * @file AuditLogger.cpp
+ * @path src/utils/AuditLogger.cpp
+ * @description Ghi chép nhật ký hoạt động của hệ thống (Audit Logs).
+ * Theo dõi các thao tác quan trọng: đăng nhập, thêm/sửa/xóa dữ liệu, mượn/trả sách để phục vụ quản trị và bảo mật.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #include "utils/AuditLogger.h"
+
 #include "utils/DatabaseManager.h"
 #include "models/UserManager.h"
 #include "utils/EventBus.h"
@@ -13,6 +21,11 @@ const QString AuditLogger::ACTION_INSERT = "INSERT";
 const QString AuditLogger::ACTION_UPDATE = "UPDATE";
 const QString AuditLogger::ACTION_DELETE = "DELETE";
 const QString AuditLogger::ACTION_RESTORE = "RESTORE";
+const QString AuditLogger::ACTION_BORROW = "MUON_SACH";
+const QString AuditLogger::ACTION_RETURN = "TRA_SACH";
+const QString AuditLogger::ACTION_LOST = "BAO_MAT";
+const QString AuditLogger::ACTION_SETTINGS = "CAU_HINH";
+const QString AuditLogger::ACTION_SYSTEM = "HE_THONG";
 
 void AuditLogger::log(const QString& action, const QString& table, const QString& objectId, const QString& details) {
     // 1. Lấy thông tin người dùng hiện tại

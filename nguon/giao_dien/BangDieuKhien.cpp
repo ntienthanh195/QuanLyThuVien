@@ -1,4 +1,12 @@
+/**
+ * @file BangDieuKhien.cpp
+ * @path nguon/giao_dien/BangDieuKhien.cpp
+ * @description Widget Dashboard (Bảng điều khiển) chính của ứng dụng.
+ * Hiển thị các phím tắt điều hướng nhanh, thống kê sơ lược và là màn hình chào mừng.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #include "giao_dien/BangDieuKhien.h"
+
 #include "giao_dien/hop_thoai/HopThoaiThongKe.h"
 #include "giao_dien/hop_thoai/HopThoaiTop10.h"
 #include "giao_dien/hop_thoai/HopThoaiQuetMaVach.h"
@@ -18,8 +26,11 @@
 #include "utils/AuditLogger.h"
 #include "utils/DatabaseManager.h"
 #include "utils/BackupManager.h"
+#include "utils/ImportManager.h"
+#include "views/dialogs/ManHinhPreviewImport.h"
 #include <QSqlQuery>
 #include <QSqlError>
+#include "utils/PrintHelper.h"
 #include <QFileDialog>
 #include <QTextStream>
 #include <QDateTime>
@@ -93,6 +104,12 @@ namespace {
         }
         void setList(const std::vector<Item> &list) { beginResetModel(); m_items = list; endResetModel(); }
         void prepend(const Item &it) { beginResetModel(); m_items.insert(m_items.begin(), it); if (m_items.size() > 50) m_items.resize(50); endResetModel(); }
+        
+        // Expose refresh for language update
+        void refreshLanguage() {
+            emit headerDataChanged(Qt::Horizontal, 0, 3);
+            emit layoutChanged();
+        }
     private:
         std::vector<Item> m_items;
     };
@@ -109,8 +126,7 @@ BangDieuKhien::BangDieuKhien(QWidget *cha) : QWidget(cha),
     nutQuanLyDocGia(nullptr),
     nutMuonTraSach(nullptr),
     nutXemBaoCao(nullptr),
-    nutInThe(nullptr),
-    nutQuetMa(nullptr)
+    nutInThe(nullptr)
 {
     qDebug() << "Bắt đầu khởi tạo BangDieuKhien";
     thieLapGiaoDien();
@@ -121,47 +137,47 @@ BangDieuKhien::BangDieuKhien(QWidget *cha) : QWidget(cha),
     // Kết nối EventBus để nhận các sự kiện và ghi vào bảng Hoạt động gần đây
     try {
         connect(&EventBus::instance(), &EventBus::docGiaAdded, this, [this](int maThe){
-            AuditLogger::log("Thêm", "DOC_GIA", QString::number(maThe), QString("Độc giả - Mã thẻ: %1").arg(maThe));
+            AuditLogger::log(AuditLogger::ACTION_INSERT, "DOC_GIA", QString::number(maThe), QString("Độc giả - Mã thẻ: %1").arg(maThe));
         });
         connect(&EventBus::instance(), &EventBus::docGiaUpdated, this, [this](int maThe){
-            AuditLogger::log("Sửa", "DOC_GIA", QString::number(maThe), QString("Độc giả - Mã thẻ: %1").arg(maThe));
+            AuditLogger::log(AuditLogger::ACTION_UPDATE, "DOC_GIA", QString::number(maThe), QString("Độc giả - Mã thẻ: %1").arg(maThe));
         });
         connect(&EventBus::instance(), &EventBus::docGiaRemoved, this, [this](int maThe){
-            AuditLogger::log("Xóa", "DOC_GIA", QString::number(maThe), QString("Độc giả - Mã thẻ: %1").arg(maThe));
+            AuditLogger::log(AuditLogger::ACTION_DELETE, "DOC_GIA", QString::number(maThe), QString("Độc giả - Mã thẻ: %1").arg(maThe));
         });
 
         connect(&EventBus::instance(), &EventBus::dauSachAdded, this, [this](const QString &isbn){
-            AuditLogger::log("Thêm", "DAU_SACH", isbn, QString("Sách - ISBN: %1").arg(isbn));
+            AuditLogger::log(AuditLogger::ACTION_INSERT, "DAU_SACH", isbn, QString("Sách - ISBN: %1").arg(isbn));
         });
         connect(&EventBus::instance(), &EventBus::dauSachUpdated, this, [this](const QString &isbn){
-            AuditLogger::log("Sửa", "DAU_SACH", isbn, QString("Sách - ISBN: %1").arg(isbn));
+            AuditLogger::log(AuditLogger::ACTION_UPDATE, "DAU_SACH", isbn, QString("Sách - ISBN: %1").arg(isbn));
         });
         connect(&EventBus::instance(), &EventBus::dauSachRemoved, this, [this](const QString &isbn){
-            AuditLogger::log("Xóa", "DAU_SACH", isbn, QString("Sách - ISBN: %1").arg(isbn));
+            AuditLogger::log(AuditLogger::ACTION_DELETE, "DAU_SACH", isbn, QString("Sách - ISBN: %1").arg(isbn));
         });
 
         connect(&EventBus::instance(), &EventBus::nguoiDungAdded, this, [this](const QString &username){
-            AuditLogger::log("Thêm", "NGUOI_DUNG", username, QString("Nhân viên - User: %1").arg(username));
+            AuditLogger::log(AuditLogger::ACTION_INSERT, "NGUOI_DUNG", username, QString("Nhân viên - User: %1").arg(username));
         });
         connect(&EventBus::instance(), &EventBus::nguoiDungUpdated, this, [this](const QString &username){
-            AuditLogger::log("Sửa", "NGUOI_DUNG", username, QString("Nhân viên - User: %1").arg(username));
+            AuditLogger::log(AuditLogger::ACTION_UPDATE, "NGUOI_DUNG", username, QString("Nhân viên - User: %1").arg(username));
         });
         connect(&EventBus::instance(), &EventBus::nguoiDungRemoved, this, [this](const QString &username){
-            AuditLogger::log("Xóa", "NGUOI_DUNG", username, QString("Nhân viên - User: %1").arg(username));
+            AuditLogger::log(AuditLogger::ACTION_DELETE, "NGUOI_DUNG", username, QString("Nhân viên - User: %1").arg(username));
         });
 
         connect(&EventBus::instance(), &EventBus::muonTraAdded, this, [this](int maThe, const QString &maSach){
-            AuditLogger::log("Mượn", "MUON_TRA", QString("%1-%2").arg(maThe).arg(maSach), QString("Thẻ: %1 | Sách: %2").arg(maThe).arg(maSach));
+            AuditLogger::log(AuditLogger::ACTION_BORROW, "MUON_TRA", QString("%1-%2").arg(maThe).arg(maSach), QString("Thẻ: %1 | Sách: %2").arg(maThe).arg(maSach));
         });
         connect(&EventBus::instance(), &EventBus::muonTraUpdated, this, [this](int maThe, const QString &maSach){
-            AuditLogger::log("Sửa/Gia hạn", "MUON_TRA", QString("%1-%2").arg(maThe).arg(maSach), QString("Thẻ: %1 | Sách: %2").arg(maThe).arg(maSach));
+            AuditLogger::log(AuditLogger::ACTION_UPDATE, "MUON_TRA", QString("%1-%2").arg(maThe).arg(maSach), QString("Thẻ: %1 | Sách: %2").arg(maThe).arg(maSach));
         });
         connect(&EventBus::instance(), &EventBus::muonTraRemoved, this, [this](int maThe, const QString &maSach){
-            AuditLogger::log("Trả", "MUON_TRA", QString("%1-%2").arg(maThe).arg(maSach), QString("Thẻ: %1 | Sách: %2").arg(maThe).arg(maSach));
+            AuditLogger::log(AuditLogger::ACTION_RETURN, "MUON_TRA", QString("%1-%2").arg(maThe).arg(maSach), QString("Thẻ: %1 | Sách: %2").arg(maThe).arg(maSach));
         });
 
         connect(&EventBus::instance(), &EventBus::dataChanged, this, [this](){
-            AuditLogger::log("System", "DATA", "", "Dữ liệu bên ngoài thay đổi");
+            AuditLogger::log(AuditLogger::ACTION_SYSTEM, "DATA", "", "Dữ liệu bên ngoài thay đổi");
         });
 
         // CENTRAL LOG LISTENER: receives events from AuditLogger (and thus DB)
@@ -226,9 +242,8 @@ void BangDieuKhien::thieLapGiaoDien() {
 
 void BangDieuKhien::taoTheThongKe(QVBoxLayout *boTri) {
     // Lấy thống kê từ backend
-    extern PTRDG rootDocGia;
-    extern PTRDS dsDauSach[];
-    extern int soLuongDauSach;
+    // dsDauSach, soLuongDauSach from QuanLySach.h
+
     
     // KIỂM TRA DỮ LIỆU HỢP LỆ - QUAN TRỌNG ĐỂ TRÁNH CRASH
     if (!boTri) {
@@ -292,10 +307,11 @@ void BangDieuKhien::taoTheThongKe(QVBoxLayout *boTri) {
     layoutThe->setSpacing(15);
     
     // 4 thẻ với icon và màu riêng - LƯU CÁC LABEL ĐỂ CẬP NHẬT SAU
-    QWidget *theTongSach = taoTheNho(":/icons/book.svg", QString::number(tkSach.tongSoBanSao), LanguageManager::instance().getText("DASH_TOTAL_BOOKS"), "#3B82F6", &labelSoLieuTongSach);
-    QWidget *theTongDocGia = taoTheNho(":/icons/user.svg", QString::number(tkDocGia.tongSoDocGia), LanguageManager::instance().getText("DASH_TOTAL_READERS"), "#10B981", &labelSoLieuTongDocGia);
-    QWidget *theDangMuon = taoTheNho(":/icons/transaction.svg", QString::number(tkSach.soBanSaoDangMuon), LanguageManager::instance().getText("DASH_BORROWING"), "#F59E0B", &labelSoLieuDangMuon);
-    QWidget *theQuaHan = taoTheNho(":/icons/warning.svg", QString::number(tkDocGia.docGiaCoSachQuaHan), LanguageManager::instance().getText("DASH_OVERDUE"), "#EF4444", &labelSoLieuQuaHan);
+    // 4 thẻ với icon và màu riêng - LƯU CÁC LABEL ĐỂ CẬP NHẬT SAU
+    QWidget *theTongSach = taoTheNho(":/icons/book.svg", QString::number(tkSach.tongSoBanSao), LanguageManager::instance().getText("DASH_TOTAL_BOOKS"), "#3B82F6", &labelSoLieuTongSach, &lblTitleTongSach);
+    QWidget *theTongDocGia = taoTheNho(":/icons/user.svg", QString::number(tkDocGia.tongSoDocGia), LanguageManager::instance().getText("DASH_TOTAL_READERS"), "#10B981", &labelSoLieuTongDocGia, &lblTitleTongDocGia);
+    QWidget *theDangMuon = taoTheNho(":/icons/transaction.svg", QString::number(tkSach.soBanSaoDangMuon), LanguageManager::instance().getText("DASH_BORROWING"), "#F59E0B", &labelSoLieuDangMuon, &lblTitleDangMuon);
+    QWidget *theQuaHan = taoTheNho(":/icons/warning.svg", QString::number(tkDocGia.docGiaCoSachQuaHan), LanguageManager::instance().getText("DASH_OVERDUE"), "#EF4444", &labelSoLieuQuaHan, &lblTitleQuaHan);
     
     layoutThe->addWidget(theTongSach);
     layoutThe->addWidget(theTongDocGia);
@@ -305,7 +321,7 @@ void BangDieuKhien::taoTheThongKe(QVBoxLayout *boTri) {
     boTri->addLayout(layoutThe);
 }
 
-QWidget* BangDieuKhien::taoTheNho(const QString &iconPath, const QString &soLieu, const QString &nhan, const QString &mau, QLabel **outLabelSoLieu) {
+QWidget* BangDieuKhien::taoTheNho(const QString &iconPath, const QString &soLieu, const QString &nhan, const QString &mau, QLabel **outLabelSoLieu, QLabel **outLabelNhan) {
     QWidget *the = new QWidget();
     the->setMinimumHeight(140);
     the->setStyleSheet(QString(
@@ -391,6 +407,11 @@ QWidget* BangDieuKhien::taoTheNho(const QString &iconPath, const QString &soLieu
         "letter-spacing: 0.3px;"
         "border: none;"
     );
+    
+    // Capture pointer title
+    if (outLabelNhan) {
+        *outLabelNhan = labelNhan;
+    }
     
     boTri->addWidget(labelIcon);
     boTri->addSpacing(5);
@@ -503,109 +524,90 @@ void BangDieuKhien::yeuCauCapNhatThongKe() {
 }
 
 // NEW: Lightweight update - only setText(), no recreate UI
+// NEW: Lightweight update - only setText(), no recreate UI
 void BangDieuKhien::capNhatThongKeNhanh() {
-    extern int soLuongDauSach;
-    extern PTRDG rootDocGia;
+    // dsDauSach and soLuongDauSach are available from QuanLySach.h
+    // rootDocGia from DocGia.h
+    
+    // Use unified stats calculation (Shared Helpers) to avoid code duplication
+    // and improve performance (Single traversal instead of multiple)
+    
+    ThongKeSach tkSach = {};
+    ThongKeDocGia tkDocGia = {};
+    
+    try {
+        tkSach = LayThongKeSach();
+        
+        if (rootDocGia) {
+            tkDocGia = LayThongKeDocGia(rootDocGia, dsDauSach, soLuongDauSach);
+        }
+    } catch (...) {
+        qWarning() << "Lỗi khi cập nhật thống kê nhanh";
+    }
     
     // Update số liệu sách
     if (labelSoLieuTongSach) {
-        labelSoLieuTongSach->setText(QString::number(soLuongDauSach));
+        labelSoLieuTongSach->setText(QString::number(tkSach.tongSoBanSao));
     }
     
-    // Update số độc giả (count tree)
+    // Update số độc giả
     if (labelSoLieuTongDocGia) {
-        int count = demDocGia(rootDocGia);
-        labelSoLieuTongDocGia->setText(QString::number(count));
+        labelSoLieuTongDocGia->setText(QString::number(tkDocGia.tongSoDocGia));
     }
     
-    // Update đang mượn (query SQL nhanh)
+    // Update đang mượn
     if (labelSoLieuDangMuon) {
-        int dangMuon = demSachDangMuon();
-        labelSoLieuDangMuon->setText(QString::number(dangMuon));
+        labelSoLieuDangMuon->setText(QString::number(tkSach.soBanSaoDangMuon));
     }
     
     // Update quá hạn
     if (labelSoLieuQuaHan) {
-        int quaHan = demSachQuaHan();
-        labelSoLieuQuaHan->setText(QString::number(quaHan));
+        labelSoLieuQuaHan->setText(QString::number(tkDocGia.docGiaCoSachQuaHan));
     }
 }
 
-// Helper: Count readers in BST
-int BangDieuKhien::demDocGia(PTRDG root) const {
-    if (!root) return 0;
-    return 1 + demDocGia(root->left) + demDocGia(root->right);
-}
+// Helpers demDocGia, demSachDangMuon, demSachQuaHan REMOVED
+// Logic consolidated to use LayThongKeSach and LayThongKeDocGia in capNhatThongKeNhanh
 
-// Helper: Count books currently on loan (via tree traversal)
-int BangDieuKhien::demSachDangMuon() const {
-    extern PTRDS dsDauSach[];
-    extern int soLuongDauSach;
+// NEW: Central method for smart language update
+void BangDieuKhien::retranslateUi() {
+    // Header
+    if (lblHello) lblHello->setText(LanguageManager::instance().getText("DASH_WELCOME"));
+    if (lblSubtitle) lblSubtitle->setText(LanguageManager::instance().getText("DASH_SUBTITLE"));
+    if (inputSearch) inputSearch->setPlaceholderText(LanguageManager::instance().getText("DASH_SEARCH_PLACEHOLDER"));
     
-    int count = 0;
-    for (int i = 0; i < soLuongDauSach; i++) {
-        if (!dsDauSach[i]) continue;
-        PTRDMS p = dsDauSach[i]->dms;
-        while (p) {
-            if (p->trangThai == 1) count++; // 1 = DANG_MUON (borrowed)
-            p = p->next;
+    // Quick Access Buttons
+    if (nutQuanLySach) nutQuanLySach->setText(LanguageManager::instance().getText("MENU_BOOKS"));
+    if (nutQuanLyDocGia) nutQuanLyDocGia->setText(LanguageManager::instance().getText("MENU_READERS"));
+    if (nutMuonTraSach) nutMuonTraSach->setText(LanguageManager::instance().getText("MENU_LOAN"));
+    if (nutXemBaoCao) nutXemBaoCao->setText(LanguageManager::instance().getText("BTN_REPORTS"));
+    
+    // Stat Cards
+    if (lblTitleTongSach) lblTitleTongSach->setText(LanguageManager::instance().getText("DASH_TOTAL_BOOKS"));
+    if (lblTitleTongDocGia) lblTitleTongDocGia->setText(LanguageManager::instance().getText("DASH_TOTAL_READERS"));
+    if (lblTitleDangMuon) lblTitleDangMuon->setText(LanguageManager::instance().getText("DASH_BORROWING"));
+    if (lblTitleQuaHan) lblTitleQuaHan->setText(LanguageManager::instance().getText("DASH_OVERDUE"));
+    
+    // Panels
+    if (lblTitleCanhBao) lblTitleCanhBao->setText(LanguageManager::instance().getText("DASH_PANEL_ALERTS"));
+    
+    // Activity Table Header
+    if (modelHoatDong) {
+        ActivityModel *model = dynamic_cast<ActivityModel*>(modelHoatDong);
+        if (model) {
+            model->refreshLanguage();
         }
     }
-    return count;
-}
-
-// Helper: Count overdue books (use existing API)
-int BangDieuKhien::demSachQuaHan() const {
-    extern PTRDG rootDocGia;
-    extern PTRDS dsDauSach[];
-    extern int soLuongDauSach;
-    
-    // Use existing ThongKeDocGia API which already calculates this
-    ThongKeDocGia tk = LayThongKeDocGia(rootDocGia, dsDauSach, soLuongDauSach);
-    return tk.docGiaCoSachQuaHan; // Number of readers with overdue books (approximation)
 }
 
 void BangDieuKhien::capNhatNgonNgu() {
     try {
         qDebug() << "[BangDieuKhien] Language update started - Smart Update";
         
-        // Strategy: Find and update specific labels by objectName instead of recreating entire UI
+        // Use smart update: setText only, no recreation
+        retranslateUi();
         
-        // Update button texts
-        if (nutQuanLySach) {
-            nutQuanLySach->setText(LanguageManager::instance().getText("MENU_BOOKS"));
-        }
-        if (nutQuanLyDocGia) {
-            nutQuanLyDocGia->setText(LanguageManager::instance().getText("MENU_READERS"));
-        }
-        if (nutMuonTraSach) {
-            nutMuonTraSach->setText(LanguageManager::instance().getText("MENU_LOAN"));
-        }
-        if (nutXemBaoCao) {
-            nutXemBaoCao->setText(LanguageManager::instance().getText("BTN_REPORTS"));
-        }
-        
-        // For other labels that don't have saved pointers,
-        // we still need to recreate UI but with debouncing to prevent lag
-        if (!m_updateTimer) {
-            m_updateTimer = new QTimer(this);
-            m_updateTimer->setSingleShot(true);
-        }
-        
-        // Disconnect previous connection (if any) to avoid duplicate calls
-        m_updateTimer->disconnect();
-        
-        // Connect with debounced recreate
-        connect(m_updateTimer, &QTimer::timeout, this, [this]() {
-            qDebug() << "[BangDieuKhien] Executing debounced language refresh...";
-            if (QThread::currentThread() == QApplication::instance()->thread()) {
-                thieLapGiaoDien();
-                qDebug() << "[BangDieuKhien] Language refresh complete";
-            }
-        });
-        
-        // Start timer - if called multiple times within 200ms, only last one executes
-        m_updateTimer->start(200); // Faster than stats update since language change is rare
+        qDebug() << "[BangDieuKhien] Language refresh complete (Smart Update)";
         
     } catch (const std::exception& e) {
         qCritical() << "[BangDieuKhien] EXCEPTION:" << e.what();
@@ -618,9 +620,9 @@ void BangDieuKhien::capNhatRealtimeTuWidget() {
     qDebug() << "📊 Dashboard nhận realtime update từ widget khác - CẬP NHẬT NGAY LẬP TỨC!";
     
     // Lấy dữ liệu mới nhất
-    extern PTRDG rootDocGia;
-    extern PTRDS dsDauSach[];
-    extern int soLuongDauSach;
+    // Lấy dữ liệu mới nhất
+    // rootDocGia, dsDauSach, soLuongDauSach from headers
+
     
     if (soLuongDauSach < 0 || soLuongDauSach > MAX_DAUSACH) {
         qWarning() << "Dữ liệu không hợp lệ, bỏ qua realtime update";
@@ -943,7 +945,7 @@ QWidget* BangDieuKhien::taoBieuDoCotThongKe() {
     }
     
     // 2. Fetch Data (scan all loans - basic optimization: simple full scan is fast enough for < 1000 users)
-    extern PTRDG rootDocGia;
+    // extern PTRDG rootDocGia; // From DocGia.h
     PTRDG dsDocGia[100]; // Limit scan
     int dem = 0;
     try {
@@ -1129,9 +1131,9 @@ QWidget* BangDieuKhien::taoBangHoatDongGanDay() {
     );
     
     // Dữ liệu mẫu từ backend
-    extern PTRDG rootDocGia;
-    extern PTRDS dsDauSach[];
-    extern int soLuongDauSach;
+    // Dữ liệu mẫu từ backend
+    // Global vars from headers
+
     
     // KIỂM TRA AN TOÀN trước khi truy cập dữ liệu
     if (rootDocGia && soLuongDauSach >= 0 && soLuongDauSach <= MAX_DAUSACH) {
@@ -1307,13 +1309,14 @@ QWidget* BangDieuKhien::taoPanelCanhBao() {
     QHBoxLayout *headerLayout = new QHBoxLayout(header);
     headerLayout->setContentsMargins(24, 18, 24, 18);
     
-    QLabel *tieuDe = new QLabel(LanguageManager::instance().getText("DASH_PANEL_ALERTS"));
-    tieuDe->setStyleSheet("font-size: 14px; font-weight: 700; color: #E0E0E0; background: transparent; border: none; letter-spacing: 0.3px;");
+    // Assign to member variable
+    lblTitleCanhBao = new QLabel(LanguageManager::instance().getText("DASH_PANEL_ALERTS"));
+    lblTitleCanhBao->setStyleSheet("font-size: 14px; font-weight: 700; color: #E0E0E0; background: transparent; border: none; letter-spacing: 0.3px;");
     
     QPushButton *nutMenu = new QPushButton("⋯");
     nutMenu->setStyleSheet("background: transparent; border: none; color: #858585; font-size: 20px; padding: 0; max-width: 24px;");
     
-    headerLayout->addWidget(tieuDe);
+    headerLayout->addWidget(lblTitleCanhBao);
     headerLayout->addStretch();
     headerLayout->addWidget(nutMenu);
     
@@ -1334,9 +1337,9 @@ QWidget* BangDieuKhien::taoPanelCanhBao() {
     noiDungLayout->setSpacing(0);
     
     // Lấy thống kê với kiểm tra an toàn
-    extern PTRDG rootDocGia;
-    extern PTRDS dsDauSach[];
-    extern int soLuongDauSach;
+    // Lấy thống kê với kiểm tra an toàn
+    // rootDocGia, dsDauSach, soLuongDauSach from headers
+
     
     ThongKeDocGia tkDocGia = {};
     
@@ -1454,9 +1457,9 @@ QWidget* BangDieuKhien::taoPanelCanhBao() {
     noiDungLayout->addWidget(taoMucCanhBao("🖨️", LanguageManager::instance().getText("DASH_TASK_PRINT"), "#a855f7", LanguageManager::instance().getText("DASH_DESC_PRINT"),
         [this]() { xuLyMoDialogInAn(); }));
         
-    // 2. Quét Mã
-    noiDungLayout->addWidget(taoMucCanhBao("🔍", LanguageManager::instance().getText("DASH_TASK_SCAN"), "#60a5fa", LanguageManager::instance().getText("DASH_DESC_SCAN"),
-        [this]() { xuLyNutQuetMa(); }));
+    // 2. Nhập Dữ Liệu (Replaced Quét Mã)
+    noiDungLayout->addWidget(taoMucCanhBao("📥", LanguageManager::instance().getText("DASH_TASK_IMPORT"), "#38bdf8", LanguageManager::instance().getText("DASH_DESC_IMPORT"),
+        [this]() { xuLyNhapDuLieuTongHop(); }));
     
     // 3. Sao Lưu (New)
     noiDungLayout->addWidget(taoMucCanhBao("", LanguageManager::instance().getText("DASH_TASK_BACKUP"), "#34d399", LanguageManager::instance().getText("DASH_DESC_BACKUP"),
@@ -1536,7 +1539,8 @@ void BangDieuKhien::xuLyMoDialogInAn() {
 // ===================== PRINT PANEL SLOT IMPLEMENTATIONS =====================
 
 void BangDieuKhien::xuLyInTheDocGiaHienTai() {
-    extern PTRDG rootDocGia;
+    // extern PTRDG rootDocGia; // From DocGia.h
+
     
     // Tạo hộp thoại chọn độc giả
     if (!rootDocGia) {
@@ -1570,7 +1574,8 @@ void BangDieuKhien::xuLyInTheDocGiaHienTai() {
 }
 
 void BangDieuKhien::xuLyInHangLoatThe() {
-    extern PTRDG rootDocGia;
+    // extern PTRDG rootDocGia; // From DocGia.h
+
     
     if (!rootDocGia) {
         QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"), LanguageManager::instance().getText("MSG_NO_READER_SYSTEM"));
@@ -1606,12 +1611,12 @@ void BangDieuKhien::xuLyInTemSachHienTai() {
     }
     
     // Tìm sách theo ISBN
-    extern PTRDS dsDauSach[MAX_DAUSACH];
-    extern int soLuongDauSach;
+    // Globals from QuanLySach.h
+
     
     for (int i = 0; i < soLuongDauSach; i++) {
         if (dsDauSach[i] && QString::fromStdString(dsDauSach[i]->ISBN) == isbn.trimmed()) {
-            PrintHelper::inTemSachTuDong(dsDauSach[i], this);
+            PrintHelper::inTemSachTuDong(dsDauSach[i], -1, this);
             return;
         }
     }
@@ -1652,8 +1657,8 @@ void BangDieuKhien::xuLyInNhieuTem() {
         return;
     }
     
-    extern PTRDS dsDauSach[MAX_DAUSACH];
-    extern int soLuongDauSach;
+    // extern PTRDS dsDauSach[MAX_DAUSACH];
+    // extern int soLuongDauSach;
     
     for (int i = 0; i < soLuongDauSach; i++) {
         if (dsDauSach[i] && QString::fromStdString(dsDauSach[i]->ISBN) == isbn.trimmed()) {
@@ -1666,7 +1671,8 @@ void BangDieuKhien::xuLyInNhieuTem() {
 }
 
 void BangDieuKhien::xuLyInDanhSachDocGia() {
-    extern PTRDG rootDocGia;
+    // extern PTRDG rootDocGia; // From DocGia.h
+
     
     if (!rootDocGia) {
         QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"), LanguageManager::instance().getText("MSG_NO_READER_SYSTEM"));
@@ -1677,8 +1683,8 @@ void BangDieuKhien::xuLyInDanhSachDocGia() {
 }
 
 void BangDieuKhien::xuLyInDanhMucSach() {
-    extern PTRDS dsDauSach[MAX_DAUSACH];
-    extern int soLuongDauSach;
+    // extern PTRDS dsDauSach[MAX_DAUSACH];
+    // extern int soLuongDauSach;
     
     if (soLuongDauSach == 0) {
         QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"), LanguageManager::instance().getText("MSG_NO_BOOK_SYSTEM"));
@@ -1689,9 +1695,10 @@ void BangDieuKhien::xuLyInDanhMucSach() {
 }
 
 void BangDieuKhien::xuLyInPhieuMuon() {
-    extern PTRDG rootDocGia;
-    extern PTRDS dsDauSach[MAX_DAUSACH];
-    extern int soLuongDauSach;
+    // extern PTRDG rootDocGia; // From DocGia.h
+
+    // extern PTRDS dsDauSach[MAX_DAUSACH];
+    // extern int soLuongDauSach;
     
     // Nhập mã thẻ độc giả
     bool ok;
@@ -1749,7 +1756,8 @@ void BangDieuKhien::xuLyInPhieuMuon() {
 }
 
 void BangDieuKhien::xuLyInPhieuTra() {
-    extern PTRDG rootDocGia;
+    // extern PTRDG rootDocGia; // From DocGia.h
+
     
     // Nhập mã thẻ độc giả
     bool ok;
@@ -1791,17 +1799,52 @@ void BangDieuKhien::xuLyInPhieuTra() {
     
     QMessageBox::StandardButton reply = QMessageBox::question(this, LanguageManager::instance().getText("TITLE_CONFIRM"), msg, QMessageBox::Yes | QMessageBox::No);
     
-
     if (reply == QMessageBox::Yes) {
-         // Reuse inPhieuMuon template but modify title? No, hardcoded.
-         // Let's just print the Reader Card info as a receipt for now.
-         PrintHelper::inTheDocGiaTuDong(docGia, this);
+         // Printing card as return receipt was annoying and incorrect.
+         // Removed per user request. 
+         // In the future, we could call PrintHelper::inPhieuTraTuDong if requested.
+    }
+}
+
+void BangDieuKhien::xuLyNhapDuLieuTongHop() {
+    QString fileName = QFileDialog::getOpenFileName(this, 
+        LanguageManager::instance().getText("TITLE_SELECT_EXCEL_IMPORT"), 
+        "", "Excel Files (*.xlsx *.xls)");
+    
+    if (fileName.isEmpty()) return;
+
+    ImportManager& mgr = ImportManager::instance();
+    
+    // Check and install dependencies (IMPORTANT for other machines)
+    if (!mgr.ensureDependencies(this)) {
+        return; // Error message shown inside ensureDependencies
+    }
+    
+    // Show loading? (Simple enough for now)
+    ImportManager::PreviewResult res = mgr.runPreview(fileName);
+    
+    if (!res.success) {
+        QMessageBox::critical(this, LanguageManager::instance().getText("TITLE_ERROR"), res.message);
+        return;
+    }
+
+    // Launch Import Preview Dialog
+    ManHinhPreviewImport dlg(res, fileName, &mgr, this);
+    if (dlg.exec() == QDialog::Accepted) {
+        // Log the action (Dialog already handled runApply internally)
+        AuditLogger::log("IMPORT", "HE_THONG", fileName, "Import du lieu tong hop tu Excel");
+        
+        // EventBus will notify other widgets to refresh
+        EventBus::instance().emitDataChanged();
     }
 }
 
 QWidget* BangDieuKhien::taoHeaderDashboard() {
     QWidget *header = new QWidget();
-    header->setFixedHeight(80);
+    // REMOVED: header->setFixedHeight(80); caused overlaps with large fonts/translations
+    header->setMinimumHeight(80); 
+    header->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+    
     header->setStyleSheet("background: transparent;");
     
     QHBoxLayout *layout = new QHBoxLayout(header);
@@ -1812,19 +1855,23 @@ QWidget* BangDieuKhien::taoHeaderDashboard() {
     QWidget *textContainer = new QWidget();
     QVBoxLayout *textLayout = new QVBoxLayout(textContainer);
     textLayout->setContentsMargins(0,0,0,0);
-    textLayout->setSpacing(2);
+    textLayout->setSpacing(4); // Increased spacing slightly
     
-    QLabel *lblHello = new QLabel(LanguageManager::instance().getText("DASH_WELCOME"));
+    // Assign to member variable
+    lblHello = new QLabel(LanguageManager::instance().getText("DASH_WELCOME"));
     lblHello->setStyleSheet("font-size: 24px; font-weight: 800; color: #f8fafc; font-family: 'Segoe UI';");
+    lblHello->setWordWrap(true); // Fix: Allow multi-line greeting for long names/languages
     
-    QLabel *lblSub = new QLabel(LanguageManager::instance().getText("DASH_SUBTITLE"));
-    lblSub->setStyleSheet("font-size: 14px; color: #94a3b8;");
+    // Assign to member variable
+    lblSubtitle = new QLabel(LanguageManager::instance().getText("DASH_SUBTITLE"));
+    lblSubtitle->setStyleSheet("font-size: 14px; color: #94a3b8;");
+    lblSubtitle->setWordWrap(true);
     
     textLayout->addWidget(lblHello);
-    textLayout->addWidget(lblSub);
+    textLayout->addWidget(lblSubtitle); // Use member variable
     
-    layout->addWidget(textContainer);
-    layout->addStretch();
+    layout->addWidget(textContainer, 1); // Give text container stretch factor 1
+    layout->addStretch(0); // Add flexible space but priority to text/search balance
     
     // Search Bar
     QWidget *searchContainer = new QWidget();
@@ -1840,24 +1887,25 @@ QWidget* BangDieuKhien::taoHeaderDashboard() {
     QLabel *icon = new QLabel("🔍");
     icon->setStyleSheet("border: none; background: transparent; color: #64748b; font-size: 16px;");
     
-    QLineEdit *input = new QLineEdit();
-    input->setPlaceholderText(LanguageManager::instance().getText("DASH_SEARCH_PLACEHOLDER"));
-    input->setStyleSheet("border: none; background: transparent; color: white; font-size: 14px;");
+    // Assign to member variable
+    inputSearch = new QLineEdit();
+    inputSearch->setPlaceholderText(LanguageManager::instance().getText("DASH_SEARCH_PLACEHOLDER"));
+    inputSearch->setStyleSheet("border: none; background: transparent; color: white; font-size: 14px;");
     
     searchLayout->addWidget(icon);
-    searchLayout->addWidget(input);
+    searchLayout->addWidget(inputSearch); // Use member variable
     
     layout->addWidget(searchContainer);
     
     // Connect Search (Smart Omni-Search)
-    connect(input, &QLineEdit::returnPressed, this, [this, input](){
-        QString query = input->text().trimmed();
+    connect(inputSearch, &QLineEdit::returnPressed, this, [this](){
+        if (!inputSearch) return; // Safety check
+        QString query = inputSearch->text().trimmed();
         if (query.isEmpty()) return;
         
         // 1. Prepare Data
-        extern PTRDS dsDauSach[];
-        extern int soLuongDauSach;
-        extern PTRDG rootDocGia;
+        // extern PTRDG rootDocGia; // From DocGia.h
+
         
         struct SearchResult { 
             QString type; 
@@ -1963,7 +2011,7 @@ QWidget* BangDieuKhien::taoHeaderDashboard() {
         });
         
         dlg.exec();
-        input->clear();
+        inputSearch->clear();
     });
     
     return header;

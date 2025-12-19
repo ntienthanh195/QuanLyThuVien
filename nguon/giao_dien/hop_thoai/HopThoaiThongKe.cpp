@@ -1,3 +1,4 @@
+    #include "utils/LanguageManager.h"
 #include "giao_dien/hop_thoai/HopThoaiThongKe.h"
 #include "models/QuanLySach.h"
 #include "models/DocGia.h"
@@ -11,7 +12,7 @@
 #include <QtCharts/QValueAxis>
 
 HopThoaiThongKe::HopThoaiThongKe(QWidget *cha) : QDialog(cha) {
-    setWindowTitle("📊 Thống Kê Thư Viện");
+    setWindowTitle("📊 " + LanguageManager::instance().getText("TAB_STATS_SYMBOL"));
     ResponsiveHelper::ScreenSize screenSize = ResponsiveHelper::detectScreenSize();
     setMinimumSize(ResponsiveHelper::getScaledWidth(900, screenSize), 
                    ResponsiveHelper::getScaledHeight(700, screenSize));
@@ -26,7 +27,7 @@ void HopThoaiThongKe::thieLapGiaoDien() {
     int margin = ResponsiveHelper::getScaledMargin(20, screenSize);
     boTriChinh->setContentsMargins(margin, margin, margin, margin);
     
-    QLabel *tieuDe = new QLabel("📊 THỐNG KÊ TỔNG QUAN THƯ VIỆN");
+    QLabel *tieuDe = new QLabel("📊 " + LanguageManager::instance().getText("STATS_MAIN_TITLE"));
     int titleSize = ResponsiveHelper::getScaledFontSize(22, screenSize);
     tieuDe->setStyleSheet(QString("font-size: %1px; font-weight: bold; color: #FFFFFF;").arg(titleSize));
     tieuDe->setAlignment(Qt::AlignCenter);
@@ -35,7 +36,7 @@ void HopThoaiThongKe::thieLapGiaoDien() {
     QHBoxLayout *boTriNoiDung = new QHBoxLayout();
     
     // Cột trái: Thống kê sách
-    QGroupBox *nhomSach = new QGroupBox("📚 Thống Kê Sách");
+    QGroupBox *nhomSach = new QGroupBox("📚 " + LanguageManager::instance().getText("STATS_BOOKS_GROUP"));
     int fontSize = ResponsiveHelper::getScaledFontSize(14, screenSize);
     nhomSach->setStyleSheet(QString("QGroupBox { background-color: #1E1E2D; border: 2px solid #3699FF; border-radius: 12px; font-size: %1px; color: #FFFFFF; padding-top: 15px; }").arg(fontSize));
     QVBoxLayout *boTriSach = new QVBoxLayout(nhomSach);
@@ -51,19 +52,19 @@ void HopThoaiThongKe::thieLapGiaoDien() {
     nhanTyLe = new QLabel("0%");
     nhanTheLoai = new QLabel("0");
     
-    luoiSach->addWidget(new QLabel("Tổng đầu sách:"), 0, 0);
+    luoiSach->addWidget(new QLabel(LanguageManager::instance().getText("LBL_TOTAL_TITLES")), 0, 0);
     luoiSach->addWidget(nhanTongDauSach, 0, 1);
-    luoiSach->addWidget(new QLabel("Tổng bản sao:"), 1, 0);
+    luoiSach->addWidget(new QLabel(LanguageManager::instance().getText("LBL_TOTAL_COPIES_STAT")), 1, 0);
     luoiSach->addWidget(nhanTongBanSao, 1, 1);
-    luoiSach->addWidget(new QLabel("Có thể mượn:"), 2, 0);
+    luoiSach->addWidget(new QLabel(LanguageManager::instance().getText("LBL_AVAILABLE_STAT")), 2, 0);
     luoiSach->addWidget(nhanCoTheMuon, 2, 1);
-    luoiSach->addWidget(new QLabel("Đang mượn:"), 3, 0);
+    luoiSach->addWidget(new QLabel(LanguageManager::instance().getText("LBL_BORROWED_STAT")), 3, 0);
     luoiSach->addWidget(nhanDangMuon, 3, 1);
-    luoiSach->addWidget(new QLabel("Đã thanh lý:"), 4, 0);
+    luoiSach->addWidget(new QLabel(LanguageManager::instance().getText("LBL_LIQUIDATED_STAT")), 4, 0);
     luoiSach->addWidget(nhanThanhLy, 4, 1);
-    luoiSach->addWidget(new QLabel("Tỷ lệ cho mượn:"), 5, 0);
+    luoiSach->addWidget(new QLabel(LanguageManager::instance().getText("LBL_BORROW_RATE")), 5, 0);
     luoiSach->addWidget(nhanTyLe, 5, 1);
-    luoiSach->addWidget(new QLabel("Số thể loại:"), 6, 0);
+    luoiSach->addWidget(new QLabel(LanguageManager::instance().getText("LBL_CATEGORIES_STAT")), 6, 0);
     luoiSach->addWidget(nhanTheLoai, 6, 1);
     
     for (int i = 0; i < luoiSach->rowCount(); i++) {
@@ -78,7 +79,7 @@ void HopThoaiThongKe::thieLapGiaoDien() {
     boTriNoiDung->addWidget(nhomSach);
     
     // Cột phải: Thống kê độc giả
-    QGroupBox *nhomDocGia = new QGroupBox("👥 Thống Kê Độc Giả");
+    QGroupBox *nhomDocGia = new QGroupBox("👥 " + LanguageManager::instance().getText("STATS_READERS_GROUP"));
     nhomDocGia->setStyleSheet(QString("QGroupBox { background-color: #1E1E2D; border: 2px solid #F64E60; border-radius: 12px; font-size: %1px; color: #FFFFFF; padding-top: 15px; }").arg(fontSize));
     QVBoxLayout *boTriDocGia = new QVBoxLayout(nhomDocGia);
     
@@ -91,17 +92,17 @@ void HopThoaiThongKe::thieLapGiaoDien() {
     nhanTongSachMuon = new QLabel("0");
     nhanQuaHan = new QLabel("0");
     
-    luoiDocGia->addWidget(new QLabel("Tổng độc giả:"), 0, 0);
+    luoiDocGia->addWidget(new QLabel(LanguageManager::instance().getText("LBL_TOTAL_READERS_STAT")), 0, 0);
     luoiDocGia->addWidget(nhanTongDocGia, 0, 1);
-    luoiDocGia->addWidget(new QLabel("Đang hoạt động:"), 1, 0);
+    luoiDocGia->addWidget(new QLabel(LanguageManager::instance().getText("LBL_ACTIVE_STAT")), 1, 0);
     luoiDocGia->addWidget(nhanHoatDong, 1, 1);
-    luoiDocGia->addWidget(new QLabel("Bị khóa thẻ:"), 2, 0);
+    luoiDocGia->addWidget(new QLabel(LanguageManager::instance().getText("LBL_LOCKED_STAT")), 2, 0);
     luoiDocGia->addWidget(nhanBiKhoa, 2, 1);
-    luoiDocGia->addWidget(new QLabel("Đang mượn sách:"), 3, 0);
+    luoiDocGia->addWidget(new QLabel(LanguageManager::instance().getText("LBL_READERS_BORROWING_STAT")), 3, 0);
     luoiDocGia->addWidget(nhanDangMuonSach, 3, 1);
-    luoiDocGia->addWidget(new QLabel("Tổng sách mượn:"), 4, 0);
+    luoiDocGia->addWidget(new QLabel(LanguageManager::instance().getText("LBL_TOTAL_BORROWED_BOOKS_STAT")), 4, 0);
     luoiDocGia->addWidget(nhanTongSachMuon, 4, 1);
-    luoiDocGia->addWidget(new QLabel("Có sách quá hạn:"), 5, 0);
+    luoiDocGia->addWidget(new QLabel(LanguageManager::instance().getText("LBL_READERS_OVERDUE_STAT")), 5, 0);
     luoiDocGia->addWidget(nhanQuaHan, 5, 1);
     
     for (int i = 0; i < luoiDocGia->rowCount(); i++) {
@@ -121,7 +122,7 @@ void HopThoaiThongKe::thieLapGiaoDien() {
     QHBoxLayout *boTriNut = new QHBoxLayout();
     int buttonHeight = ResponsiveHelper::getScaledHeight(45, screenSize);
     
-    nutDong = new QPushButton("✖ Đóng");
+    nutDong = new QPushButton("✖ " + LanguageManager::instance().getText("BTN_CLOSE"));
     nutDong->setMinimumHeight(buttonHeight);
     nutDong->setStyleSheet("QPushButton { background-color: #3699FF; color: white; border: none; border-radius: 8px; font-weight: bold; padding: 0 30px; } QPushButton:hover { background-color: #187DE4; }");
     connect(nutDong, &QPushButton::clicked, this, &QDialog::accept);
@@ -160,9 +161,9 @@ QChartView* HopThoaiThongKe::taoBieuDoSach() {
     ThongKeSach tk = LayThongKeSach();
     
     QPieSeries *series = new QPieSeries();
-    series->append("Có thể mượn", tk.soBanSaoCoTheMuon);
-    series->append("Đang mượn", tk.soBanSaoDangMuon);
-    series->append("Đã thanh lý", tk.soBanSaoThanhLy);
+    series->append(LanguageManager::instance().getText("OPTION_STATUS_AVAILABLE_SYMBOL"), tk.soBanSaoCoTheMuon);
+    series->append(LanguageManager::instance().getText("STATUS_BORROWED"), tk.soBanSaoDangMuon);
+    series->append(LanguageManager::instance().getText("OPTION_STATUS_LIQUIDATED_SYMBOL"), tk.soBanSaoThanhLy);
     
     series->setLabelsVisible(true);
     series->setLabelsPosition(QPieSlice::LabelOutside);
@@ -176,7 +177,7 @@ QChartView* HopThoaiThongKe::taoBieuDoSach() {
     
     QChart *chart = new QChart();
     chart->addSeries(series);
-    chart->setTitle("Phân Bố Trạng Thái Sách");
+    chart->setTitle(LanguageManager::instance().getText("CHART_BOOK_STATUS"));
     chart->setAnimationOptions(QChart::AllAnimations);
     chart->setBackgroundBrush(QBrush(QColor("#1E1E2D")));
     chart->setTitleBrush(QBrush(Qt::white));
@@ -197,8 +198,8 @@ QChartView* HopThoaiThongKe::taoBieuDoDocGia() {
     ThongKeDocGia tk = LayThongKeDocGia(rootDocGia, dsDauSach, soLuongDauSach);
     
     QPieSeries *series = new QPieSeries();
-    series->append("Hoạt động", tk.docGiaHoatDong);
-    series->append("Bị khóa", tk.docGiaBiKhoa);
+    series->append(LanguageManager::instance().getText("STATUS_ACTIVE"), tk.docGiaHoatDong);
+    series->append(LanguageManager::instance().getText("STATUS_LOCKED"), tk.docGiaBiKhoa);
     
     series->setLabelsVisible(true);
     series->setLabelsPosition(QPieSlice::LabelOutside);
@@ -212,7 +213,7 @@ QChartView* HopThoaiThongKe::taoBieuDoDocGia() {
     
     QChart *chart = new QChart();
     chart->addSeries(series);
-    chart->setTitle("Trạng Thái Độc Giả");
+    chart->setTitle(LanguageManager::instance().getText("CHART_READER_STATUS"));
     chart->setAnimationOptions(QChart::AllAnimations);
     chart->setBackgroundBrush(QBrush(QColor("#1E1E2D")));
     chart->setTitleBrush(QBrush(Qt::white));

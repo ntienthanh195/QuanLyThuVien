@@ -33,10 +33,12 @@ private:
     QLineEdit *oNhapISBN;
     QLineEdit *oNhapTenSach;
     QLineEdit *oNhapTacGia;
-    QComboBox *hopChonTheLoai;
+    QLineEdit *oNhapTheLoai; // Changed from QComboBox
     QSpinBox *soNamXuatBan;
     QSpinBox *soSoTrang;
-    QDoubleSpinBox *soGiaTien; // Added Price field
+    QDoubleSpinBox *oNhapGiaTien; // Added Price field
+    QLineEdit *oNhapViTri; // Added Location field
+    QLineEdit *oNhapNhaXuatBan; // Added Publisher field
     QPushButton *nutLuu;
     QPushButton *nutHuy;
     QLabel *nhanTrangThai;

@@ -6,6 +6,7 @@
 #include <QComboBox>
 #include <QPushButton>
 #include <QLabel>
+#include <QDateEdit>
 #include "models/DocGia.h"
 
 class HopThoaiSuaDocGia : public QDialog {
@@ -32,6 +33,13 @@ private:
     QLineEdit *oNhapHo;
     QLineEdit *oNhapTen;
     QComboBox *hopChonGioiTinh;
+
+    // Phase 2 Fields
+    QLineEdit *oNhapSDT;
+    QLineEdit *oNhapLop;
+    QLineEdit *oNhapEmail;
+    QDateEdit *oNhapNgaySinh;
+    QComboBox *hopChonLoaiDocGia;
 
     QComboBox *hopChonTrangThai;
     // Feature 5 Dates

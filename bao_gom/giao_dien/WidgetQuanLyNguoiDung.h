@@ -1,4 +1,11 @@
+/**
+ * @file WidgetQuanLyNguoiDung.h
+ * @path bao_gom/giao_dien/WidgetQuanLyNguoiDung.h
+ * @description Header của Widget quản lý người dùng (V2).
+ * @project Library Management System (QuanLyThuVien)
+ */
 #ifndef WIDGETQUANLYNGUOIDUNG_H
+
 #define WIDGETQUANLYNGUOIDUNG_H
 
 #include <QWidget>

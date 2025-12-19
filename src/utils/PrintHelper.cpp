@@ -1,11 +1,25 @@
+/**
+ * @file PrintHelper.cpp
+ * @path src/utils/PrintHelper.cpp
+ * @description Hỗ trợ in ấn và xuất báo cáo (PDF/Printer).
+ * Xử lý: tạo layout trang in, in danh sách học viên, danh sách sách, và phiếu mượn/trả.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #include "utils/PrintHelper.h"
+
+#include "utils/FilePathManager.h"
 #include <QPainter>
 #include "qrcode/Code128.h"
 #include "utils/QrCodeGenerator.h"
 #include "utils/SettingsManager.h"
+#include "utils/LanguageManager.h"  // Missing
 #include "utils/CustomPrintDialog.h"  // Custom dark-themed print preview
 #include <QPrinter>
 #include <QPrintDialog>
+#include <QPageSize>
+#include <QPageLayout>
+#include <QMarginsF>
+#include <QInputDialog> // Missing
 #include <QTextDocument>
 #include <QMessageBox>
 #include <QPushButton>
@@ -15,6 +29,9 @@
 #include <QFontDatabase>
 #include <QApplication>
 #include <QDate>
+#include <QtMath>
+#include <QDesktopServices>
+#include <QUrl>
 #include <QTime>
 #include <QFileDialog>
 #include <QDir>
@@ -22,12 +39,16 @@
 #include <functional> // For std::function
 #include <QBuffer>
 #include <QDateTime>
+#include <QRandomGenerator>
 #include <QPair>
 
 // Static config
-// Static config
 PrintHelper::PrintConfig PrintHelper::s_config;
 static bool s_configLoaded = false; // Flag to track initialization
+
+// Caching for Performance (Phase 10)
+static QMap<QString, QString> s_barcodeCache;
+static QMap<QString, QString> s_qrCache;
 
 // Forward declarations
 // static QImage generateCode39Image(const QString &text, int height);
@@ -44,7 +65,28 @@ static bool s_configLoaded = false; // Flag to track initialization
 bool PrintHelper::inTheDocGia(PTRDG docGia, QWidget* parent) {
     if (!docGia) return false;
     
-    QString html = taoHTMLTheDocGia(docGia);
+    // Generate card HTML
+    QString cardHtml = taoHTMLTheDocGia(docGia);
+    
+    // Wrap card with centered container for single-card printing
+    // This ensures the card appears in the center of A4 page instead of top-left
+    QString html = QString(
+        "<html><head><style>"
+        "body { "
+        "  margin: 0; "
+        "  padding: 0; "
+        "  background: white; "
+        "  display: flex; "
+        "  align-items: center; /* Canh giữa dọc */"
+        "  justify-content: center; /* Canh giữa ngang */"
+        "  min-height: 297mm; /* A4 height */"
+        "  width: 210mm; /* A4 width */"
+        "}"
+        "</style></head><body>"
+        "%1"
+        "</body></html>"
+    ).arg(cardHtml);
+    
     QTextDocument doc;
     doc.setHtml(html);
     
@@ -52,9 +94,10 @@ bool PrintHelper::inTheDocGia(PTRDG docGia, QWidget* parent) {
         .arg(QString::fromStdString(docGia->data.Ho))
         .arg(QString::fromStdString(docGia->data.Ten));
     
-    // Auto filename for PDF: TheHocVien_[MaThe].pdf
-    QString defaultFile = taoTenFileTheDocGia(docGia->data.MaThe);
-        
+    // Auto filename for PDF: The_Hoc_Vien_[Name]_[Code].pdf
+    QString hoTen = QString::fromStdString(docGia->data.Ho + " " + docGia->data.Ten);
+    QString defaultFile = taoTenFileTheDocGia(docGia->data.MaThe, hoTen);
+    
     return showPrintPreview(&doc, title, parent, defaultFile);
 }
 
@@ -67,50 +110,63 @@ bool PrintHelper::inTheDocGiaTuDong(PTRDG docGia, QWidget* parent) {
 bool PrintHelper::inNhieuTheDocGia(const QList<PTRDG>& danhSach, QWidget* parent) {
     if (danhSach.isEmpty()) return false;
     
-    // Unified Grid/Flex Layout for Cards (Similar to Labels)
+    // Load Config
+    PrintConfig cfg = getCauHinh();
+    
+    // Config-driven Grid Layout for student cards (A4 paper)
+    // Allows customization via SettingsManager
+    // TABLE-BASED LAYOUT (Compatible with QTextDocument)
+    // Replaces CSS Grid/Flexbox which are not supported
     QString htmlToanBo = "<html><head><style>"
-                         "body { margin: 0; padding: 0.5cm; background: white; }"
-                         ".card-container { "
-                         "  display: flex; "
-                         "  flex-wrap: wrap; "
-                         "  justify-content: space-between; " // Distribute space (Left - Right)
-                         "  align-content: flex-start; "
-                         "  width: 100%; "
-                         "}"
-                         "</style></head><body>"
-                         " <div class='card-container'>";
-                         
+                         "body { margin: 0; padding: 10mm; background: white; }"
+                         "</style></head><body>";
+    
+    // Start Table
+    // Use fixed width table or 100%? 100% is safer for centering if columns match
+    htmlToanBo += "<table width='100%' border='0' cellspacing='0' cellpadding='5'>"; // cellpadding roughly half of gap
+    
     for (int i = 0; i < danhSach.size(); ++i) {
+        // Start new row if needed
+        if (i % cfg.cardCols == 0) {
+            htmlToanBo += "<tr>";
+        }
+        
+        // Table Cell
+        double colWidthPercent = 100.0 / cfg.cardCols;
+        htmlToanBo += QString("<td width='%1%' align='center' valign='top'>").arg(colWidthPercent);
+        
+        // Render Card
         htmlToanBo += taoHTMLTheDocGia(danhSach[i]);
-        // No manual page break - Flexbox handles wrapping
+        
+        htmlToanBo += "</td>";
+        
+        // Close row if it's the last column OR last item
+        bool isLastColumn = ((i + 1) % cfg.cardCols == 0);
+        bool isLastItem = (i == danhSach.size() - 1);
+        
+        if (isLastColumn || isLastItem) {
+             htmlToanBo += "</tr>";
+        }
     }
     
-    htmlToanBo += "</div></body></html>";
+    htmlToanBo += "</table></body></html>";
     
     QTextDocument doc;
     doc.setHtml(htmlToanBo);
     
     QString title = QString("Xem trước: %1 thẻ học viên").arg(danhSach.size());
     QString ngayFile = QDate::currentDate().toString("yyyyMMdd");
-    QString defaultFile = QString("TheHocVien_Batch_%1the_%2.pdf").arg(danhSach.size()).arg(ngayFile);
+    QString defaultFile = QString("The_Hoc_Vien_Hang_Loat_%1the_%2.pdf").arg(danhSach.size()).arg(ngayFile);
     
     return showPrintPreview(&doc, title, parent, defaultFile);
 }
 
 bool PrintHelper::inA4NhieuThe(const QList<PTRDG>& danhSach, int soCot, QWidget* parent) {
-    if (danhSach.isEmpty()) return false;
+    // Student cards always use 2-column grid layout for consistency
+    // Ignore soCot parameter - always force 2 columns
+    Q_UNUSED(soCot);
     
-    QString html = taoHTMLA4NhieuThe(danhSach, soCot);
-    QTextDocument doc;
-    doc.setHtml(html);
-    
-    QString title = QString("Xem trước: %1 thẻ học viên (A4)").arg(danhSach.size());
-    
-    // Auto filename
-    QString ngayFile = QDate::currentDate().toString("yyyyMMdd");
-    QString defaultFile = QString("TheHocVien_A4_%1the_%2.pdf").arg(danhSach.size()).arg(ngayFile);
-    
-    return showPrintPreview(&doc, title, parent, defaultFile);
+    return inNhieuTheDocGia(danhSach, parent);
 }
 
 bool PrintHelper::inHangLoatTheDocGia(PTRDG root, QWidget* parent) {
@@ -139,145 +195,295 @@ bool PrintHelper::inTemMaVachSach(const QString& maSach, const QString& tenSach,
 
 }
 
-bool PrintHelper::inTemSachTuDong(PTRDS dauSach, QWidget* parent) {
+bool PrintHelper::inTemSachTuDong(PTRDS dauSach, int soLuong, QWidget* parent) {
     if (!dauSach) return false;
-    QString tenSach = QString::fromStdString(dauSach->tenSach);
-    QString maSach = QString::fromStdString(dauSach->ISBN); // Default to ISBN
-    if (dauSach->dms) {
-        maSach = QString::fromStdString(dauSach->dms->maSach); // Use first copy code if available
+    
+    int qty = soLuong;
+    if (qty <= 0) {
+        int totalCopies = dauSach->tongBanSao;
+        if (totalCopies <= 0) totalCopies = 1;
+
+        bool ok;
+        qty = QInputDialog::getInt(parent, 
+            LanguageManager::instance().getText("DIALOG_PRINT_LABELS"), 
+            LanguageManager::instance().getText("MSG_ENTER_PRINT_QUANTITY"), 
+            totalCopies, 1, 1000, 1, &ok);
+        
+        if (!ok) return false;
     }
 
-    return inTemMaVachSach(maSach, tenSach, parent);
-
+    QList<QPair<PTRDS, int>> list;
+    list.append(qMakePair(dauSach, qty));
+    return inNhieuTemSachBatch(list, parent);
 }
 
 bool PrintHelper::inNhieuTemSach(PTRDS dauSach, int soLuong, QWidget* parent) {
     if (!dauSach || soLuong <= 0) return false;
     
+    // Redirect to Batch function to ensure we use the high-quality grid layout (A4)
+    QList<QPair<PTRDS, int>> list;
+    list.append(qMakePair(dauSach, soLuong));
+    return inNhieuTemSachBatch(list, parent);
+}
+
+bool PrintHelper::inTemSachTuyChon(PTRDS dauSach, const QStringList& codes, QWidget* parent) {
+    if (!dauSach || codes.isEmpty()) return false;
+
+    PrintConfig cfg = getCauHinh();
     QString tenSach = QString::fromStdString(dauSach->tenSach);
-    QString htmlToanBo;
     
-    // Lặp qua danh mục sách để in nhiều tem
-    PTRDMS p = dauSach->dms;
-    int count = 0;
-    while (p && count < soLuong) {
-        QString maSach = QString::fromStdString(p->maSach);
-        htmlToanBo += taoHTMLTemSach(maSach, tenSach);
-        if (count < soLuong - 1) {
-            htmlToanBo += "<div style='page-break-after: always;'></div>";
+    // AUTO-CALCULATE GRID
+    double pageWidth = 190.0;
+    if (cfg.pageSize.toUpper() == "A4") {
+        pageWidth = (cfg.orientation.toLower() == "landscape" ? 277.0 : 190.0);
+    }
+
+    int cols = cfg.labelCols;
+    if (cols <= 0) {
+        cols = qFloor((pageWidth + cfg.labelGapMm) / (cfg.labelWidth + cfg.labelGapMm));
+        if (cols < 1) cols = 1;
+    }
+
+    QString html = "<html><head><style>body { margin: 0; padding: 0; background: white; }</style></head><body>";
+    html += QString("<table width='100%' border='0' style='border-collapse: separate; border-spacing: %1mm; padding: 0;'>").arg(cfg.labelGapMm);
+    
+    int currentCell = 0;
+    bool rowOpen = false;
+    
+    for (int k = 0; k < codes.size(); ++k) {
+        if (currentCell % cols == 0) { 
+            html += "<tr>"; 
+            rowOpen = true; 
         }
-        p = p->next;
-        ++count;
+        
+        double colWidth = 100.0 / cols;
+        html += QString("<td width='%1%' align='center' valign='top' style='padding:0;'>").arg(colWidth);
+        
+        QString priceStr = "";
+        if (cfg.showPrice) {
+             QLocale locale(QLocale::Vietnamese, QLocale::Vietnam);
+             priceStr = locale.toCurrencyString((double)dauSach->giaTien, "đ");
+        }
+
+        html += taoHTMLTemSach(codes[k], tenSach, priceStr);
+        html += "</td>";
+        
+        if ((currentCell + 1) % cols == 0) { 
+            html += "</tr>"; 
+            rowOpen = false; 
+        }
+        currentCell++;
     }
     
+    if (rowOpen) {
+        for (int m = currentCell % cols; m < cols; ++m) {
+             html += "<td></td>";
+        }
+        html += "</tr>";
+    }
+    
+    html += "</table></body></html>";
+    
     QTextDocument doc;
-    doc.setHtml(htmlToanBo);
+    doc.setHtml(html);
     
-    QString title = QString("Xem trước: %1 tem - %2").arg(soLuong).arg(tenSach);
-    
-    // Auto filename: TemSach_[ISBN]_sl[N].pdf
-    QString defaultFile = taoTenFileTemSach(QString::fromStdString(dauSach->ISBN), soLuong);
+    QString title = QString("In %1 tem tự chọn - %2").arg(codes.size()).arg(tenSach);
+    QString defaultFile = taoTenFileTemSach(QString::fromStdString(dauSach->ISBN), codes.size());
     
     return showPrintPreview(&doc, title, parent, defaultFile);
+}
+
+QString PrintHelper::taoHTMLTemSach(const QString& maSach, const QString& tenSach, const QString& giaSach) {
+    PrintConfig cfg = getCauHinh();
+    
+    int numBlocks = cfg.blocks.size();
+    if (numBlocks == 0) return "";
+
+    // Calculate total height used by text blocks (approximate)
+    // 1pt = 0.3528mm. Let's assume some padding.
+    double totalTextHeightMm = 0;
+    int textBlockCount = 0;
+    for (const auto& block : cfg.blocks) {
+        if (block.type == "text") {
+            totalTextHeightMm += (block.fontSize * 0.5); // Approx mm height including leading
+            textBlockCount++;
+        }
+    }
+
+    double remainingHeightMm = cfg.labelHeight - totalTextHeightMm - 2.0; // 2mm safety margin
+    if (remainingHeightMm < 5.0) remainingHeightMm = 5.0; // Minimum floor
+
+    double padding = (cfg.labelWidth < 25) ? 0.3 : 1.0; // Minimal padding for micro labels
+
+    // 2. Start HTML
+    QString html = QString(
+        "<div style='"
+        " width: %1mm; height: %2mm; max-width: %1mm; max-height: %2mm;"
+        " border: %3;" 
+        " margin: 0; padding: %4mm;"
+        " font-family: \"%5\", sans-serif;"
+        " background: #fff;"
+        " box-sizing: border-box;"
+        " page-break-inside: avoid;"
+        " overflow: hidden;"
+        "'>"
+        "<table width='100%%' height='100%%' border='0' cellspacing='0' cellpadding='0' style='table-layout: fixed; width: 100%%; height: 100%%;'>"
+    ).arg(cfg.labelWidth).arg(cfg.labelHeight)
+     .arg(cfg.showBorder ? "0.2mm solid #000" : "none")
+     .arg(padding)
+     .arg(cfg.fontFamily);
+
+    for (const auto& block : cfg.blocks) {
+        QString content = "";
+        QString style = QString("font-size: %1pt; %2 text-align: %3; line-height: 1.0; overflow: hidden; white-space: nowrap;")
+                        .arg(block.fontSize).arg(block.bold ? "font-weight: bold;" : "").arg(block.textAlign);
+
+        if (block.type == "text") {
+            if (block.field == "tenDonVi") content = cfg.tenVietTat.isEmpty() ? cfg.tenThuVien : cfg.tenVietTat;
+            else if (block.field == "tenSach") content = tenSach;
+            else if (block.field == "maBanSao") content = maSach;
+            else if (block.field == "giaTien") content = giaSach;
+            
+            // DYNAMIC FONT SCALING for small labels
+            int fontSize = block.fontSize;
+            if (cfg.labelHeight < 12) fontSize = qMax(5, fontSize - 2);
+            else if (cfg.labelHeight < 15) fontSize = qMax(6, fontSize - 1);
+
+            QString adjustedStyle = QString("font-size: %1pt; %2 text-align: %3; line-height: 0.9; overflow: hidden; white-space: nowrap;")
+                            .arg(fontSize).arg(block.bold ? "font-weight: bold;" : "").arg(block.textAlign);
+
+            html += QString("<tr><td style='%1'>%2</td></tr>").arg(adjustedStyle).arg(content);
+        } 
+        else if (block.type == "barcode") {
+            double hBarcode = remainingHeightMm; 
+            double barcodeWidthMm = cfg.labelWidth * cfg.barcodeWidthRatio;
+            
+            // For tiny labels, ensure barcode is at least 70% of height if possible
+            if (cfg.labelHeight < 12 && hBarcode < 6.0) hBarcode = 6.0;
+
+            QString barcodeBase64 = generateBarcodeBase64(maSach, hBarcode, cfg.barcodeDPI, barcodeWidthMm);
+            
+            html += QString(
+                "<tr><td align='%1' valign='middle' height='100%%' style='padding: 0.2mm 0;'>"
+                "  <img src='data:image/png;base64,%2' style='height: %3mm; max-width: 100%%; image-rendering: pixelated;' />"
+                "</td></tr>"
+            ).arg(block.textAlign).arg(barcodeBase64).arg(hBarcode);
+        }
+    }
+
+    html += "</table></div>";
+    return html;
 }
 
 bool PrintHelper::inNhieuTemSachBatch(const QList<QPair<PTRDS, int>>& list, QWidget* parent) {
     if (list.isEmpty()) return false;
 
-    // Load Config
     PrintConfig cfg = getCauHinh();
     
-    // Calculate page styles based on config if needed, but for now stick to A4 default container
+    // 1. AUTO-CALCULATE GRID
+    // Assume A4 (210mm) if not specified. Subtract 20mm for margins (10mm each side).
+    double pageWidth = 190.0; // Printable width default
+    if (cfg.pageSize.toUpper() == "A4") {
+        pageWidth = (cfg.orientation.toLower() == "landscape" ? 277.0 : 190.0);
+    } else if (cfg.pageSize.toUpper() == "A5") {
+        pageWidth = (cfg.orientation.toLower() == "landscape" ? 190.0 : 128.0);
+    }
+
+    int cols = cfg.labelCols;
+    if (cols <= 0) {
+        // cols = floor( (PageWidth + Gap) / (LabelWidth + Gap) )
+        cols = qFloor((pageWidth + cfg.labelGapMm) / (cfg.labelWidth + cfg.labelGapMm));
+        if (cols < 1) cols = 1;
+    }
+
+    // 2. Start HTML
     QString html = "<html><head><style>"
-                   "body { margin: 0; padding: 0.5cm; background: white; }"
-                   // Container using Flexbox to flow labels
-                   ".label-container { "
-                   "  display: flex; "
-                   "  flex-wrap: wrap; "
-                   "  align-content: flex-start; "
-                   "  width: 100%; " 
-                   "}"
-                   "</style></head><body>"
-                   " <div class='label-container'>";
-
-    for (const auto& pair : list) {
-        PTRDS sach = pair.first;
-        int count = pair.second;
-        if (!sach) continue;
-
-        QString tenStr = QString::fromStdString(sach->tenSach);
-        QString maGoc = QString::fromStdString(sach->ISBN); // Default
+                   "body { margin: 0; padding: 0mm; background: white; }"
+                   "td.end-marker { font-weight: bold; font-size: 10pt; color: #333; height: %1mm; }"
+                   "</style></head><body>";
+    html = html.arg(cfg.labelHeight);
+                   
+    html += QString("<table border='0' style='border-collapse: separate; border-spacing: %1mm; padding: 10mm 5mm;'>").arg(cfg.labelGapMm);
+    
+    int currentCell = 0;
+    bool rowOpen = false;
+    
+    for (int i = 0; i < list.size(); ++i) {
+        PTRDS dauSach = list[i].first;
+        int soLuong = list[i].second;
         
-        // Loop through copies
-        PTRDMS p = sach->dms;
-        int actualPrinted = 0;
+        QString maSach = QString::fromStdString(dauSach->ISBN);
+        QString tenSach = QString::fromStdString(dauSach->tenSach);
         
-        while (p && actualPrinted < count) {
-            html += taoHTMLTemSach(QString::fromStdString(p->maSach), tenStr);
-            p = p->next;
-            actualPrinted++;
+        QList<QString> copyCodes;
+        if (dauSach->dms) {
+            PTRDMS p = dauSach->dms;
+            while (p && copyCodes.size() < soLuong) {
+                copyCodes.append(QString::fromStdString(p->maSach));
+                p = p->next;
+            }
         }
         
-        // If we ran out of specific copies but still need count (e.g. printing generic ISBN labels)
-        while (actualPrinted < count) {
-             html += taoHTMLTemSach(maGoc, tenStr);
-             actualPrinted++;
+        // Print Labels for current book
+        for (int k = 0; k < soLuong; ++k) {
+             QString codeToPrint = (k < copyCodes.size()) ? copyCodes[k] : maSach;
+
+            if (currentCell % cols == 0) {
+                html += "<tr>";
+                rowOpen = true;
+            }
+            
+            html += QString("<td width='%1mm' align='center' valign='top' style='padding:0;'>").arg(cfg.labelWidth);
+            
+            QString priceStr = "";
+            if (cfg.showPrice) {
+                 QLocale locale(QLocale::Vietnamese, QLocale::Vietnam);
+                 priceStr = locale.toCurrencyString((double)dauSach->giaTien, "đ");
+            }
+
+            html += taoHTMLTemSach(codeToPrint, tenSach, priceStr);
+            html += "</td>";
+            
+            if ((currentCell + 1) % cols == 0) {
+                html += "</tr>";
+                rowOpen = false;
+            }
+            currentCell++;
         }
 
-        // Add "HET" divider (full width) - forced break
-        // Flexbox divider needs width 100%
-        html += QString(
-            "<div style='flex-basis: 100%; height: 0; margin: 0;'></div>" // Force break
-            "<div style='width: 100%; text-align: center; margin: 15px 0; clear: both;'>"
-            "  <div style='border-top: 1px dashed #ccc; margin-bottom: 5px;'></div>"
-            "  <span style='font-family: Arial; font-size: 9pt; font-weight: bold; color: #666; background: #fff; padding: 0 10px;'>"
-            "    -- HẾT: %1 --"
-            "  </span>"
-            "</div>"
-        ).arg(tenStr);
+        // ADD "-- HẾT --" MARKER AFTER EACH BOOK BATCH (Matching sample image)
+        if (currentCell % cols == 0) {
+            html += "<tr>";
+            rowOpen = true;
+        }
+        
+        html += QString("<td width='%1mm' align='center' valign='middle' class='end-marker'>-- HẾT --</td>").arg(cfg.labelWidth);
+        
+        if ((currentCell + 1) % cols == 0) {
+            html += "</tr>";
+            rowOpen = false;
+        }
+        currentCell++;
     }
     
-    html += "</div></body></html>";
+    // Final closing of the last row if still open
+    if (rowOpen) {
+        for (int m = currentCell % cols; m < cols; ++m) {
+             html += "<td></td>";
+        }
+        html += "</tr>";
+    }
+    
+    html += "</table></body></html>";
 
     QTextDocument doc;
     doc.setHtml(html);
     
     QString title = "Xem trước: Tem mã vạch hàng loạt";
     
-    // Auto filename with timestamp
+    // Auto filename with timestamp: Tem_Ma_Vach_Hang_Loat_[Date].pdf
     QString dateStr = QDateTime::currentDateTime().toString("yyyyMMdd_HHmm");
-    QString defaultFile = QString("Batch_Barcodes_%1.pdf").arg(dateStr);
-    
-    return showPrintPreview(&doc, title, parent, defaultFile);
-}
-
-bool PrintHelper::inTemSachTuyChon(PTRDS dauSach, const QStringList& codes, QWidget* parent) {
-    if (!dauSach || codes.isEmpty()) return false;
-
-    QString html = "<html><head><style>"
-                   "body { margin: 0; padding: 10px; background: white; }"
-                   "</style></head><body>"
-                   " <div style='display: block; width: 100%;'>";
-
-    QString tenStr = QString::fromStdString(dauSach->tenSach);
-    for (const QString& ma : codes) {
-        html += taoHTMLTemSach(ma, tenStr);
-    }
-
-    html += "</div></body></html>";
-
-    QTextDocument doc;
-    doc.setHtml(html);
-    
-    QString title = QString("Xem trước: %1 tem tùy chọn - %2")
-        .arg(codes.size())
-        .arg(QString::fromStdString(dauSach->tenSach));
-    
-    // Auto filename
-    QString dateStr = QDateTime::currentDateTime().toString("yyyyMMdd_HHmm");
-    QString defaultFile = QString("Labels_%1_%2.pdf")
-        .arg(QString::fromStdString(dauSach->ISBN))
-        .arg(dateStr);
+    QString defaultFile = QString("Tem_Ma_Vach_Hang_Loat_%1.pdf").arg(dateStr);
     
     return showPrintPreview(&doc, title, parent, defaultFile);
 }
@@ -285,10 +491,18 @@ bool PrintHelper::inTemSachTuyChon(PTRDS dauSach, const QStringList& codes, QWid
 bool PrintHelper::inDanhSachSach(PTRDS* dsDauSach, int soLuong, QWidget* parent) {
     if (!dsDauSach || soLuong <= 0) return false;
     
-    QString noiDungBang = "<table border='1' cellpadding='5' cellspacing='0' style='width:100%; border-collapse:collapse;'>"
-                          "<tr style='background:#f0f0f0;'>"
-                          "<th>ISBN</th><th>Tên sách</th><th>Tác giả</th><th>Số bản</th>"
-                          "</tr>";
+    // Data Table (Black & White - Match Sample)
+    QString noiDungBang = "<table border='1' cellspacing='0' cellpadding='8' width='100%'>"
+                          "<thead>"
+                          "<tr>"
+                          "<th>STT</th>"
+                          "<th>ISBN</th>"
+                          "<th>Tên sách</th>"
+                          "<th>Tác giả</th>"
+                          "<th>Số bản</th>"
+                          "</tr>"
+                          "</thead>"
+                          "<tbody>";
     
     for (int i = 0; i < soLuong; ++i) {
         PTRDS p = dsDauSach[i];
@@ -299,16 +513,25 @@ bool PrintHelper::inDanhSachSach(PTRDS* dsDauSach, int soLuong, QWidget* parent)
         QString tacGia = QString::fromStdString(p->tacGia);
         int soBan = p->tongBanSao;
         
-        noiDungBang += QString("<tr><td>%1</td><td>%2</td><td>%3</td><td>%4</td></tr>")
-                          .arg(isbn).arg(ten).arg(tacGia).arg(soBan);
+        noiDungBang += QString("<tr>"
+                               "<td class='text-center'>%1</td>"
+                               "<td class='text-center nowrap'><b>%2</b></td>"
+                               "<td>%3</td>"
+                               "<td>%4</td>"
+                               "<td class='text-center'>%5</td>"
+                               "</tr>")
+                          .arg(i + 1).arg(isbn).arg(ten).arg(tacGia).arg(soBan);
     }
     
-    noiDungBang += "</table>";
+    noiDungBang += "</tbody></table>";
     
-    QString html = taoHTMLDanhSach("DANH MỤC SÁCH", noiDungBang);
+    // Wrap and Preview
+    QString html = taoHTMLDanhSach("DANH SÁCH ĐẦU SÁCH", noiDungBang);
     QTextDocument doc;
     doc.setHtml(html);
-    return xuLyYeuCauIn(&doc, "In Danh Mục Sách", QString("In danh sách %1 đầu sách").arg(soLuong), taoTenFileBaoCao("DMSach"), parent, s_config.printerReport);
+    
+    QString title = QString("Báo cáo: %1 đầu sách").arg(soLuong);
+    return xuLyYeuCauIn(&doc, "DANH SÁCH SÁCH", title, taoTenFileBaoCao("DSSach"), parent, s_config.printerReport);
 }
 
 bool PrintHelper::inDanhMucSach(PTRDS* dsDauSach, int soLuong, QWidget* parent) {
@@ -360,7 +583,7 @@ bool PrintHelper::inPhieuMuonTra(PTRDG docGia, const QList<QString>& danhSachSac
 bool PrintHelper::inDanhSachDocGia(PTRDG root, QWidget* parent) {
     if (!root) return false;
     
-    // Convert Tree to List for Table
+    // 1. Flatten Tree to List for Table
     QList<PTRDG> list;
     std::function<void(PTRDG)> traverse = [&](PTRDG p) {
         if (!p) return;
@@ -372,22 +595,67 @@ bool PrintHelper::inDanhSachDocGia(PTRDG root, QWidget* parent) {
     
     if (list.isEmpty()) return false;
     
-    QString bangHTML = "<table border='1' cellpadding='5' cellspacing='0' style='width:100%; border-collapse:collapse;'>"
-                       "<tr style='background:#f0f0f0;'>"
-                       "<th>STT</th><th>Mã Thẻ</th><th>Họ Tên</th>"
-                       "<th>Giới Tính</th><th>Trạng Thái</th><th>Đang Mượn</th>"
-                       "</tr>";
-                       
+    // 2. Summary Statistics
+    int totalActive = 0, totalInactive = 0;
+    int totalMale = 0, totalFemale = 0;
+    int totalWithBooks = 0;
+    
+    for (PTRDG p : list) {
+        if (p->data.TrangThai == 1) totalActive++; else totalInactive++;
+        if (p->data.Phai == 0) totalMale++; else totalFemale++;
+        if (p->data.soSachDangMuon > 0) totalWithBooks++;
+    }
+    
+    // 3. Build HTML Content
+    QString contentHTML;
+    
+    // Summary Box (Improved Aesthetics with Borders - No Colors)
+    contentHTML += QString(
+        "<div style='margin-bottom: 25px;'>"
+        "  <div style='font-size: 13pt; font-weight: bold; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 12px; color: #000;'>TỔNG QUAN ĐỘC GIẢ</div>"
+        "  <table border='1' cellspacing='0' cellpadding='10' width='100%' style='font-size: 10.5pt;'>"
+        "    <tr>"
+        "      <td width='33%'><b>Tổng số:</b> %1</td>"
+        "      <td width='33%'><b>Đang hoạt động:</b> %2</td>"
+        "      <td width='34%'><b>Bị khóa:</b> %3</td>"
+        "    </tr>"
+        "    <tr>"
+        "      <td><b>Đang mượn sách:</b> %4</td>"
+        "      <td><b>Nam:</b> %5</td>"
+        "      <td><b>Nữ:</b> %6</td>"
+        "    </tr>"
+        "  </table>"
+        "</div>"
+    ).arg(list.size()).arg(totalActive).arg(totalInactive).arg(totalWithBooks).arg(totalMale).arg(totalFemale);
+    
+    // Data Table (Explicit borders - Center Alignment for IDs/Numbers)
+    contentHTML += "<table border='1' cellspacing='0' cellpadding='8' width='100%'>"
+                   "<thead>"
+                   "<tr>"
+                   "<th>STT</th>"
+                   "<th>Mã Thẻ</th>"
+                   "<th>Họ Tên</th>"
+                   "<th>Phái</th>"
+                   "<th>Trạng Thái</th>"
+                   "<th>Đang Mượn</th>"
+                   "</tr>"
+                   "</thead>"
+                   "<tbody>";
+                        
     for (int i = 0; i < list.size(); i++) {
         PTRDG p = list[i];
         QString hoTen = QString::fromStdString(p->data.Ho + " " + p->data.Ten);
         QString phai = p->data.Phai ? "Nữ" : "Nam";
-        QString trangThai = (p->data.TrangThai == 1) ? "Hoạt động" : "Khóa";
+        QString trangThai = (p->data.TrangThai == 1) ? "Hoạt động" : "Bị khóa";
         
-        bangHTML += QString("<tr>"
-                           "<td>%1</td><td>%2</td><td>%3</td>"
-                           "<td>%4</td><td>%5</td><td>%6</td>"
-                           "</tr>")
+        contentHTML += QString("<tr>"
+                               "<td class='text-center'>%1</td>"
+                               "<td class='text-center nowrap'><b>%2</b></td>"
+                               "<td>%3</td>"
+                               "<td class='text-center'>%4</td>"
+                               "<td class='text-center'>%5</td>"
+                               "<td class='text-center'><b>%6</b> cuốn</td>"
+                               "</tr>")
             .arg(i + 1)
             .arg(p->data.MaThe)
             .arg(hoTen)
@@ -395,15 +663,17 @@ bool PrintHelper::inDanhSachDocGia(PTRDG root, QWidget* parent) {
             .arg(trangThai)
             .arg(p->data.soSachDangMuon);
     }
-    bangHTML += "</table>";
+    contentHTML += "</tbody></table>";
     
-    QString html = taoHTMLDanhSach("DANH SÁCH HỌC VIÊN", bangHTML);
+    // 4. Wrap with Standard Master Template
+    QString html = taoHTMLDanhSach("DANH SÁCH HỌC VIÊN", contentHTML);
+    
+    // 5. Build Document and Execute Print
     QTextDocument doc;
     doc.setHtml(html);
     
-    QString question = QString("Tìm thấy %1 học viên.").arg(list.size());
-    return xuLyYeuCauIn(&doc, "In Danh Sách Học Viên", question, taoTenFileBaoCao("DSHocVien"), parent, s_config.printerReport);
-
+    QString statusMsg = QString("In báo cáo: %1 học viên").arg(list.size());
+    return xuLyYeuCauIn(&doc, "BÁO CÁO HỌC VIÊN", statusMsg, taoTenFileBaoCao("DSHocVien"), parent, s_config.printerReport);
 }
 
 bool PrintHelper::inBienLaiPhat(PTRDG docGia, const QString& lyDo, long long soTien, QWidget* parent) {
@@ -438,6 +708,10 @@ bool PrintHelper::inBienLaiPhat(PTRDG docGia, const QString& lyDo, long long soT
      
     QTextDocument doc;
     doc.setHtml(html);
+
+    // Silent Audit Log (Phase 10)
+    logReceiptToPDF(&doc, "BienLaiPhat");
+
     QString question = QString("In biên lai phạt cho: %1\nSố tiền: %2").arg(hoTen).arg(soTien);
     return xuLyYeuCauIn(&doc, "Biên Lai Phạt", question, taoTenFileBaoCao("Phat"), parent, s_config.printerReceipt);
 
@@ -445,115 +719,212 @@ bool PrintHelper::inBienLaiPhat(PTRDG docGia, const QString& lyDo, long long soT
 
 // ===== HELPER FUNCTIONS =====
 // Helper to generate barcode image (Code128 preferred)
-static QImage generateBarcodeImage(const QString &text, int height) {
+// Parameters now use mm for physical dimensions, converted to px based on target DPI
+static QImage generateBarcodeImage(const QString &text, double heightMm, double maxWidthMm = 0, int targetDPI = 300) {
     // 1. Generate Code128 Pattern
     QVector<bool> pattern = Code128::encode(text);
     if (pattern.isEmpty()) return QImage();
 
-    // 2. High DPI Settings
-    // Minimum 2px per module for better fit on small labels (2px * 128 chars ~= 250px width)
-    int moduleW = 2; 
-    int quietZone = 5 * moduleW;
+    // ═══════════════════════════════════════════════════════════════
+    // 2. CODE 128 BEST PRACTICES (mm-based with DPI conversion)
+    // ═══════════════════════════════════════════════════════════════
     
-    int totalWidth = (pattern.size() * moduleW) + (2 * quietZone);
-    // Ensure height is reasonable (passed 200 usually)
+    // DPI Conversion Helper: mm to pixels
+    // Formula: pixels = (mm / 25.4) * DPI
+    auto mmToPx = [targetDPI](double mm) -> int {
+        return qRound((mm / 25.4) * targetDPI);
+    };
     
-    QImage image(totalWidth, height, QImage::Format_ARGB32);
-    image.fill(Qt::white);
+    // Default Module Width
+    // - ISO 15417 recommends: 0.25mm - 1.016mm
+    // - For 300 DPI, 0.25mm is 3 pixels (Thinner, as requested)
+    double moduleWidthMm = 0.25; 
+    
+    // Auto-Scaling Logic (NEW)
+    // If maxWidthMm is provided, check if we need to shrink module width
+    if (maxWidthMm > 0) {
+        // Calculate minimum required width at default 0.33mm
+        // Width = (11 * L + overhead) * X + QuietZones
+        // Exact pattern size:
+        int numModules = pattern.size();
+        double quietZoneTotalMm = 12.0 * moduleWidthMm * 2; // 12X on both sides
+        double totalRequiredMm = (numModules * moduleWidthMm) + quietZoneTotalMm;
+        
+        if (totalRequiredMm > maxWidthMm) {
+            // Need to shrink
+            // Formula: maxWidthMm = (numModules * X) + (24 * X) = X * (numModules + 24)
+            // X = maxWidthMm / (numModules + 24)
+            double calculatedModuleWidth = maxWidthMm / (numModules + 24);
+            
+            // Enforce minimum readable size (ISO minimum is usually 0.17mm or 0.25mm depending on scanner)
+            // But user requires it to fit. Let's floor at 0.17mm (High density) for 300DPI
+            if (calculatedModuleWidth < 0.17) calculatedModuleWidth = 0.17; 
+            
+            moduleWidthMm = calculatedModuleWidth;
+        }
+    }
+    
+    // Quiet Zone: 12X
+    double quietZoneMm = 12.0 * moduleWidthMm;
+    
+    // Convert to pixels for rendering
+    int moduleWidthPx = mmToPx(moduleWidthMm);
+    int quietZonePx = mmToPx(quietZoneMm);
+    int heightPx = mmToPx(heightMm);
+    
+    // Ensure minimum pixel values (prevent zero-width at low DPI)
+    if (moduleWidthPx < 1) moduleWidthPx = 1; // Allow 1px for high density
+    if (quietZonePx < 5) quietZonePx = 5;
+    if (heightPx < 30) heightPx = 30; // Min height 30px
+    
+    int totalWidthPx = (pattern.size() * moduleWidthPx) + (2 * quietZonePx);
+    
+    QImage image(totalWidthPx, heightPx, QImage::Format_ARGB32);
+    image.fill(Qt::white); // White background (required for contrast)
     
     QPainter painter(&image);
     painter.setPen(Qt::NoPen);
-    painter.setBrush(Qt::black);
+    painter.setBrush(Qt::black); // Black bars
     
-    int x = quietZone;
+    // Render bars
+    int x = quietZonePx;
     for (bool isBar : pattern) {
         if (isBar) {
-            painter.drawRect(x, 0, moduleW, height);
+            painter.drawRect(x, 0, moduleWidthPx, heightPx);
         }
-        x += moduleW;
+        x += moduleWidthPx;
     }
     
     return image;
 }
 
-// Helper to expose Barcode Base64 generation
-QString PrintHelper::generateBarcodeBase64(const QString &text, int height) {
-    QImage barcodeImg = generateBarcodeImage(text, height);
+// Helper to expose Barcode Base64 generation (mm-based)
+QString PrintHelper::generateBarcodeBase64(const QString &text, double heightMm, int targetDPI, double maxWidthMm) {
+    QString cacheKey = QString("%1_%2_%3_%4").arg(text).arg(heightMm).arg(targetDPI).arg(maxWidthMm);
+    if (s_barcodeCache.contains(cacheKey)) return s_barcodeCache[cacheKey];
+
+    QImage barcodeImg = generateBarcodeImage(text, heightMm, maxWidthMm, targetDPI);
     if (barcodeImg.isNull()) return "";
 
     QByteArray byteArray;
     QBuffer buffer(&byteArray);
     buffer.open(QIODevice::WriteOnly);
     barcodeImg.save(&buffer, "PNG");
-    return byteArray.toBase64();
+    QString base64 = byteArray.toBase64();
+    
+    s_barcodeCache[cacheKey] = base64;
+    return base64;
 }
 
 QString PrintHelper::taoMaVachHTML(const QString& maSo, int fontSize) {
-    // New Logic: Use Code128 & High-Height Image
-    // Ignore fontSize arg for image generation height (use fixed high-res 150px)
-    // fontSize is used for CSS display height if desired, or we just rely on auto-scaling.
+    // Default: 12mm height
+    double heightMm = (fontSize > 0) ? (fontSize * 0.2646) : 12.0; 
+    int targetDPI = 600; // High precision
     
-    QString base64 = generateBarcodeBase64(maSo, 150);
+    // Auto-fit to 35mm if not specified
+    QString base64 = generateBarcodeBase64(maSo, heightMm, targetDPI, 35.0); 
     
-    // Use pixelated rendering style and max-height constraints
-    // Display height matches 'fontSize' roughly (e.g. 50px)
-    int displayHeight = (fontSize > 0) ? fontSize : 50;
-    
-    return QString("<img src='data:image/png;base64,%1' style='height:%2px; max-width:100%%; image-rendering: pixelated; -ms-interpolation-mode: nearest-neighbor;' />")
-            .arg(base64).arg(displayHeight);
+    return QString("<img src='data:image/png;base64,%1' style='height:%2mm; max-width:100%%; image-rendering: pixelated;' />")
+            .arg(base64).arg(heightMm);
 }
 
 QString PrintHelper::taoMaQRHTML(const QString& maSo, int size) {
-    QImage qr = QrCodeGenerator::generateQrImage(maSo, size);
-    if (qr.isNull()) return "";
+    QString cacheKey = maSo + "_" + QString::number(size);
+    QString base64;
     
-    QByteArray byteArray;
-    QBuffer buffer(&byteArray);
-    buffer.open(QIODevice::WriteOnly);
-    qr.save(&buffer, "PNG");
-    QString base64 = byteArray.toBase64();
+    if (s_qrCache.contains(cacheKey)) {
+        base64 = s_qrCache[cacheKey];
+    } else {
+        QImage qr = QrCodeGenerator::generateQrImage(maSo, size);
+        if (qr.isNull()) return "";
+        
+        QByteArray byteArray;
+        QBuffer buffer(&byteArray);
+        buffer.open(QIODevice::WriteOnly);
+        qr.save(&buffer, "PNG");
+        base64 = byteArray.toBase64();
+        s_qrCache[cacheKey] = base64;
+    }
     
     return QString("<img src='data:image/png;base64,%1' width='%2' height='%2' />")
            .arg(base64).arg(size);
 }
 
-// Helper to create file names
-QString PrintHelper::taoTenFilePhieuMuon(int maThe, const QString& maSach) {
-    return QString("PhieuMuon_%1_%2_%3.pdf").arg(maThe).arg(maSach).arg(QDateTime::currentDateTime().toString("yyyyMMdd_HHmm"));
+// Helper to create file names (Sanitized for filesystem)
+static QString sanitizeFileName(const QString& name) {
+    QString safe = name;
+    safe.replace(" ", "_");
+    // Simple ASCII and common characters only
+    safe.remove(QRegularExpression("[^a-zA-Z0-9_.-]"));
+    return safe;
 }
-QString PrintHelper::taoTenFilePhieuTra(int maThe, const QString& maSach) {
-    return QString("PhieuTra_%1_%2_%3.pdf").arg(maThe).arg(maSach).arg(QDateTime::currentDateTime().toString("yyyyMMdd_HHmm"));
+
+QString PrintHelper::taoTenFilePhieuMuon(int maThe, const QString& hoTen, const QString& maSach) {
+    QString name = sanitizeFileName(hoTen);
+    return QString("Phieu_Muon_%1_%2_%3_%4.pdf")
+        .arg(name)
+        .arg(maThe)
+        .arg(maSach)
+        .arg(QDateTime::currentDateTime().toString("yyyyMMdd_HHmm"));
 }
-QString PrintHelper::taoTenFileTheDocGia(int maThe) {
-    return QString("TheHocVien_%1.pdf").arg(maThe);
+
+QString PrintHelper::taoTenFilePhieuTra(int maThe, const QString& hoTen, const QString& maSach) {
+    QString name = sanitizeFileName(hoTen);
+    return QString("Phieu_Tra_%1_%2_%3_%4.pdf")
+        .arg(name)
+        .arg(maThe)
+        .arg(maSach)
+        .arg(QDateTime::currentDateTime().toString("yyyyMMdd_HHmm"));
 }
+
+QString PrintHelper::taoTenFileTheDocGia(int maThe, const QString& hoTen) {
+    QString name = sanitizeFileName(hoTen);
+    return QString("The_Hoc_Vien_%1_%2.pdf").arg(name).arg(maThe);
+}
+
 QString PrintHelper::taoTenFileTemSach(const QString& isbn, int soLuong) {
-    return QString("TemSach_%1_sl%2.pdf").arg(isbn).arg(soLuong);
+    return QString("Tem_Ma_Vach_Sach_%1_sl%2.pdf").arg(isbn).arg(soLuong);
 }
+
 QString PrintHelper::taoTenFileBaoCao(const QString& loaiBaoCao) {
-    return QString("BaoCao_%1_%2.pdf").arg(loaiBaoCao).arg(QDate::currentDate().toString("yyyyMMdd"));
+    QString loai = sanitizeFileName(loaiBaoCao);
+    return QString("Bao_Cao_%1_%2.pdf").arg(loai).arg(QDate::currentDate().toString("yyyyMMdd"));
 }
 
 bool PrintHelper::xuatPDF(QTextDocument* doc, const QString& tenFile, QWidget* parent) {
     if (!doc) return false;
+    
+    PrintConfig cfg = getCauHinh();
+
+    // Ensure Directory Exists
+    QFileInfo fileInfo(tenFile);
+    if (!QDir().mkpath(fileInfo.absolutePath())) {
+        qWarning() << "Failed to create directory:" << fileInfo.absolutePath();
+    }
+
     QPrinter printer(QPrinter::HighResolution);
     printer.setOutputFormat(QPrinter::PdfFormat);
     printer.setOutputFileName(tenFile);
     
-    // Load Settings
-    // NOTE: Cần include "utils/SettingsManager.h" nếu chưa có, hoặc dùng QSettings trực tiếp
-    // Giả sử dùng QSettings để đơn giản hoá dependency nếu chưa include SettingsManager
+    // 1. Page Size Mapping
+    QPageSize::PageSizeId paperId = QPageSize::A4;
+    QString ps = cfg.pageSize.toUpper();
+    if (ps == "A3") paperId = QPageSize::A3;
+    else if (ps == "A5") paperId = QPageSize::A5;
+    else if (ps == "LETTER") paperId = QPageSize::Letter;
+    else if (ps == "LEGAL") paperId = QPageSize::Legal;
+    
+    printer.setPageSize(QPageSize(paperId));
+    
+    // 2. Orientation Mapping
+    QPageLayout::Orientation orient = QPageLayout::Portrait;
+    if (cfg.orientation.toLower() == "landscape") {
+        orient = QPageLayout::Landscape;
+    }
+    printer.setPageOrientation(orient);
+    
+    // 3. Margins (mm) - Read from config or defaults
     QSettings settings("HVPGCT", "QuanLyThuVien_V2");
-    
-    // 1. Page Size
-    int paperId = settings.value("printer_paper_size", QPageSize::A4).toInt();
-    printer.setPageSize(QPageSize(static_cast<QPageSize::PageSizeId>(paperId)));
-    
-    // 2. Orientation
-    int orientId = settings.value("printer_orientation", QPageLayout::Portrait).toInt();
-    printer.setPageOrientation(static_cast<QPageLayout::Orientation>(orientId));
-    
-    // 3. Margins (mm)
     qreal mL = settings.value("printer_margin_left", 10).toDouble();
     qreal mR = settings.value("printer_margin_right", 10).toDouble();
     qreal mT = settings.value("printer_margin_top", 10).toDouble();
@@ -562,14 +933,43 @@ bool PrintHelper::xuatPDF(QTextDocument* doc, const QString& tenFile, QWidget* p
     printer.setPageMargins(QMarginsF(mL, mT, mR, mB), QPageLayout::Millimeter);
     
     // 4. Color Mode
-    if (s_config.inMauSac) {
-        printer.setColorMode(QPrinter::Color);
-    } else {
-        printer.setColorMode(QPrinter::GrayScale);
-    }
+    printer.setColorMode(cfg.inMauSac ? QPrinter::Color : QPrinter::GrayScale);
 
     doc->print(&printer);
-    QMessageBox::information(parent, "Xuất PDF", "Đã lưu file thành công:\n" + tenFile);
+    
+    QString absPath = QDir::toNativeSeparators(fileInfo.absoluteFilePath());
+    QMessageBox::information(parent, "Xuất PDF", 
+        "Đã lưu file thành công tại:\n" + absPath);
+        
+    QDesktopServices::openUrl(QUrl::fromLocalFile(absPath));
+    return true;
+}
+
+bool PrintHelper::logReceiptToPDF(QTextDocument* doc, const QString& type) {
+    if (!doc) return false;
+    
+    // Base log directory (Phase 11: Dynamic Path)
+    QString dateFolder = QDate::currentDate().toString("yyyyMM");
+    QString fullLogPath = FilePathManager::getPrintLogPath() + "/" + dateFolder;
+    
+    if (!QDir().mkpath(fullLogPath)) return false;
+    
+    QString fileName = QString("%1_%2_%3.pdf")
+        .arg(type)
+        .arg(QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss"))
+        .arg(QRandomGenerator::global()->bounded(1000)); // Add randomness to avoid collisions
+        
+    QString fullPath = fullLogPath + "/" + fileName;
+
+    QPrinter printer(QPrinter::HighResolution);
+    printer.setOutputFormat(QPrinter::PdfFormat);
+    printer.setOutputFileName(fullPath);
+    
+    // Compact log format
+    printer.setPageSize(QPageSize(QPageSize::A6));
+    printer.setPageMargins(QMarginsF(5, 5, 5, 5), QPageLayout::Millimeter);
+
+    doc->print(&printer);
     return true;
 }
 
@@ -578,30 +978,75 @@ void PrintHelper::setCauHinh(const PrintConfig& config) {
     s_configLoaded = true; // Mark as loaded when set manually
 }
 
+void PrintHelper::reloadCauHinh() {
+    s_configLoaded = false; // Force reload on next getCauHinh()
+    getCauHinh(); // Reload immediately
+}
+
 // Flag moved to top
 
 PrintHelper::PrintConfig PrintHelper::getCauHinh() {
     if (!s_configLoaded) {
-        // Lazy Load from SettingsManager
         PrintHelper::PrintConfig cfg;
-        cfg.tenThuVien = SettingsManager::instance().getString("Print/TenThuVien", "THƯ VIỆN");
-        cfg.tenVietTat = SettingsManager::instance().getString("Print/TenVietTat", "TV");
+        
+        cfg.tenThuVien = SettingsManager::instance().getString("Print/TenThuVien", "HỌC VIỆN PHẬT GIÁO NAM TÔNG KHMER");
+        cfg.tenVietTat = SettingsManager::instance().getString("Print/TenVietTat", "HVPG NAMTONG");
+        cfg.loiChao = SettingsManager::instance().getString("Print/LoiChao", "Xin cảm ơn!");
+        
         cfg.inMauSac = SettingsManager::instance().getBool("Print/Color", false);
         cfg.hienThiLogo = SettingsManager::instance().getBool("Print/ShowLogo", false);
         cfg.duongDanLogo = SettingsManager::instance().getString("Print/LogoPath", "");
-        cfg.qrOutputDir = SettingsManager::instance().getString("Print/QrPath", "");
-        cfg.pdfOutputDir = SettingsManager::instance().getString("Print/PdfPath", "");
         cfg.silentPrint = SettingsManager::instance().getBool("Print/Silent", false);
+        
         cfg.printerReceipt = SettingsManager::instance().getString("Print/Receipt", "");
         cfg.printerReport = SettingsManager::instance().getString("Print/Report", "");
+        cfg.pdfOutputDir = SettingsManager::instance().getString("Print/PdfPath", "");
+        cfg.qrOutputDir = SettingsManager::instance().getString("Print/QrPath", "");
+        cfg.duongDanThuMucIn = SettingsManager::instance().getString("Print/InDir", "in");
+        cfg.thuMucPdf = SettingsManager::instance().getString("Print/PdfSubDir", "pdf");
+        cfg.thuMucQR = SettingsManager::instance().getString("Print/QrSubDir", "qr");
         
-        cfg.labelWidth = SettingsManager::instance().getInt("Print/BarcodeWidth", 140);
-        cfg.labelHeight = SettingsManager::instance().getInt("Print/BarcodeHeight", 88);
-        cfg.labelCols = SettingsManager::instance().getInt("Print/BarcodeCols", 3);
+        cfg.pageSize = SettingsManager::instance().getString("Print/PageSize", "A4");
+        cfg.orientation = SettingsManager::instance().getString("Print/Orientation", "Portrait");
+
+        // ═══ TEM SÁCH ═══
+        cfg.labelWidth = SettingsManager::instance().getInt("Print/BarcodeWidth", 38);
+        cfg.labelHeight = SettingsManager::instance().getInt("Print/BarcodeHeight", 20);
+        cfg.labelCols = SettingsManager::instance().getInt("Print/BarcodeCols", 4); 
+        cfg.labelGapMm = SettingsManager::instance().getInt("Print/LabelGapMm", 5);
         cfg.showLibName = SettingsManager::instance().getBool("Print/ShowLibName", true);
         cfg.showBookTitle = SettingsManager::instance().getBool("Print/ShowBookTitle", true);
         cfg.showPrice = SettingsManager::instance().getBool("Print/ShowPrice", false);
         cfg.showBorder = SettingsManager::instance().getBool("Print/ShowBorder", true);
+        cfg.fontFamily = SettingsManager::instance().getString("Print/FontFamily", "Times New Roman");
+        cfg.barcodeWidthRatio = SettingsManager::instance().getDouble("Print/BarcodeWidthRatio", 0.9);
+
+        // Load blocks or use default
+        QString blocksJson = SettingsManager::instance().getString("Print/LabelBlocks", "");
+        if (blocksJson.isEmpty()) {
+            // Default Layout: Lib Name -> Book Title -> Barcode -> Price -> Code
+            cfg.blocks.append({"text", "tenDonVi", "top", 7, true, "center"});
+            cfg.blocks.append({"text", "tenSach", "middle", 9, true, "center"});
+            cfg.blocks.append({"barcode", "maBanSao", "middle", 0, false, "center"});
+            cfg.blocks.append({"text", "maBanSao", "bottom", 8, true, "center"});
+        } else {
+            // TODO: Parse JSON if implemented in SettingsManager
+            // For now, hard-coded default if no specific logic exists for JSON parsing here
+        }
+
+        // ═══ THẺ HỌC VIÊN ═══
+        cfg.cardWidth = SettingsManager::instance().getDouble("Print/CardWidth", 80.0);
+        cfg.cardHeight = SettingsManager::instance().getDouble("Print/CardHeight", 50.0);
+        cfg.cardCols = SettingsManager::instance().getInt("Print/CardCols", 2);
+        cfg.cardGapMm = SettingsManager::instance().getInt("Print/CardGapMm", 5);
+        cfg.cardValidityMonths = SettingsManager::instance().getInt("Print/CardValidityMonths", 12);
+        
+        cfg.barcodeDPI = SettingsManager::instance().getInt("Print/BarcodeDPI", 300);
+        cfg.barcodeModuleWidthMm = SettingsManager::instance().getDouble("Print/BarcodeModuleWidthMm", 0.33);
+        cfg.barcodeQuietZoneMm = SettingsManager::instance().getDouble("Print/BarcodeQuietZoneMm", 4.0);
+        cfg.defaultBarcodeHeight = SettingsManager::instance().getInt("Print/DefaultBarcodeHeight", 14);
+
+        cfg.reportShowSummary = SettingsManager::instance().getBool("Print/ReportShowSummary", true);
 
         s_config = cfg;
         s_configLoaded = true;
@@ -653,76 +1098,6 @@ bool PrintHelper::inDocument(QTextDocument* doc, QWidget* parent, const QString&
     return true;
 }
 
-QString PrintHelper::taoHTMLTemSach(const QString& maSach, const QString& tenSach) {
-    // 1. Load Settings (Refresh to ensure latest)
-    PrintConfig cfg = getCauHinh();
-    
-    // 2. Prepare Data
-    QString libName = cfg.showLibName ? (cfg.tenVietTat.isEmpty() ? cfg.tenThuVien : cfg.tenVietTat) : "";
-    QString safeTen = cfg.showBookTitle ? tenSach : "";
-    if (safeTen.length() > 50) safeTen = safeTen.left(47) + "...";
-    
-    // 3. Layout Calculations
-    // Total Height = cfg.labelHeight
-    int hTotal = cfg.labelHeight;
-    int wTotal = cfg.labelWidth;
-    
-    // Estimations for content height
-    int hLib = cfg.showLibName ? 14 : 0; // Approx 14px for lib name
-    int hTitle = cfg.showBookTitle ? 26 : 0; // Approx 2 lines of text
-    int hCode = 12; // Bottom text code
-    
-    // Barcode takes remaining space
-    int hBarcode = hTotal - hLib - hTitle - hCode - 8; // 8px padding
-    if (hBarcode < 20) hBarcode = 20; // Min safe height
-    
-    // 4. Generate Real Barcode Image
-    QString barcodeBase64 = generateBarcodeBase64(maSach, 150); // High res source
-    
-    QString borderStyle = cfg.showBorder ? "1px solid #000" : "1px dashed #eee";
-    
-    // 5. Build HTML
-    QString html = QString(
-        "<div style='"
-        " width: %1px; height: %2px;"
-        " border: %3;" 
-        " margin: 0; padding: 2px;"
-        " font-family: 'Segoe UI', Arial, sans-serif;"
-        " text-align: center;"
-        " background: #fff;"
-        " float: left;" // Important for flow
-        " position: relative;"
-        " overflow: hidden;"
-        " box-sizing: border-box;"
-        " page-break-inside: avoid;"
-        "'>"
-    ).arg(wTotal).arg(hTotal).arg(borderStyle);
-
-    // Library Name
-    if (cfg.showLibName) {
-        html += QString("<div style='font-size: 7pt; font-weight: bold; text-transform: uppercase; white-space: nowrap; overflow: hidden; height: %1px; line-height: %1px;'>%2</div>").arg(hLib).arg(libName);
-    }
-    
-    // Book Title
-    if (cfg.showBookTitle) {
-        html += QString("<div style='font-size: 8pt; font-weight: 600; height: %1px; overflow: hidden; line-height: 1.1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;'>%2</div>").arg(hTitle).arg(safeTen);
-    }
-    
-    // Barcode Image
-    html += QString(
-        "  <div style='height: %1px; display: flex; align-items: center; justify-content: center; overflow: hidden; margin: 1px 0;'>"
-        "    <img src='data:image/png;base64,%2' style='height: 100%%; max-width: 98%%; image-rendering: pixelated;' />"
-        "  </div>"
-    ).arg(hBarcode).arg(barcodeBase64);
-    
-    // Readable Code
-    html += QString("<div style='font-size: 8pt; font-weight: bold; height: %1px;'>%2</div>").arg(hCode).arg(maSach);
-    
-    html += "</div>";
-    
-    return html;
-}
-
 QString PrintHelper::taoHTMLA4NhieuThe(const QList<PTRDG>& danhSach, int soCot) {
     if (danhSach.isEmpty()) return "";
     
@@ -761,44 +1136,74 @@ QString PrintHelper::taoHTMLA4NhieuThe(const QList<PTRDG>& danhSach, int soCot) 
 }
 
 QString PrintHelper::taoHTMLDanhSach(const QString& tieuDe, const QString& noiDungBang) {
+    PrintConfig cfg = getCauHinh();
+    QString currentTime = QDateTime::currentDateTime().toString("dd/MM/yyyy HH:mm");
+    
+    // Process noiDungBang to ensure tables have the report-table class if possible
+    QString content = noiDungBang;
+    if (!content.contains("class=")) {
+        content.replace("<table>", "<table class='report-table'>");
+    }
+
     return QString(
         "<html><head><style>"
-        "body { font-family: 'Siemreap', 'Khmer OS Siemreap', 'Times New Roman', serif; font-size: 11pt; color: #000; margin: 20px; }"
-        ".page-header { text-align: center; margin-bottom: 20px; }"
-        ".org-name { font-weight: bold; font-size: 12pt; text-transform: uppercase; margin-bottom: 5px; }"
-        ".report-title { font-weight: 900; font-size: 16pt; margin-top: 15px; text-transform: uppercase; }"
-        "table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 10pt; }"
-        "th { background-color: #eee; border: 1px solid #000; padding: 8px; font-weight: bold; text-align: center; }"
-        "td { border: 1px solid #000; padding: 6px; }"
-        "tr:nth-child(even) { background-color: #f9f9f9; }" // Zebra Striping for readability
-        ".footer { margin-top: 30px; text-align: right; font-style: italic; font-size: 10pt; }"
-        ".signature-box { margin-top: 40px; display: flex; justify-content: space-between; text-align: center; }"
-        ".date-time { margin-bottom: 50px; }"
+        "body { font-family: '%1', 'Siemreap', 'Segoe UI', serif; font-size: 11pt; color: #000; margin: 15mm; }"
+        "table { border-collapse: collapse; width: 100%%; margin-bottom: 20px; }"
+        "table[border='1'] { border: 1px solid #000; }"
+        "table[border='1'] th { background-color: #ffffff; border: 1px solid #000; padding: 10px 5px; font-weight: bold; text-align: center; color: #000; }"
+        "table[border='1'] td { border: 1px solid #000; padding: 8px 5px; vertical-align: middle; background-color: #ffffff; color: #000; }"
+        ".no-border, .no-border td, .no-border th { border: none !important; border-width: 0px !important; }"
+        ".header-container { display: table-header-group; }"
+        ".header-content { border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }"
+        ".org-name { font-weight: bold; font-size: 13pt; text-transform: uppercase; color: #000; }"
+        ".report-title { font-weight: bold; font-size: 18pt; margin: 20px 0; text-transform: uppercase; text-align: center; color: #000; }"
+        ".footer { margin-top: 40px; text-align: right; font-size: 10.5pt; page-break-inside: avoid; }"
+        ".signature-box { margin-top: 25px; text-align: center; float: right; width: 250px; color: #000; }"
+        ".nowrap { white-space: nowrap; }"
+        ".text-center { text-align: center; }"
         "</style></head><body>"
         
-        "<div class='page-header'>"
-        "  <div class='org-name'>%1</div>"
-        "  <div style='font-size: 9pt;'>Thư Viện Học Viện</div>"
-        "  <div class='report-title'>%2</div>"
-        "  <div style='font-size: 10pt;'>Ngày xuất báo cáo: %3</div>"
-        "</div>"
-        
-        "%4" // Table Content
-        
-        "<div class='footer'>"
-        "  <div class='date-time'>Cần Thơ, ngày %5 tháng %6 năm %7</div>"
-        "  <div style='width: 200px; float: right; text-align: center;'>"
-        "    <b>Người Lập Biểu</b><br>"
-        "    <i>(Ký và ghi rõ họ tên)</i>"
-        "  </div>"
-        "  <div style='clear: both;'></div>"
-        "</div>"
-        
+        "<table class='no-border' border='0' style='width: 100%%;'>"
+        "  <thead class='header-container'>"
+        "    <tr><td style='border: none;'>"
+        "      <div class='header-content'>"
+        "        <table width='100%%' style='border: none;'>"
+        "          <tr>"
+        "            <td style='border: none; padding: 0;'>"
+        "              <div class='org-name'>%2</div>"
+        "              <div style='font-size: 9pt; color: #555;'>Hệ thống Quản lý Thư viện • %3</div>"
+        "            </td>"
+        "            <td style='border: none; padding: 0; text-align: right; font-size: 8.5pt; color: #777; vertical-align: bottom;'>"
+        "              Ngày in: %4"
+        "            </td>"
+        "          </tr>"
+        "        </table>"
+        "      </div>"
+        "    </td></tr>"
+  "  </thead>"
+        "  <tbody>"
+        "    <tr><td style='border: none;'>"
+        "      <div class='report-title'>%5</div>"
+        "      <div class='report-body'>%6</div>"
+        "      <div class='footer'>"
+        "        <div>Cần Thơ, ngày %7 tháng %8 năm %9</div>"
+        "        <div class='signature-box'>"
+        "          <b>Người Lập Biểu</b><br>"
+        "          <div style='height: 80px;'></div>"
+        "          <i>(Ký và ghi rõ họ tên)</i>"
+        "        </div>"
+        "        <div style='clear: both;'></div>"
+        "      </div>"
+        "    </td></tr>"
+        "  </tbody>"
+        "</table>"
         "</body></html>"
-    ).arg(SettingsManager::instance().getString("Print/TenThuVien", s_config.tenThuVien))
+    ).arg(cfg.fontFamily)
+     .arg(cfg.tenThuVien)
+     .arg("Báo cáo Nghiệp vụ")
+     .arg(currentTime)
      .arg(tieuDe)
-     .arg(QDate::currentDate().toString("dd/MM/yyyy HH:mm"))
-     .arg(noiDungBang)
+     .arg(content)
      .arg(QDate::currentDate().day())
      .arg(QDate::currentDate().month())
      .arg(QDate::currentDate().year());
@@ -906,16 +1311,26 @@ bool PrintHelper::inPhieuMuonTuDong(PTRDG docGia, const QString& maSach, const Q
     QString html = taoHTMLPhieuMuon(docGia, maSach, tenSach, ngayMuon);
     QTextDocument doc;
     doc.setHtml(html);
+    
+    // Silent Audit Log (Phase 10)
+    logReceiptToPDF(&doc, "PhieuMuon");
+
     QString question = QString("In phiếu mượn cho: %1\nSách: %2").arg(QString::fromStdString(docGia->data.Ho + " " + docGia->data.Ten)).arg(tenSach);
-    return xuLyYeuCauIn(&doc, "In Phiếu Mượn", question, taoTenFilePhieuMuon(docGia->data.MaThe, maSach), parent, s_config.printerReceipt, forcePreview);
+    QString hoTen = QString::fromStdString(docGia->data.Ho + " " + docGia->data.Ten);
+    return xuLyYeuCauIn(&doc, "In Phiếu Mượn", question, taoTenFilePhieuMuon(docGia->data.MaThe, hoTen, maSach), parent, s_config.printerReceipt, forcePreview);
 }
 
 bool PrintHelper::inPhieuTraTuDong(PTRDG docGia, const QString& maSach, const QString& tenSach, const QString& ngayTra, QWidget* parent, bool forcePreview) {
     QString html = taoHTMLPhieuMuon(docGia, maSach, tenSach, ngayTra);
     QTextDocument doc;
     doc.setHtml(html);
+
+    // Silent Audit Log (Phase 10)
+    logReceiptToPDF(&doc, "PhieuTra");
+
     QString question = QString("In phiếu trả cho: %1\nSách: %2").arg(QString::fromStdString(docGia->data.Ho + " " + docGia->data.Ten)).arg(tenSach);
-    return xuLyYeuCauIn(&doc, "In Phiếu Trả", question, taoTenFilePhieuTra(docGia->data.MaThe, maSach), parent, s_config.printerReceipt, forcePreview);
+    QString hoTen = QString::fromStdString(docGia->data.Ho + " " + docGia->data.Ten);
+    return xuLyYeuCauIn(&doc, "In Phiếu Trả", question, taoTenFilePhieuTra(docGia->data.MaThe, hoTen, maSach), parent, s_config.printerReceipt, forcePreview);
 }
 
 // ===== PRIVATE HELPERS =====
@@ -923,58 +1338,63 @@ bool PrintHelper::inPhieuTraTuDong(PTRDG docGia, const QString& maSach, const QS
 QString PrintHelper::taoHTMLTheDocGia(PTRDG docGia) {
     if (!docGia) return "";
     
+    // Load Config
+    PrintConfig cfg = getCauHinh();
+    
     // Generate QR with fixed size
     QString qrCode = taoMaQRHTML(QString::number(docGia->data.MaThe), 110);
     
-    // Config: Validity Duration (Default 12 months)
-    int durationMonths = SettingsManager::instance().getInt("Print/HanTheMonths", 12);
+    // Config: Validity Duration
     QDate issueDate = QDate::currentDate();
-    QDate expiryDate = issueDate.addMonths(durationMonths);
+    QDate expiryDate = issueDate.addMonths(cfg.cardValidityMonths);
     
-    // CARD DESIGN: ID-1 Standard (85.6mm x 54mm)
-    // Using a clean, horizontal landscape layout to avoid overlapping
+    // CARD DESIGN: Config-driven dimensions
+    // Pure B&W design for professional printing
+    // CARD DESIGN: Config-driven dimensions
+    // Pure B&W design for professional printing
+    // REFACTOR: Use HTML Tables instead of Flexbox for internal layout (Qt requirement)
     return QString(
         "<div style='"
-        " width: 85.6mm; height: 53.98mm;" // Standard Credit Card Size
-        " border: 1px solid #333;"         // Solid border for cutting
+        " width: %1mm; height: %2mm;"
+        " border: 2px solid #000;"         // Strong border
         " padding: 3mm;"
-        " margin: 2mm;"                    // Spacing between cards in batch
-        " font-family: 'Segoe UI', Arial, sans-serif;"
-        " background-color: #ffffff;"
-        " position: relative;"
-        " overflow: hidden;"
+        " font-family: 'Arial', sans-serif;"
+        " background-color: #fff;"
         " box-sizing: border-box;"
         " page-break-inside: avoid;"
-        " float: left;"                    // Float for batch printing flow
         "'>"
         
-        // --- HEADER ---
-        "  <div style='text-align: center; border-bottom: 2px solid #0056b3; padding-bottom: 2px; margin-bottom: 4px;'>"
-        "    <div style='font-size: 7pt; font-weight: bold; text-transform: uppercase; color: #555;'>%1</div>"
-        "    <div style='font-size: 14pt; font-weight: 900; text-transform: uppercase; color: #0056b3; letter-spacing: 1px; margin-top: 1px;'>THẺ HỌC VIÊN</div>"
+        // --- HEADER (B&W) ---
+        "  <div style='text-align: center; border-bottom: 2px solid #000; padding-bottom: 2mm; margin-bottom: 2mm;'>"
+        "    <div style='font-size: 6pt; font-weight: bold; text-transform: uppercase; color: #000;'>%3</div>"
+        "    <div style='font-size: 12pt; font-weight: bold; text-transform: uppercase; color: #000; letter-spacing: 1px;'>THẺ HỌC VIÊN</div>"
         "  </div>"
 
-        // --- BODY (Flex Row) ---
-        "  <div style='display: flex; flex-direction: row; height: 35mm;'>"
+        // --- BODY (Table Layout) ---
+        "  <table width='100%' border='0' cellspacing='0' cellpadding='0' style='height: 65%;'>"
+        "    <tr>"
         
-        // LEFT: QR Code & ID
-        "    <div style='width: 32mm; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-right: 2px; border-right: 1px dotted #ccc;'>"
-        "      <div style='margin-bottom: 2px;'>%2</div>" // QR Image
-        "      <div style='font-size: 11pt; font-weight: bold; color: #333; margin-top: 2px;'>%3</div>" // ID Number
-        "    </div>"
+        // LEFT CELL: QR Code & ID
+        "      <td width='40%' align='center' valign='middle' style='padding-right: 2mm;'>"
+        "        <div style='margin-bottom: 2mm;'>%4</div>"
+        "        <div style='font-size: 10pt; font-weight: bold; color: #000;'>%5</div>"
+        "      </td>"
 
-        // RIGHT: Student Details
-        "    <div style='flex: 1; padding-left: 8px; display: flex; flex-direction: column; justify-content: center;'>"
-        "      <div style='font-size: 11pt; font-weight: bold; color: #000; text-transform: uppercase; margin-bottom: 3px; line-height: 1.2;'>%4 %5</div>" // Name
-        "      <div style='font-size: 9pt; margin-bottom: 2px; color: #444;'>Giới tính: <b>%6</b></div>"
-        "      <div style='font-size: 9pt; margin-bottom: 2px; color: #444;'>Ngày cấp: %7</div>"
-        "      <div style='font-size: 9pt; color: #d9534f; font-weight: bold; margin-top: 2px;'>Hết hạn: %8</div>"
-        "    </div>"
+        // RIGHT CELL: Student Details
+        "      <td width='60%' valign='middle' style='padding-left: 3mm;'>"
+        "        <div style='font-size: 10pt; font-weight: bold; color: #000; text-transform: uppercase; margin-bottom: 2mm; line-height: 1.2;'>%6 %7</div>"
+        "        <div style='font-size: 8pt; margin-bottom: 1.5mm; color: #000;'>Giới tính: <b>%8</b></div>"
+        "        <div style='font-size: 8pt; margin-bottom: 1.5mm; color: #000;'>Ngày cấp: <b>%9</b></div>"
+        "        <div style='font-size: 8pt; font-weight: bold; color: #000; border-top: 1px solid #000; padding-top: 1mm; margin-top: 1mm;'>Hết hạn: %10</div>"
+        "      </td>"
         
-        "  </div>" // End Body
+        "    </tr>"
+        "  </table>"
         
-        "</div>" // End Card
-    ).arg(SettingsManager::instance().getString("Print/TenThuVien", s_config.tenThuVien))
+        "</div>"
+    ).arg(cfg.cardWidth)
+     .arg(cfg.cardHeight)
+     .arg(cfg.tenThuVien)
      .arg(qrCode)
      .arg(docGia->data.MaThe)
      .arg(QString::fromStdString(docGia->data.Ho))
@@ -993,21 +1413,24 @@ QString PrintHelper::taoHTMLPhieuMuon(PTRDG docGia, const QString& maSach, const
     QString barcodeCard = taoMaVachHTML(QString::number(docGia->data.MaThe), 40); 
     
     // Receipt Style (K80)
+    // REFACTOR: Use Tables instead of Flexbox/Grid for compatibility
     return QString(
         "<html><head><style>"
-        "body { font-family: 'Segoe UI', 'Arial', sans-serif; font-size: 10pt; margin: 0; padding: 8px; width: 72mm; color: #000; background: #fff; }"
+        "body { font-family: 'Segoe UI', 'Arial', sans-serif; font-size: 10pt; margin: 0; padding: 10mm 5mm; width: 72mm; color: #000; background: #fff; }"
         ".header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 12px; }"
-        ".org-name { font-weight: bold; font-size: 9pt; text-transform: uppercase; }"
-        ".title { font-size: 15pt; font-weight: 900; margin: 6px 0; text-transform: uppercase; }"
-        ".datetime { font-size: 8pt; color: #555; }"
-        ".section { margin: 10px 0; }"
-        ".row { margin-bottom: 6px; display: flex; justify-content: space-between; }"
-        ".label { font-weight: bold; color: #333; }"
+        ".org-name { font-weight: bold; font-size: 10pt; text-transform: uppercase; }"
+        ".title { font-size: 16pt; font-weight: 900; margin: 8px 0; text-transform: uppercase; }"
+        ".datetime { font-size: 9pt; color: #333; }"
+        ".section { margin: 15px 0; }"
+        "table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }"
+        "td { vertical-align: top; }"
+        ".label { font-weight: bold; color: #000; text-align: left; }"
         ".value { text-align: right; color: #000; }"
-        ".divider { border-top: 1px dashed #000; margin: 12px 0; }"
-        ".barcode-section { text-align: center; margin: 12px 0; background: #f9f9f9; padding: 8px; border-radius: 4px; }"
-        ".barcode-label { font-size: 8pt; color: #666; margin-bottom: 4px; font-weight: bold; }"
-        ".footer { text-align: center; font-size: 8pt; font-style: italic; margin-top: 15px; color: #666; border-top: 1px solid #ddd; padding-top: 8px; }"
+        ".divider { border-top: 1px dashed #000; margin: 15px 0; }"
+        ".barcode-section { text-align: center; margin: 15px 0; background: #fff; padding: 5px; border: 1px solid #eee; }"
+        ".barcode-label { font-size: 9pt; color: #333; margin-bottom: 6px; font-weight: bold; }"
+        ".footer { text-align: center; font-size: 9pt; font-style: italic; margin-top: 20px; color: #666; border-top: 1px solid #000; padding-top: 10px; }"
+        ".cutter-mark { border-top: 1px dashed #ccc; margin-top: 20mm; text-align: center; font-size: 8pt; color: #999; }"
         "</style></head><body>"
         
         // Header
@@ -1019,7 +1442,10 @@ QString PrintHelper::taoHTMLPhieuMuon(PTRDG docGia, const QString& maSach, const
         
         // Student Info
         "<div class='section'>"
-        "  <div class='row'><span class='label'>Độc giả:</span><span class='value'>%3 %4</span></div>"
+        "  <table border='0'><tr>"
+        "    <td class='label'>Độc giả:</td>"
+        "    <td class='value'>%3 %4</td>"
+        "  </tr></table>"
         "  <div class='barcode-section'>"
         "    <div class='barcode-label'>MÃ THẺ</div>"
         "    %5"
@@ -1031,8 +1457,8 @@ QString PrintHelper::taoHTMLPhieuMuon(PTRDG docGia, const QString& maSach, const
         
         // Book Info
         "<div class='section'>"
-        "  <div class='row'><span class='label'>Tên sách:</span></div>"
-        "  <div style='font-size: 9pt; margin-bottom: 8px; font-weight: 600;'>%7</div>"
+        "  <div style='font-weight: bold; margin-bottom: 4px;'>Tên sách:</div>"
+        "  <div style='font-size: 9pt; margin-bottom: 15px; font-weight: 600;'>%7</div>"
         "  <div class='barcode-section'>"
         "    <div class='barcode-label'>MÃ SÁCH</div>"
         "    %8"
@@ -1045,6 +1471,8 @@ QString PrintHelper::taoHTMLPhieuMuon(PTRDG docGia, const QString& maSach, const
         "  <div>%10</div>"
         "  <div style='margin-top: 4px;'>%11</div>"
         "</div>"
+        
+        "<div class='cutter-mark'>- - - DẤU CẮT / CUT HERE - - -</div>"
         
         "</body></html>"
     ).arg(SettingsManager::instance().getString("Print/TenThuVien", s_config.tenThuVien))
@@ -1131,8 +1559,12 @@ bool PrintHelper::inPhieuMuonBatch(PTRDG docGia, const QList<ThongTinSachDangMuo
     QTextDocument doc;
     doc.setHtml(html);
     
+    // Silent Audit Log (Phase 10)
+    logReceiptToPDF(&doc, "PhieuMuonBatch");
+
     QString title = QString("Xem trước: Phiếu mượn (%1 sách)").arg(danhSachSach.size());
-    QString defaultFile = QString("PhieuMuon_Batch_%1_%2.pdf").arg(docGia->data.MaThe).arg(QDateTime::currentDateTime().toString("yyyyMMdd_HHmm"));
+    QString hoTen = QString::fromStdString(docGia->data.Ho + " " + docGia->data.Ten);
+    QString defaultFile = QString("Phieu_Muon_Hang_Loat_%1_%2.pdf").arg(sanitizeFileName(hoTen)).arg(QDateTime::currentDateTime().toString("yyyyMMdd_HHmm"));
     
     return showPrintPreview(&doc, title, parent, defaultFile);
 }
@@ -1156,7 +1588,7 @@ bool PrintHelper::showPrintPreview(QTextDocument* doc, const QString& title, QWi
         return true;
     } else if (result == CustomPrintDialog::PDF_EXPORT) {
         qDebug() << "User exported to PDF:" << dialog.exportPath();
-        return true;
+        return xuatPDF(doc, dialog.exportPath(), parent);
     } else {
         qDebug() << "User cancelled";
         return false;

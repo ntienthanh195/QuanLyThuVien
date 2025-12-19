@@ -1,4 +1,12 @@
+/**
+ * @file XuLyChuoi.cpp
+ * @path src/utils/XuLyChuoi.cpp
+ * @description Tiện ích xử lý chuỗi ký tự Tiếng Việt.
+ * Cung cấp các hàm: chuyển đổi Unicode, cắt khoảng trắng, chuẩn hóa tên riêng và các thao tác liên quan đến tìm kiếm.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #include "utils/XuLyChuoi.h"
+
 #include "utils/NgayThang.h"
 #include "utils/ThongBao.h"
 #include "Constants.h"

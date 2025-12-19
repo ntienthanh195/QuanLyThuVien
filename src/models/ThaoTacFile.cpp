@@ -1,7 +1,15 @@
 ﻿#include <fstream>
 #include <iostream>
 #include <string>
+/**
+ * @file ThaoTacFile.cpp
+ * @path src/models/ThaoTacFile.cpp
+ * @description Triển khai các hàm đọc và ghi dữ liệu ra file văn bản (.txt).
+ * Quản lý lưu trữ/khôi phục trạng thái cây học viên và mảng đầu sách.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #include "models/ThaoTacFile.h"
+
 #include "models/KiemTraDuLieu.h"
 #include "utils/XuLyChuoi.h"
 #include "models/QuanLySach.h"

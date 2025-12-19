@@ -1,4 +1,11 @@
+/**
+ * @file SettingsManager.h
+ * @path include/utils/SettingsManager.h
+ * @description Header quản lý Cài đặt hệ thống (Singleton).
+ * @project Library Management System (QuanLyThuVien)
+ */
 #ifndef SETTINGSMANAGER_H
+
 #define SETTINGSMANAGER_H
 
 #include <QString>

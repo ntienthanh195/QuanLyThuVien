@@ -83,15 +83,22 @@ def generate_sample(path):
     wb = Workbook()
     ds = wb.active
     ds.title = "DauSach"
-    ds.append(["isbn", "ten_sach", "so_trang", "tac_gia", "nam_xb", "the_loai", "location", "tong_ban_sao", "gia_tien"])
-    ds.append(["9780306406157", "Sample Book A", 200, "Nguyen Van A", 2020, "Khoa hoc", "Ke A1", 2, 85000])
-    ds.append(["9786040000644", "Ai Trong Doi Song", 300, "Pham Thao", 2023, "Tri Tue Nhan Tao", "Ke B2", 1, 120000])
+    ds.append(["isbn", "ten_sach", "so_trang", "tac_gia", "nam_xb", "the_loai", "location", "tong_ban_sao", "gia_tien", "nha_xuat_ban"])
+    ds.append(["9780306406157", "Sample Book A", 200, "Nguyen Van A", 2020, "Khoa hoc", "Ke A1", 2, 85000, "NXB Giao Duc"])
+    ds.append(["9786040000644", "Ai Trong Doi Song", 300, "Pham Thao", 2023, "Tri Tue Nhan Tao", "Ke B2", 1, 120000, "NXB Tre"])
 
     bs = wb.create_sheet("BanSao")
     bs.append(["isbn", "ma_sach", "status", "vi_tri", "date_added"])
     bs.append(["9780306406157", "9780306406157-001", "CHO_MUON_DUOC", "Ke A1", "2025-12-06"])
     bs.append(["9780306406157", "9780306406157-002", "DANG_MUON", "Ke A1", "2025-12-07"])
 
+    wb.save(path)
+    # Also add DocGia sheet
+    dg = wb.create_sheet("DocGia")
+    dg.append(["ma_the", "ho", "ten", "phai", "trang_thai", "so_dien_thoai", "email", "lop", "ngay_sinh", "loai_doc_gia"])
+    dg.append([10001, "Nguyen", "An", 0, 1, "0912345678", "an.nv@gmail.com", "12A1", "2006-05-15", 0])
+    dg.append([10002, "Tran", "Binh", 1, 1, "0987654321", "binh.tt@gmail.com", "11B2", "2007-10-20", 0])
+    
     wb.save(path)
     print(f"Sample workbook written: {path}")
     return path
@@ -115,6 +122,7 @@ def preview_and_prepare(dauSachRows, banSaoRows, out_dir, docGiaRows=None, muonT
         location = r.get('location') or r.get('vi_tri')
         total_copies = r.get('tong_ban_sao') or r.get('total_copies') or 0
         price = r.get('gia_tien') or r.get('price') or r.get('Gi\u00e1 ti\u1ec1n') or 0
+        publisher = r.get('nha_xuat_ban') or r.get('publisher') or r.get('NXB')
 
         isbn = normalize_isbn(isbn_raw or "")
         valid = True
@@ -153,6 +161,7 @@ def preview_and_prepare(dauSachRows, banSaoRows, out_dir, docGiaRows=None, muonT
             'location': str(location or '').strip(),
             'total_copies': int(total_copies) if total_copies not in (None, '') else 0,
             'price': int(price) if price not in (None, '') else 0,
+            'publisher': str(publisher or '').strip(),
             'valid': valid,
             'reasons': '; '.join(reasons)
         })
@@ -196,9 +205,9 @@ def preview_and_prepare(dauSachRows, banSaoRows, out_dir, docGiaRows=None, muonT
     # write previews
     with open(dausach_preview, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
-        writer.writerow(['isbn','title','pages','author','year','genre','location','total_copies','price','valid','reasons'])
+        writer.writerow(['isbn','title','pages','author','year','genre','location','total_copies','price','publisher','valid','reasons'])
         for r in ds_out:
-            writer.writerow([r['isbn'], r['title'], r['pages'], r['author'], r['year'], r['genre'], r['location'], r['total_copies'], r['price'], r['valid'], r['reasons']])
+            writer.writerow([r['isbn'], r['title'], r['pages'], r['author'], r['year'], r['genre'], r['location'], r['total_copies'], r['price'], r['publisher'], r['valid'], r['reasons']])
 
     with open(bansao_preview, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
@@ -225,20 +234,29 @@ def preview_and_prepare(dauSachRows, banSaoRows, out_dir, docGiaRows=None, muonT
             ten = r.get('ten') or r.get('Ten')
             phai = r.get('phai') or r.get('gioi_tinh') or 0
             trang_thai = r.get('trang_thai') or r.get('status') or 1
+            phone = r.get('so_dien_thoai') or r.get('phone') or r.get('sdt') or r.get('SDT')
+            email = r.get('email') or r.get('Email')
+            clazz = r.get('lop') or r.get('class') or r.get('unit') or r.get('Lop')
+            dob = r.get('ngay_sinh') or r.get('dob') or r.get('birthday')
+            type_dg = r.get('loai_doc_gia') or r.get('type') or 0
             try:
-                ma_the_n = int(ma_the) if ma_the not in (None, '') else None
+                ma_the_n = int(ma_the) if ma_the not in (None, '') else -1
             except Exception:
-                ma_the_n = None
-            valid = ma_the_n is not None and ho and ten
+                ma_the_n = -1
+            valid = ho and ten # ma_the is now optional for import, will be auto-gen if -1
             reasons = []
-            if ma_the_n is None: reasons.append('Invalid ma_the')
-            if not ho or not ten: reasons.append('Missing name parts')
+            if not ho or not ten: reasons.append('Missing name parts (Ho/Ten)')
             dg_out.append({
                 'ma_the': ma_the_n,
                 'ho': str(ho or '').strip(),
                 'ten': str(ten or '').strip(),
                 'phai': int(phai) if str(phai).isdigit() else 0,
                 'trang_thai': int(trang_thai) if str(trang_thai).isdigit() else 1,
+                'so_dien_thoai': str(phone or '').strip(),
+                'email': str(email or '').strip(),
+                'lop': str(clazz or '').strip(),
+                'ngay_sinh': str(dob or '').strip(),
+                'loai_doc_gia': int(type_dg) if str(type_dg).isdigit() else 0,
                 'valid': valid,
                 'reasons': '; '.join(reasons)
             })
@@ -246,9 +264,9 @@ def preview_and_prepare(dauSachRows, banSaoRows, out_dir, docGiaRows=None, muonT
                 dg_errors.append((i, ma_the, reasons))
         with open(dg_preview, 'w', newline='', encoding='utf-8') as f:
             w = csv.writer(f)
-            w.writerow(['ma_the','ho','ten','phai','trang_thai','valid','reasons'])
+            w.writerow(['ma_the','ho','ten','phai','trang_thai','so_dien_thoai','email','lop','ngay_sinh','loai_doc_gia','valid','reasons'])
             for r in dg_out:
-                w.writerow([r['ma_the'], r['ho'], r['ten'], r['phai'], r['trang_thai'], r['valid'], r['reasons']])
+                w.writerow([r['ma_the'], r['ho'], r['ten'], r['phai'], r['trang_thai'], r['so_dien_thoai'], r['email'], r['lop'], r['ngay_sinh'], r['loai_doc_gia'], r['valid'], r['reasons']])
         report['docgia_count'] = len(dg_out)
         report['docgia_errors'] = len(dg_errors)
         report['docgia_preview_csv'] = dg_preview
@@ -327,6 +345,21 @@ def map_status_to_int(status):
     return 0
 
 
+def generate_random_ma_the(cur):
+    import random
+    MA_THE_MIN = 10000
+    MA_THE_MAX = 99999
+    # Divide and scatter logic similar to C++ if needed, but simple random is fine for script
+    for _ in range(100): # max tries
+        ma = random.randint(MA_THE_MIN, MA_THE_MAX)
+        cur.execute('SELECT 1 FROM doc_gia WHERE ma_the=?', (ma,))
+        if not cur.fetchone():
+            return ma
+    # fallback
+    cur.execute('SELECT MAX(ma_the) FROM doc_gia')
+    max_ma = cur.fetchone()[0] or MA_THE_MIN
+    return max_ma + 1
+
 def apply_to_db(ds_out, bs_out, dg_out=None, mt_out=None, mode='merge', data_dir='data'):
     db_path = os.path.join(data_dir, 'files', 'library.db')
     if not os.path.isdir(data_dir):
@@ -357,6 +390,8 @@ def apply_to_db(ds_out, bs_out, dg_out=None, mt_out=None, mode='merge', data_dir
         tac_gia TEXT,
         nam_xuat_ban INTEGER,
         the_loai TEXT,
+        nha_xuat_ban TEXT,
+        gia_tien INTEGER DEFAULT 0,
         so_luot_muon INTEGER DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS ban_sao (
@@ -374,6 +409,9 @@ def apply_to_db(ds_out, bs_out, dg_out=None, mt_out=None, mode='merge', data_dir
         trang_thai INTEGER DEFAULT 1,
         so_dien_thoai TEXT,
         email TEXT,
+        lop TEXT,
+        ngay_sinh TEXT,
+        loai_doc_gia INTEGER DEFAULT 0,
         ngay_dang_ky TEXT,
         ngay_het_han TEXT,
         so_sach_dang_muon INTEGER DEFAULT 0
@@ -402,12 +440,12 @@ def apply_to_db(ds_out, bs_out, dg_out=None, mt_out=None, mode='merge', data_dir
                 cur.execute('SELECT id FROM dau_sach WHERE isbn=?', (isbn,))
                 if cur.fetchone():
                     continue
-                cur.execute('INSERT INTO dau_sach(isbn, ten_sach, so_trang, tac_gia, nam_xuat_ban, the_loai, gia_tien) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                            (isbn, r.get('title',''), r.get('pages',0), r.get('author',''), r.get('year',0), r.get('genre',''), r.get('price',0)))
+                cur.execute('INSERT INTO dau_sach(isbn, ten_sach, so_trang, tac_gia, nam_xuat_ban, the_loai, gia_tien, nha_xuat_ban) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                            (isbn, r.get('title',''), r.get('pages',0), r.get('author',''), r.get('year',0), r.get('genre',''), r.get('price',0), r.get('publisher','')))
             elif mode == 'replace':
                 cur.execute('DELETE FROM dau_sach WHERE isbn=?', (isbn,))
-                cur.execute('INSERT INTO dau_sach(isbn, ten_sach, so_trang, tac_gia, nam_xuat_ban, the_loai, gia_tien) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                            (isbn, r.get('title',''), r.get('pages',0), r.get('author',''), r.get('year',0), r.get('genre',''), r.get('price',0)))
+                cur.execute('INSERT INTO dau_sach(isbn, ten_sach, so_trang, tac_gia, nam_xuat_ban, the_loai, gia_tien, nha_xuat_ban) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                            (isbn, r.get('title',''), r.get('pages',0), r.get('author',''), r.get('year',0), r.get('genre',''), r.get('price',0), r.get('publisher','')))
             else:  # merge
                 cur.execute('SELECT id, ten_sach, so_trang, tac_gia, nam_xuat_ban, the_loai, gia_tien FROM dau_sach WHERE isbn=?', (isbn,))
                 row = cur.fetchone()
@@ -427,12 +465,14 @@ def apply_to_db(ds_out, bs_out, dg_out=None, mt_out=None, mode='merge', data_dir
                         updates.append('the_loai=?'); params.append(r.get('genre'))
                     if r.get('price'):
                         updates.append('gia_tien=?'); params.append(r.get('price'))
+                    if r.get('publisher'):
+                        updates.append('nha_xuat_ban=?'); params.append(r.get('publisher'))
                     if updates:
                         params.append(did)
                         cur.execute('UPDATE dau_sach SET ' + ','.join(updates) + ' WHERE id=?', params)
                 else:
-                    cur.execute('INSERT INTO dau_sach(isbn, ten_sach, so_trang, tac_gia, nam_xuat_ban, the_loai, gia_tien) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                                (isbn, r.get('title',''), r.get('pages',0), r.get('author',''), r.get('year',0), r.get('genre',''), r.get('price',0)))
+                    cur.execute('INSERT INTO dau_sach(isbn, ten_sach, so_trang, tac_gia, nam_xuat_ban, the_loai, gia_tien, nha_xuat_ban) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                                (isbn, r.get('title',''), r.get('pages',0), r.get('author',''), r.get('year',0), r.get('genre',''), r.get('price',0), r.get('publisher','')))
 
         # Insert/update ban_sao
         for r in bs_out:
@@ -482,18 +522,29 @@ def apply_to_db(ds_out, bs_out, dg_out=None, mt_out=None, mode='merge', data_dir
                 if ma is None:
                     print('Skipping doc_gia with invalid ma_the')
                     continue
+                if ma == -1:
+                    ma = generate_random_ma_the(cur)
+                    print(f'Generated auto ma_the: {ma} for {r.get("ho")} {r.get("ten")}')
                 ho = r.get('ho','')
                 ten = r.get('ten','')
                 phai = int(r.get('phai',0))
                 tt = int(r.get('trang_thai',1))
+                sdt = r.get('so_dien_thoai','')
+                email = r.get('email','')
+                lop = r.get('lop','')
+                ns = r.get('ngay_sinh','')
+                loai = int(r.get('loai_doc_gia',0))
+
                 if mode == 'skip':
                     cur.execute('SELECT ma_the FROM doc_gia WHERE ma_the=?',(ma,))
                     if cur.fetchone():
                         continue
-                    cur.execute('INSERT INTO doc_gia(ma_the, ho, ten, phai, trang_thai) VALUES (?, ?, ?, ?, ?)', (ma, ho, ten, phai, tt))
+                    cur.execute('INSERT INTO doc_gia(ma_the, ho, ten, phai, trang_thai, so_dien_thoai, email, lop, ngay_sinh, loai_doc_gia) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+                                (ma, ho, ten, phai, tt, sdt, email, lop, ns, loai))
                 elif mode == 'replace':
                     cur.execute('DELETE FROM doc_gia WHERE ma_the=?', (ma,))
-                    cur.execute('INSERT INTO doc_gia(ma_the, ho, ten, phai, trang_thai) VALUES (?, ?, ?, ?, ?)', (ma, ho, ten, phai, tt))
+                    cur.execute('INSERT INTO doc_gia(ma_the, ho, ten, phai, trang_thai, so_dien_thoai, email, lop, ngay_sinh, loai_doc_gia) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+                                (ma, ho, ten, phai, tt, sdt, email, lop, ns, loai))
                 else:  # merge
                     cur.execute('SELECT ma_the FROM doc_gia WHERE ma_the=?',(ma,))
                     if cur.fetchone():
@@ -502,11 +553,16 @@ def apply_to_db(ds_out, bs_out, dg_out=None, mt_out=None, mode='merge', data_dir
                         params = []
                         if ho: updates.append('ho=?'); params.append(ho)
                         if ten: updates.append('ten=?'); params.append(ten)
+                        if sdt: updates.append('so_dien_thoai=?'); params.append(sdt)
+                        if email: updates.append('email=?'); params.append(email)
+                        if lop: updates.append('lop=?'); params.append(lop)
+                        if ns: updates.append('ngay_sinh=?'); params.append(ns)
                         if updates:
                             params.append(ma)
                             cur.execute('UPDATE doc_gia SET ' + ','.join(updates) + ' WHERE ma_the=?', params)
                     else:
-                        cur.execute('INSERT INTO doc_gia(ma_the, ho, ten, phai, trang_thai) VALUES (?, ?, ?, ?, ?)', (ma, ho, ten, phai, tt))
+                        cur.execute('INSERT INTO doc_gia(ma_the, ho, ten, phai, trang_thai, so_dien_thoai, email, lop, ngay_sinh, loai_doc_gia) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+                                    (ma, ho, ten, phai, tt, sdt, email, lop, ns, loai))
 
         # Insert/update muon_tra if provided
         if mt_out:

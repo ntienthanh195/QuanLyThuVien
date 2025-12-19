@@ -1,5 +1,12 @@
 
+/**
+ * @file UserManager.h
+ * @path include/models/UserManager.h
+ * @description Header định nghĩa cấu trúc tài khoản người dùng và quyền hạn.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #ifndef USERMANAGER_H
+
 #define USERMANAGER_H
 
 #include <QString>

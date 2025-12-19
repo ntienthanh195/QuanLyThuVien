@@ -10,6 +10,8 @@ class QComboBox;
 class QCheckBox;
 class QPushButton;
 class QPrinter;
+class QSlider;
+class QLabel;
 
 /**
  * @brief Custom Print Dialog with inline preview
@@ -40,6 +42,7 @@ private slots:
     void onPdfClicked();
     void onPrinterChanged(int index);
     void updatePreview(QPrinter* printer);
+    void onZoomChanged(int value);
 
 private:
     void setupUI();
@@ -54,6 +57,8 @@ private:
     QPushButton* m_btnPrint;
     QPushButton* m_btnPdf;
     QPushButton* m_btnCancel;
+    QSlider* m_zoomSlider;
+    QLabel* m_zoomLabel;
 
     // Data
     QString m_suggestedFileName;

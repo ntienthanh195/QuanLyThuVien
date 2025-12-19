@@ -1,4 +1,11 @@
+/**
+ * @file ManHinhChiTietSach.h
+ * @path include/views/dialogs/ManHinhChiTietSach.h
+ * @description Header của màn hình Chi tiết sách.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #ifndef MANHINH_CHI_TIET_SACH_H
+
 #define MANHINH_CHI_TIET_SACH_H
 
 #include <QDialog>

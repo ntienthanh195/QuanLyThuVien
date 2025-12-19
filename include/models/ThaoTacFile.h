@@ -1,4 +1,11 @@
+/**
+ * @file ThaoTacFile.h
+ * @path include/models/ThaoTacFile.h
+ * @description Header định nghĩa các hàm API cho thao tác đọc/ghi file dữ liệu.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #ifndef THAOTACFILE_H
+
 #define THAOTACFILE_H
 
 #include <string>

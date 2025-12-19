@@ -1,4 +1,12 @@
+/**
+ * @file main_v2.cpp
+ * @path nguon/main_v2.cpp
+ * @description Điểm vào (Entry point) chính thức của ứng dụng phiên bản V2.
+ * Khởi tạo ứng dựng, thiết lập tài nguyên, font chữ, database và hiển thị màn hình đăng nhập/cửa sổ chính.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #include <QApplication>
+
 #include <QMessageBox>
 #include <QDir>
 #include <QFontDatabase>
@@ -35,14 +43,12 @@ int main(int argc, char *argv[]) {
     
     QApplication ung_dung(argc, argv);
     
-    // Qt 6 đã sử dụng UTF-8 mặc định, không cần thiết lập thêm
-    
     // Load Fonts
     int fontIdKhmer = QFontDatabase::addApplicationFont(":/fonts/fonts/Siemreap-Regular.ttf");
     if (fontIdKhmer != -1) {
         QStringList fontFamilies = QFontDatabase::applicationFontFamilies(fontIdKhmer);
         if (!fontFamilies.isEmpty()) {
-            qDebug() << "Loaded font:" << fontFamilies.first();
+            qDebug() << "[FONT] Loaded Khmer font:" << fontFamilies.first();
             // Optional: Set as default if desired, or just available for fallback
             // app.setFont(QFont(fontFamilies.first(), 10)); 
         }
@@ -51,22 +57,23 @@ int main(int argc, char *argv[]) {
     }
 
     // Load font mã vạch từ resources
-    int fontIdBarcode = QFontDatabase::addApplicationFont(":/fonts/LibreBarcode128Text-Regular.ttf");
+    int fontIdBarcode = QFontDatabase::addApplicationFont(":/fonts/fonts/LibreBarcode128Text-Regular.ttf");
     if (fontIdBarcode != -1) {
         QString fontFamily = QFontDatabase::applicationFontFamilies(fontIdBarcode).at(0);
-        std::cout << "[FONT] Đã load font mã vạch: " << fontFamily.toStdString() << "\n";
+        qDebug() << "[FONT] Loaded Barcode font:" << fontFamily;
     } else {
-        std::cout << "[CẢNH BÁO] Không load được font mã vạch - In tem/thẻ có thể không hiển thị đúng\n";
+        qWarning() << "[FONT] Failed to load barcode font - Barcode printing may not display correctly";
     }
     
     // Thiết lập thông tin ứng dụng
     ung_dung.setApplicationName("Hệ Thống Quản Lý Thư Viện");
-    ung_dung.setApplicationVersion("2.0.0");
+    ung_dung.setApplicationVersion("2.1.0");
     ung_dung.setOrganizationName("Thư Viện Quốc Gia");
     
-    std::cout << "========================================\n";
-    std::cout << "  HỆ THỐNG QUẢN LÝ THƯ VIỆN V2.0\n";
-    std::cout << "========================================\n\n";
+    qInfo() << "========================================";
+    qInfo() << "  LIBRARY MANAGEMENT SYSTEM V2.1.0";
+    qInfo() << "  Build Date:" << __DATE__ << __TIME__;
+    qInfo() << "========================================";
     
     // DISABLED: GlobalScannerFilter causes issues with barcode input
     // Reverting to widget-level event filter which works reliably
@@ -79,56 +86,26 @@ int main(int argc, char *argv[]) {
     
     std::cout << "[KHỞI TẠO] Đang khởi động ứng dụng Qt...\n";
     
-    // Thiết lập thư mục làm việc (Force Absolute Path per User Request)
-    // Avoid relative path issues by hardcoding the project root as detected or fallback
-    QString projectRoot = "E:/Qt/QuanLyThuVien";
-    if (QDir(projectRoot).exists()) {
-         QDir::setCurrent(projectRoot);
-         FilePathManager::initialize(); // Re-init after setting cwd
-    } else {
-        // Fallback to normal behavior
-        FilePathManager::initialize();
-        projectRoot = FilePathManager::getRootPath();
-        QDir::setCurrent(projectRoot);
-    }
+    // Khởi tạo bộ quản lý đường dẫn động (Phase 11: Portability)
+    FilePathManager::initialize();
+    
+    QString rootPath = FilePathManager::getRootPath();
+    QDir::setCurrent(rootPath);
 
     std::cout << "[THƯ MỤC] Working Directory: " << QDir::currentPath().toStdString() << "\n";
-    std::cout << "[THƯ MỤC] Absolute Root Check: " << projectRoot.toStdString() << "\n";
-    
-    // Kiểm tra file dữ liệu
-    std::cout << "\n[KIỂM TRA] Kiểm tra các file dữ liệu...\n";
-    
-    QString fileDauSach = FilePathManager::getDauSachPath();
-    // Only check if we are in legacy mode. If DB exists, maybe we can skip?
-    // User wants ONLY library.db in data/files.
-    // However, the legacy backend might still need text files?
-    // Let's relax the check or fix the path.
-    
-    // SKIP Legacy File Checks as we are using DB Only
-    // if (!QFile::exists(fileDauSach)) { ... } removed to prevent blocking startup
-    
-    QString fileDanhMuc = FilePathManager::getDanhMucSachPath();
-    QString fileDocGia = FilePathManager::getDocGiaPath();
-    QString fileMuonTra = FilePathManager::getMuonTraPath();
-    
-    // SKIP Legacy File Checks as we are using DB Only
-    std::cout << "[CONFIG] Running in Database-Only mode. Legacy files ignored.\n";
-    
-    std::cout << "[✓] " << fileDauSach.toStdString() << " - Tồn tại\n";
-    std::cout << "[✓] " << fileDanhMuc.toStdString() << " - " 
-              << (QFile::exists(fileDanhMuc) ? "Tồn tại" : "Không tồn tại") << "\n";
-    std::cout << "[✓] " << fileDocGia.toStdString() << " - " 
-              << (QFile::exists(fileDocGia) ? "Tồn tại" : "Không tồn tại") << "\n";
+    std::cout << "[THƯ MỤC] Absolute Root: " << rootPath.toStdString() << "\n";
     
     // === DATABASE INIT (Phase 1) ===
     // Connect to SQLite DB FIRST
-    QString dbPath = "data/files/library.db";
-    // Ensure dir exists
-    QDir().mkpath("data/files");
+    QString dbPath = FilePathManager::getLibraryDbPath();
+    if (dbPath.isEmpty()) {
+        // If DB not found by FilePathManager default discovery, fall back to creation path
+        dbPath = FilePathManager::getFilePath("files/library.db");
+    }
     
     std::cout << "[INIT] Connecting to database: " << dbPath.toStdString() << "\n";
     if (!DatabaseManager::instance().connect(dbPath)) {
-        QMessageBox::critical(nullptr, "Lỗi Database", "Không thể kết nối cơ sở dữ liệu (" + dbPath + ")!");
+        QMessageBox::critical(nullptr, "Lỗi Database", "Không thể kết nối cơ sở dữ liệu!");
         return -1;
     }
     // Migrate/Create tables if needed

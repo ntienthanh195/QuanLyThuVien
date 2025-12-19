@@ -7,6 +7,7 @@
 #include <QCoreApplication>
 #include <QDir>
 #include "utils/PrintHelper.h"
+#include "utils/FilePathManager.h"
 
 // ... (code omitted)
 
@@ -180,7 +181,7 @@ bool PrintQueueManager::xuatHangDoiThanhPdf(const QString &filePath, const QStri
 bool PrintQueueManager::xuatSamplePdf(ExportLayout layout) {
     if (m_danhSach.isEmpty()) return false;
 
-    QString filePath = QCoreApplication::applicationDirPath() + "/data/sample_print.pdf";
+    QString filePath = FilePathManager::getFilePath("sample_print.pdf");
 
     // Build document according to chosen layout using PrintHelper
     QTextDocument doc;
@@ -211,7 +212,7 @@ bool PrintQueueManager::xuatSamplePdf(ExportLayout layout) {
     // Use PrintHelper xuatPDF to save
     bool ok = false;
     // Ensure directory exists
-    QDir dir(QCoreApplication::applicationDirPath() + "/data");
+    QDir dir(FilePathManager::getFilesDirectory());
     if (!dir.exists()) dir.mkpath(".");
 
     ok = PrintHelper::xuatPDF(&doc, filePath);

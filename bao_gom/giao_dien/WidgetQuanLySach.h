@@ -6,7 +6,14 @@
  *       Vui lòng thực hiện các thay đổi UI cho tab Sách tại đây.
  *       Bỏ qua file trùng lặp tại include/views/WidgetQuanLySach.h.
  */
+/**
+ * @file WidgetQuanLySach.h
+ * @path bao_gom/giao_dien/WidgetQuanLySach.h
+ * @description Header của Widget quản lý danh mục sách (V2).
+ * @project Library Management System (QuanLyThuVien)
+ */
 #ifndef WIDGETQUANLYSACH_H
+
 #define WIDGETQUANLYSACH_H
 
 #include <QWidget>

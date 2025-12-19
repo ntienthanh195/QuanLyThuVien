@@ -1,9 +1,19 @@
-﻿#ifndef DOCGIA_H
+﻿/**
+ * @file DocGia.h
+ * @path include/models/DocGia.h
+ * @description Định nghĩa cấu trúc dữ liệu và các hàm API cho Quản lý Học viên (Độc giả).
+ * @project Library Management System (QuanLyThuVien)
+ */
+#ifndef DOCGIA_H
+
 #define DOCGIA_H
 #include <string>
 #include <fstream>
+#include <vector>
+#include <ctime>
 #include "DauSach.h"
 using std::string;
+using std::vector;
 
 //danh sach muon tra
 struct MuonTra{
@@ -26,6 +36,8 @@ typedef NodeMT* MUONTRA;
 
 //PTRDGdoc gia
 //PTRDGdoc gia
+//PTRDGdoc gia
+
 struct TheDocGia{
     int MaThe;
     string Ho;
@@ -40,6 +52,17 @@ struct TheDocGia{
     // CẢI TIẾN: Thêm trường đếm sách để kiểm tra giới hạn O(1)
     int soSachDangMuon = 0; 
     
+    // OPTIMIZATION: Cached fields for O(1) stats
+    time_t ngayHetHanSomNhat = 0; // 0 = khong co sach hoac chua den han (stored as epoch)
+    int tongSachDaMuonHistory = 0; // Tong so sach da muon trong qua khu (tinh ca da tra)
+
+    // NEW FIELDS (PHASE 2)
+    string SDT;
+    string Lop;      // Don vi / Lop
+    string Email;
+    string NgaySinh;
+    int LoaiDocGia = 0; // 0: HocSinh (Student), 1: GiaoVien (Teacher)
+
     MUONTRA dsmt;//danh sach muon tra linked list
 };
 
@@ -51,6 +74,8 @@ struct NodeDG{
     NodeDG *left, *right;
 };
 typedef NodeDG* PTRDG;
+
+extern PTRDG rootDocGia;
 
 struct ThongTinQuaHan{
     PTRDG docGia;
@@ -101,6 +126,7 @@ void hieuChinhDocGia(PTRDG root, const TheDocGia& new_data);
 // Prototype cho chức năng sắp xếp (b)
 void QuickSortDocGia(PTRDG arr[], int low, int high);
 void DuyetCayRaMang(PTRDG root, PTRDG arr[], int &count);
+void DuyetCayRaVector(PTRDG root, vector<PTRDG>& result);
 void InDocGiaTheoTenHo(PTRDG root); // In ra danh sách sắp xếp theo Tên+Họ
 
 // Prototype Giải phóng bộ nhớ

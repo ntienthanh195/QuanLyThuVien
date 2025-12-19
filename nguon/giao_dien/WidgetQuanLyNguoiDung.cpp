@@ -1,4 +1,12 @@
+/**
+ * @file WidgetQuanLyNguoiDung.cpp
+ * @path nguon/giao_dien/WidgetQuanLyNguoiDung.cpp
+ * @description Widget quản lý danh sách người dùng và nhân viên (V2).
+ * Cho phép admin thêm, sửa, xóa tài khoản và phân quyền truy cập hệ thống.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #include "giao_dien/WidgetQuanLyNguoiDung.h"
+
 #include "models/UserManager.h"
 #include "utils/DatabaseManager.h"
 #include "utils/EventBus.h" // Added for Realtime Updates

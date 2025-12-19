@@ -1,4 +1,12 @@
+/**
+ * @file DatabaseManager.cpp
+ * @path src/utils/DatabaseManager.cpp
+ * @description Quản lý kết nối và thao tác với SQLite database.
+ * Xử lý: khởi tạo bảng, thực thi câu lệnh SQL, và là cầu nối lưu trữ cho Audit Log, Settings, Reports.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #include "utils/DatabaseManager.h"
+
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -14,18 +22,20 @@ DatabaseManager& DatabaseManager::instance() {
     return inst;
 }
 
+#include <QDebug>
+#include <QSqlError>
+
 bool DatabaseManager::connect(const QString& path) {
     // Nếu đã mở DB từ trước, đóng trước khi mở kết nối mới
     if (m_db.isOpen()) m_db.close();
-
-    // Bảo vệ: yêu cầu path không rỗng và file phải tồn tại. Không tự tạo DB mới ở đây.
-    // Nếu DB thiếu, caller (hoặc code khởi tạo) phải quyết định migrate hoặc báo lỗi.
 
     // Ensure path is not empty
     if (path.isEmpty()) {
         qWarning() << "[DatabaseManager] connect() called with empty path!";
         return false;
     }
+    
+    qDebug() << "[DB] Opening:" << path;
     
     // Ensure directory exists so SQLite can create the file
     QFileInfo info(path);
@@ -36,16 +46,13 @@ bool DatabaseManager::connect(const QString& path) {
             return false;
         }
     }
-    // We allow SQLite to create the file if missing
-
 
     m_path = path;
-    // Use connection name unique per process
     m_db = QSqlDatabase::addDatabase("QSQLITE");
     m_db.setDatabaseName(m_path);
     bool ok = m_db.open();
     if (!ok) {
-        qWarning() << "[DatabaseManager] Failed to open DB:" << m_db.lastError().text();
+        qCritical() << "[DB] FATAL ERROR:" << m_db.lastError().text();
         return ok;
     }
 
@@ -145,7 +152,8 @@ bool DatabaseManager::createTables() {
         "nam_xuat_ban INTEGER,"
         "the_loai TEXT,"
         "so_luot_muon INTEGER DEFAULT 0,"
-        "gia_tien INTEGER DEFAULT 0"
+        "gia_tien INTEGER DEFAULT 0,"
+        "nha_xuat_ban TEXT"
         ");"
     );
 
@@ -173,7 +181,10 @@ bool DatabaseManager::createTables() {
         "email TEXT,"
         "ngay_dang_ky TEXT,"
         "ngay_het_han TEXT,"
-        "so_sach_dang_muon INTEGER DEFAULT 0"
+        "so_sach_dang_muon INTEGER DEFAULT 0,"
+        "lop TEXT,"
+        "ngay_sinh TEXT,"
+        "loai_doc_gia INTEGER DEFAULT 0"
         ");"
     );
 
@@ -217,6 +228,35 @@ bool DatabaseManager::createTables() {
             QSqlQuery addCol(m_db);
             addCol.exec("ALTER TABLE muon_tra ADD COLUMN da_thanh_toan INTEGER DEFAULT 0");
         }
+    }
+
+    // PHASE 2 MIGRATION: DOC_GIA & DAU_SACH
+    // Table: doc_gia - New Headers: lop, ngay_sinh, loai_doc_gia (sdt, email already exist in create but maybe missing in old DB)
+    {
+        const char* newCols[][3] = {
+            {"so_dien_thoai", "TEXT", ""},
+            {"email", "TEXT", ""},
+            {"lop", "TEXT", ""},
+            {"ngay_sinh", "TEXT", ""},
+            {"loai_doc_gia", "INTEGER", "DEFAULT 0"}
+        };
+        for (auto& col : newCols) {
+            QSqlQuery check(m_db);
+            if (!check.exec(QString("SELECT %1 FROM doc_gia LIMIT 0").arg(col[0]))) {
+                 qDebug() << "[DatabaseManager] Adding missing column '" << col[0] << "' to 'doc_gia'...";
+                 QSqlQuery add(m_db);
+                 add.exec(QString("ALTER TABLE doc_gia ADD COLUMN %1 %2 %3").arg(col[0]).arg(col[1]).arg(col[2]));
+            }
+        }
+    }
+    // Table: dau_sach - New Headers: nha_xuat_ban
+    {
+         QSqlQuery check(m_db);
+         if (!check.exec("SELECT nha_xuat_ban FROM dau_sach LIMIT 0")) {
+             qDebug() << "[DatabaseManager] Adding missing column 'nha_xuat_ban' to 'dau_sach'...";
+             QSqlQuery add(m_db);
+             add.exec("ALTER TABLE dau_sach ADD COLUMN nha_xuat_ban TEXT");
+         }
     }
 
     // ==========================================

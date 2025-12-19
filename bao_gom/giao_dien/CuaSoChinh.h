@@ -1,4 +1,11 @@
+/**
+ * @file CuaSoChinh.h
+ * @path bao_gom/giao_dien/CuaSoChinh.h
+ * @description Header của lớp Cửa sổ chính (V2).
+ * @project Library Management System (QuanLyThuVien)
+ */
 #ifndef CUASOCHINH_H
+
 #define CUASOCHINH_H
 
 #include <QMainWindow>

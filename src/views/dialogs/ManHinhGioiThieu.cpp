@@ -1,4 +1,12 @@
+/**
+ * @file ManHinhGioiThieu.cpp
+ * @path src/views/dialogs/ManHinhGioiThieu.cpp
+ * @description Hộp thoại giới thiệu ứng dụng (About Dialog).
+ * Hiển thị thông tin phiên bản, tác giả và bản quyền của phần mềm QuanLyThuVien V2.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #include "views/dialogs/ManHinhGioiThieu.h"
+
 #include <QVBoxLayout>
 #include <QFont>
 #include <QFrame>

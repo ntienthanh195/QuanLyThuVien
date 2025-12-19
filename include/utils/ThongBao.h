@@ -1,4 +1,11 @@
+/**
+ * @file ThongBao.h
+ * @path include/utils/ThongBao.h
+ * @description Header định nghĩa các hàm hiển thị thông báo.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #ifndef THONGBAO_H
+
 #define THONGBAO_H
 
 #include <string>

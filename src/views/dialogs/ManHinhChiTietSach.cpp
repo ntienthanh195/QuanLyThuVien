@@ -1,4 +1,12 @@
+/**
+ * @file ManHinhChiTietSach.cpp
+ * @path src/views/dialogs/ManHinhChiTietSach.cpp
+ * @description Hộp thoại hiển thị thông tin chi tiết của một đầu sách.
+ * Bao gồm: thông tin chi tiết các bản sao sách, lịch sử mượn trả và thống kê của đầu sách đó.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #include "views/dialogs/ManHinhChiTietSach.h"
+
 #include "models/QuanLySach.h"
 #include "utils/ToastNotification.h"
 #include "utils/LanguageManager.h"
@@ -80,7 +88,7 @@ public:
                 case 2: {
                     switch (copy->trangThai) {
                         case CHO_MUON_DUOC: return LanguageManager::instance().getText("LBL_STATUS_AVAILABLE");
-                        case DANG_MUON: return LanguageManager::instance().getText("LBL_STATUS_Borrowed");
+                        case DANG_MUON: return LanguageManager::instance().getText("LBL_STATUS_BORROWED");
                         case THANH_LY: return LanguageManager::instance().getText("LBL_STATUS_LIQUIDATED");
                         default: return LanguageManager::instance().getText("LBL_STATUS_UNKNOWN");
                     }
@@ -489,6 +497,11 @@ void ManHinhChiTietSach::taiThongTinSach() {
     .arg(LanguageManager::instance().getText("LBL_PAGE_COUNT"))
     .arg(sachDuocChon->soTrang);
     
+    // Feature: Display Publisher (Phase 2)
+    info += QString("<br><b>%1:</b> %2")
+        .arg(LanguageManager::instance().getText("TABLE_HEADER_PUBLISHER"))
+        .arg(QString::fromStdString(sachDuocChon->NhaXuatBan));
+    
     // Feature: Display Price
     QLocale locale(QLocale::Vietnamese, QLocale::Vietnam);
     QString giaTienStr = locale.toCurrencyString((double)sachDuocChon->giaTien, "VNĐ");
@@ -564,7 +577,7 @@ QString ManHinhChiTietSach::layBieuTuongTrangThai(TrangThaiSach status) {
 QString ManHinhChiTietSach::layVanBanTrangThai(TrangThaiSach status) {
     switch (status) {
         case CHO_MUON_DUOC: return LanguageManager::instance().getText("LBL_STATUS_AVAILABLE");
-        case DANG_MUON: return LanguageManager::instance().getText("LBL_STATUS_Borrowed");
+        case DANG_MUON: return LanguageManager::instance().getText("LBL_STATUS_BORROWED");
         case THANH_LY: return LanguageManager::instance().getText("LBL_STATUS_LIQUIDATED");
         default: return LanguageManager::instance().getText("LBL_STATUS_UNKNOWN");
     }
@@ -698,17 +711,33 @@ void ManHinhChiTietSach::khiNhanInTem() {
 
     QStringList selected = model->getSelectedCodes();
 
+    // 1. If NO copies are selected -> AUTOMATICALLY PRINT ALL (No prompt)
     if (selected.isEmpty()) {
-        // Fallback: Ask for quantity if nothing selected
-        bool ok;
-        int soLuong = QInputDialog::getInt(this, LanguageManager::instance().getText("BTN_PRINT_BARCODE"),
-                                           LanguageManager::instance().getText("MSG_ENTER_PRINT_QUANTITY"), 1, 1, 100, 1, &ok);
-        if (ok) {
-            PrintHelper::inNhieuTemSach(sachDuocChon, soLuong, this);
-        }
-    } else {
-        // Print only selected codes
+        int total = sachDuocChon->tongBanSao;
+        if (total <= 0) total = 1;
+        PrintHelper::inTemSachTuDong(sachDuocChon, total, this);
+        return;
+    }
+
+    // 2. If copies ARE selected -> Ask user for choice
+    QMessageBox msgBox(this);
+    msgBox.setWindowTitle(LanguageManager::instance().getText("BTN_PRINT_BARCODE"));
+    msgBox.setText("Bạn muốn in tem như thế nào?");
+    msgBox.setIcon(QMessageBox::Question);
+    
+    QPushButton *btnSelected = msgBox.addButton("Chỉ in các bản sao ĐÃ CHỌN", QMessageBox::ActionRole);
+    QPushButton *btnAll = msgBox.addButton("In TOÀN BỘ bản sao đầu sách", QMessageBox::ActionRole);
+    QPushButton *btnCancel = msgBox.addButton(LanguageManager::instance().getText("BTN_CANCEL"), QMessageBox::RejectRole);
+    
+    msgBox.setDefaultButton(btnSelected);
+    msgBox.exec();
+
+    if (msgBox.clickedButton() == btnSelected) {
         PrintHelper::inTemSachTuyChon(sachDuocChon, selected, this);
+    } else if (msgBox.clickedButton() == btnAll) {
+        int total = sachDuocChon->tongBanSao;
+        if (total <= 0) total = 1;
+        PrintHelper::inTemSachTuDong(sachDuocChon, total, this);
     }
 }
 

@@ -1,4 +1,11 @@
+/**
+ * @file ManHinhGioiThieu.h
+ * @path include/views/dialogs/ManHinhGioiThieu.h
+ * @description Header của hộp thoại Giới thiệu ứng dụng (About).
+ * @project Library Management System (QuanLyThuVien)
+ */
 #ifndef MANHINH_GIOI_THIEU_H
+
 #define MANHINH_GIOI_THIEU_H
 
 #include <QDialog>

@@ -35,6 +35,9 @@ struct DauSach {
     
     // Feature: Book Price (VNĐ)
     long long giaTien = 0;
+    
+    // NEW FIELDS (PHASE 2)
+    std::string NhaXuatBan;
 };
 
 typedef DauSach* PTRDS;         // Con tro toi mot DauSach

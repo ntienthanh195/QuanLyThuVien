@@ -1,10 +1,19 @@
+/**
+ * @file PrintHelper.h
+ * @path include/utils/PrintHelper.h
+ * @description Header các hàm tiện ích in ấn.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #ifndef PRINTHELPER_H
+
 #define PRINTHELPER_H
 
 #include <QString>
 #include <QWidget>
 #include <QList>
 #include <QPair>
+#include <QDesktopServices>
+#include <QUrl>
 #include "models/DocGia.h"
 #include "models/QuanLySach.h"
 
@@ -17,37 +26,70 @@ class QTextDocument;
  */
 class PrintHelper {
 public:
+    // Cấu hình khối trong tem
+    struct LabelBlock {
+        QString type;    // "text", "barcode"
+        QString field;   // "tenDonVi", "maBanSao", "tenSach", "giaTien"
+        QString position; // "top", "bottom", "middle"
+        int fontSize = 8;
+        bool bold = false;
+        QString textAlign = "center"; // "left", "right", "center"
+    };
+
     // Cấu hình in
     struct PrintConfig {
+        // ═══ THÔNG TIN THƯ VIỆN ═══
         QString tenThuVien = "HỌC VIỆN PHẬT GIÁO NAM TÔNG CẦN THƠ";
         QString tenVietTat = "HVPG NAMTONG CANTHO";
+        QString loiChao = "Xin cảm ơn!";
+        
+        // ═══ THIẾT LẬP IN ═══
         bool inMauSac = false;
         bool hienThiLogo = true;
-        bool silentPrint = false; // Tự động in không cần hỏi (Auto Print)
-        QString printerReceipt = ""; // Tên máy in bill/nhiệt
-        QString printerReport = "";  // Tên máy in báo cáo A4
+        bool silentPrint = false;
+        QString printerReceipt = ""; 
+        QString printerReport = "";  
         QString duongDanLogo = "";
-        // Thư mục lưu trữ tệp liên quan đến in ấn (QR, PDF, temp)
-        QString duongDanThuMucIn = "data/print_assets";
-        // Thư mục con cho QR images
-        QString thuMucQR = "qr";
-        // Thư mục con cho PDF xuất ra
-        QString thuMucPdf = "pdf";
-            // Thư mục lưu trữ
-            QString qrOutputDir = "data/qrcodes"; // nơi lưu QR tạm/đã sinh
-            QString pdfOutputDir = "data";       // nơi lưu PDF xuất ra
-            QString tempDir = "data/temp";       // thư mục tạm (ảnh, etc.)
+        QString pdfOutputDir = "";   
+        QString qrOutputDir = "";    // Adding back for QR export
+        QString duongDanThuMucIn = "in"; // Legacy default
+        QString thuMucPdf = "pdf";       // Legacy default
+        QString thuMucQR = "qr";         // Legacy default
+        
+        // ═══ GIẤY & HƯỚNG ═══
+        QString pageSize = "A4";      // A4, A5, Letter...
+        QString orientation = "Portrait"; // Portrait, Landscape
+        
+        // ═══ TEM SÁCH (BOOK LABELS) ═══
+        int labelWidth = 50;     // mm
+        int labelHeight = 30;    // mm
+        int labelCols = 0;       // 0 = Auto calculate
+        int labelGapMm = 5;      // Gap between labels
+        bool showLibName = true;
+        bool showBookTitle = true;
+        bool showPrice = false;
+        bool showBorder = true;
+        QString fontFamily = "Times New Roman";
+        double barcodeWidthRatio = 0.9;
+        
+        // Danh sách các khối hiển thị trên tem (Dynamic Layout)
+        QList<LabelBlock> blocks;
 
-            QString author = ""; // metadata PDF
-
-            // === BARCODE LAYOUT SETTINGS ===
-            int labelWidth = 140;   // px (approx 37mm)
-            int labelHeight = 88;   // px (approx 23mm)
-            int labelCols = 3;      // Labels per row
-            bool showLibName = true;
-            bool showBookTitle = true;
-            bool showPrice = false;
-            bool showBorder = true;
+        // ═══ THẺ HỌC VIÊN (STUDENT CARDS) ═══
+        double cardWidth = 80.0;
+        double cardHeight = 50.0;
+        int cardCols = 2;
+        int cardGapMm = 5;
+        int cardValidityMonths = 12;
+        
+        // ═══ MÃ VẠCH (BARCODE) ═══
+        int barcodeDPI = 300;
+        double barcodeModuleWidthMm = 0.33;
+        double barcodeQuietZoneMm = 4.0;
+        int defaultBarcodeHeight = 14; // mm
+        
+        // ═══ BÁO CÁO (REPORTS) ═══
+        bool reportShowSummary = true;
     };
 
     // ===== IN THẺ ĐỘC GIẢ =====
@@ -60,7 +102,7 @@ public:
     // ===== IN TEM MÃ VẠCH SÁCH =====
     static bool inTemMaVachSach(const QString& maSach, const QString& tenSach, 
                                  QWidget* parent = nullptr);
-    static bool inTemSachTuDong(PTRDS dauSach, QWidget* parent = nullptr);
+    static bool inTemSachTuDong(PTRDS dauSach, int soLuong = -1, QWidget* parent = nullptr);
     static bool inNhieuTemSach(PTRDS dauSach, int soLuong, QWidget* parent = nullptr);
     static bool inNhieuTemSachBatch(const QList<QPair<PTRDS, int>>& list, QWidget* parent = nullptr);
     static bool inTemSachTuyChon(PTRDS dauSach, const QStringList& codes, QWidget* parent = nullptr);
@@ -85,12 +127,13 @@ public:
     static QString taoMaQRHTML(const QString& maSo, int size = 100);
     
     // Helper to generate Base64 Barcode Image (Public for Config Preview)
-    static QString generateBarcodeBase64(const QString &text, int height);
+    // Parameters: text, heightMm (millimeters), targetDPI (default 300)
+    static QString generateBarcodeBase64(const QString &text, double heightMm, int targetDPI = 300, double maxWidthMm = 0);
     
-    // Tạo tên file tự động
-    static QString taoTenFilePhieuMuon(int maThe, const QString& maSach);
-    static QString taoTenFilePhieuTra(int maThe, const QString& maSach);
-    static QString taoTenFileTheDocGia(int maThe);
+    // Tạo tên file tự động (Chuẩn tiếng Việt không dấu)
+    static QString taoTenFilePhieuMuon(int maThe, const QString& hoTen, const QString& maSach);
+    static QString taoTenFilePhieuTra(int maThe, const QString& hoTen, const QString& maSach);
+    static QString taoTenFileTheDocGia(int maThe, const QString& hoTen);
     static QString taoTenFileTemSach(const QString& isbn, int soLuong);
     static QString taoTenFileBaoCao(const QString& loaiBaoCao);
     static bool xuatPDF(QTextDocument* doc, const QString& tenFile, 
@@ -103,6 +146,7 @@ public:
     // ===== CẤU HÌNH =====
     static void setCauHinh(const PrintConfig& config);
     static PrintConfig getCauHinh();
+    static void reloadCauHinh(); // Force reload from SettingsManager
 
 private:
     static PrintConfig s_config;
@@ -110,8 +154,11 @@ private:
     static QString taoHTMLTheDocGia(PTRDG docGia);
     static QString taoHTMLPhieuMuon(PTRDG docGia, const QString& maSach, const QString& tenSach, const QString& ngayGiaoDich);
     static QString taoHTMLA4NhieuThe(const QList<PTRDG>& danhSach, int soCot);
-    static QString taoHTMLTemSach(const QString& maSach, const QString& tenSach);
+    static QString taoHTMLTemSach(const QString& maSach, const QString& tenSach, const QString& giaSach = "");
     static QString taoHTMLDanhSach(const QString& tieuDe, const QString& noiDungBang);
+    
+    // Private audit helper (Phase 10)
+    static bool logReceiptToPDF(QTextDocument* doc, const QString& type);
     
     static bool kiemTraFontMaVach();
     

@@ -1,5 +1,14 @@
+/**
+ * @file ManHinhChiTietDocGia.cpp
+ * @path src/views/dialogs/ManHinhChiTietDocGia.cpp
+ * @description Hộp thoại hiển thị thông tin chi tiết và lịch sử mượn trả của một học viên.
+ * Hỗ trợ tra cứu nhanh các giao dịch liên quan đến thẻ học viên này.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #include "views/dialogs/ManHinhChiTietDocGia.h"
+
 #include "giao_dien/hop_thoai/HopThoaiSuaDocGia.h" // Add missing include
+#include "giao_dien/hop_thoai/HopThoaiThanhToan.h" // NEW: For Payment
 #include "models/QuanLySach.h" // To lookup book titles if needed
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -20,14 +29,6 @@
 // Model for Borrowed Books table
 class SachMuonTableModel : public QAbstractTableModel {
 public:
-    struct Item {
-        QString maSach;
-        QDate ngayMuon;
-        QDate hanTra;
-        int status; // 0=Dang muon, 1=Da tra, 2=Mat
-        int overdueDays;
-    };
-
     SachMuonTableModel(std::vector<ManHinhChiTietDocGia::ThongTinMuon> *data, QObject *parent = nullptr)
         : QAbstractTableModel(parent), m_data(data) {}
 
@@ -58,10 +59,17 @@ public:
         }
 
         if (role == Qt::ForegroundRole) {
-            if (index.column() == 4 && item.soNgayQuaHan > 0) return QColor("#f64e60"); // Red for overdue
+             // 1. Debt Logic: Whole row RED
+             if ((item.status == 1 || item.status == 2) && item.tienPhat > 0 && !item.daThanhToan) {
+                 return QColor("#FF5252");
+             }
+             // 2. Overdue Logic: Only 'Overdue' column
+            if (index.column() == 4 && item.soNgayQuaHan > 0) return QColor("#f64e60"); 
+            
+            // 3. Status specific colors (if not debt)
             if (index.column() == 3) {
-                 if (item.nodeMuonTra && item.nodeMuonTra->data.TrangThai == 2) return QColor("#f64e60"); // Mat
-                 if (item.nodeMuonTra && item.nodeMuonTra->data.TrangThai == 1) return QColor("#27ae60"); // Tra
+                 if (item.status == 2) return QColor("#f64e60"); // Mat
+                 if (item.status == 1) return QColor("#27ae60"); // Tra
             }
         }
         
@@ -275,6 +283,24 @@ void ManHinhChiTietDocGia::thietLapGiaoDien() {
         "QPushButton:hover { background-color: #A80000; }"
         "QPushButton:disabled { background-color: #2b2b40; color: #565674; }"
     );
+
+    nutThanhToan = new QPushButton(LanguageManager::instance().getText("BTN_PAY"), this);
+    nutThanhToan->setEnabled(false);
+    nutThanhToan->setMinimumHeight(40);
+    nutThanhToan->setCursor(Qt::PointingHandCursor);
+    nutThanhToan->setStyleSheet(
+        "QPushButton {"
+        "   background-color: #FFA800;" // Orange/Yellow for Payment
+        "   color: #ffffff;"
+        "   border: none;"
+        "   border-radius: 4px;"
+        "   font-size: 13px;"
+        "   font-weight: 600;"
+        "   padding: 0 15px;"
+        "}"
+        "QPushButton:hover { background-color: #D98E00; }"
+        "QPushButton:disabled { background-color: #2b2b40; color: #565674; }"
+    );
     
     nutLamMoi = new QPushButton(LanguageManager::instance().getText("BTN_REFRESH"), this);
     nutLamMoi->setMinimumHeight(40);
@@ -327,6 +353,7 @@ void ManHinhChiTietDocGia::thietLapGiaoDien() {
     buttonLayout->addWidget(nutSua); // Add new button
     buttonLayout->addWidget(nutThuHoi);
     buttonLayout->addWidget(nutBaoMat);
+    buttonLayout->addWidget(nutThanhToan); // NEW
     buttonLayout->addWidget(nutLamMoi);
     buttonLayout->addWidget(nutInThe);
     buttonLayout->addStretch();
@@ -341,6 +368,7 @@ void ManHinhChiTietDocGia::thietLapKetNoi() {
     // Future implementation for return/loss:
     connect(nutThuHoi, &QPushButton::clicked, this, &ManHinhChiTietDocGia::khiNhanThuHoi);
     connect(nutBaoMat, &QPushButton::clicked, this, &ManHinhChiTietDocGia::khiNhanBaoMat);
+    connect(nutThanhToan, &QPushButton::clicked, this, &ManHinhChiTietDocGia::khiNhanThanhToan); // NEW
     connect(nutInThe, &QPushButton::clicked, this, &ManHinhChiTietDocGia::khiNhanInThe);
     
     if (bangSachMuon->selectionModel()) {
@@ -355,14 +383,35 @@ void ManHinhChiTietDocGia::taiThongTinDocGia() {
     QString status = (docGiaDuocChon->data.TrangThai == 1) ? "<span style='color:#27ae60'>" + LanguageManager::instance().getText("STATUS_ACTIVE") + "</span>" : "<span style='color:#f64e60'>" + LanguageManager::instance().getText("STATUS_LOCKED") + "</span>";
     QString gender = (docGiaDuocChon->data.Phai) ? LanguageManager::instance().getText("GENDER_FEMALE") : LanguageManager::instance().getText("GENDER_MALE");
     
-    QString info = LanguageManager::instance().getText("MSG_READER_INFO_HTML")
-    .arg(QString::fromStdString(docGiaDuocChon->data.Ho))
-    .arg(QString::fromStdString(docGiaDuocChon->data.Ten))
-    .arg(docGiaDuocChon->data.MaThe)
-    .arg(gender)
-    .arg(status)
-    .arg(docGiaDuocChon->data.soSachDangMuon);
+    // Phase 2: Show all fields
+    QString typeStr = (docGiaDuocChon->data.LoaiDocGia == 0) ? LanguageManager::instance().getText("READER_TYPE_STUDENT") : LanguageManager::instance().getText("READER_TYPE_TEACHER");
     
+    // Construct HTML manually to ensure all fields are shown without relying on old template
+    QString info = QString(
+        "<table width='100%' cellspacing='5'>"
+        "<tr><td width='30%%'><b>%1:</b></td><td>%2</td></tr>" // Ma The
+        "<tr><td><b>%3:</b></td><td>%4</td></tr>" // Ho Ten
+        "<tr><td><b>%5:</b></td><td>%6</td></tr>" // Loai Doc Gia
+        "<tr><td><b>%7:</b></td><td>%8</td></tr>" // Lop
+        "<tr><td><b>%9:</b></td><td>%10</td></tr>" // Gioi Tinh
+        "<tr><td><b>%11:</b></td><td>%12</td></tr>" // Ngay Sinh
+        "<tr><td><b>%13:</b></td><td>%14</td></tr>" // SDT
+        "<tr><td><b>%15:</b></td><td>%16</td></tr>" // Email
+        "<tr><td><b>%17:</b></td><td>%18</td></tr>" // Trang Thai
+        "<tr><td><b>%19:</b></td><td>%20</td></tr>" // Sach Dang Muon
+        "</table>"
+    )
+    .arg(LanguageManager::instance().getText("LBL_READER_ID")).arg(docGiaDuocChon->data.MaThe)
+    .arg(LanguageManager::instance().getText("LBL_FULLNAME")).arg(QString::fromStdString(docGiaDuocChon->data.Ho + " " + docGiaDuocChon->data.Ten))
+    .arg(LanguageManager::instance().getText("LBL_READER_TYPE")).arg(typeStr)
+    .arg(LanguageManager::instance().getText("LBL_CLASS")).arg(QString::fromStdString(docGiaDuocChon->data.Lop))
+    .arg(LanguageManager::instance().getText("TABLE_HEADER_GENDER")).arg(gender)
+    .arg(LanguageManager::instance().getText("LBL_DOB")).arg(QString::fromStdString(docGiaDuocChon->data.NgaySinh))
+    .arg(LanguageManager::instance().getText("LBL_PHONE")).arg(QString::fromStdString(docGiaDuocChon->data.SDT))
+    .arg(LanguageManager::instance().getText("LBL_EMAIL")).arg(QString::fromStdString(docGiaDuocChon->data.Email))
+    .arg(LanguageManager::instance().getText("LBL_STATUS")).arg(status)
+    .arg(LanguageManager::instance().getText("LBL_BORROWED_COUNT")).arg(docGiaDuocChon->data.soSachDangMuon);
+
     nhanTongQuat->setText(info);
 }
 
@@ -387,6 +436,7 @@ void ManHinhChiTietDocGia::taiDanhSachSachMuon() {
         item.hanTra = QDate::fromString(QString::fromStdString(p->data.NgayTra), "dd/MM/yyyy");
         
         // Determine status
+        item.status = p->data.TrangThai;
         if (p->data.TrangThai == 0) item.trangThai = LanguageManager::instance().getText("LBL_BORROWING");
         else if (p->data.TrangThai == 1) item.trangThai = LanguageManager::instance().getText("STATUS_RETURNED");
         else if (p->data.TrangThai == 2) item.trangThai = LanguageManager::instance().getText("STATUS_LOST");
@@ -400,8 +450,22 @@ void ManHinhChiTietDocGia::taiDanhSachSachMuon() {
             }
         }
         
+        // Populate Debt Info
+        item.tienPhat = p->data.tienPhat;
+        item.daThanhToan = p->data.daThanhToan;
+
+        // FILTER LOGIC:
+        // Hide if (Returned OR Lost) AND Paid/NoDebt
+        bool hide = false;
+        if (p->data.TrangThai != 0) { // Not borrowing
+             if (p->data.daThanhToan) hide = true; // Paid -> Hide (Clean History)
+             else if (p->data.tienPhat == 0) hide = true; // No fine -> Hide (Clean Return)
+        }
+        
+        if (!hide) {
+            danhSachMuonVec.push_back(item);
+        }
         item.nodeMuonTra = p;
-        danhSachMuonVec.push_back(item);
         p = p->next;
     }
     
@@ -444,6 +508,10 @@ void ManHinhChiTietDocGia::khiChonSachMuon(const QModelIndex &index) {
     bool isBorrowing = (item.nodeMuonTra && item.nodeMuonTra->data.TrangThai == 0);
     nutThuHoi->setEnabled(isBorrowing);
     nutBaoMat->setEnabled(isBorrowing);
+    
+    // Enable Pay if Debt > 0 and Unpaid
+    bool canPay = (item.tienPhat > 0 && !item.daThanhToan);
+    nutThanhToan->setEnabled(canPay);
 }
 
 // Externs for global data access required by MuonTra functions
@@ -551,6 +619,34 @@ void ManHinhChiTietDocGia::khiNhanDong() {
 void ManHinhChiTietDocGia::khiNhanInThe() {
     if(docGiaDuocChon) {
         PrintHelper::inTheDocGia(docGiaDuocChon, this);
+    }
+}
+
+void ManHinhChiTietDocGia::khiNhanThanhToan() {
+    if (dongSachDuocChon < 0 || dongSachDuocChon >= (int)danhSachMuonVec.size()) return;
+    ThongTinMuon item = danhSachMuonVec[dongSachDuocChon];
+    
+    if (item.tienPhat <= 0 || item.daThanhToan) {
+        hienThiThongBao(LanguageManager::instance().getText("MSG_NO_DEBT_OR_PAID"), true);
+        return;
+    }
+
+    // Call HopThoaiThanhToan
+    QString reason = LanguageManager::instance().getText("REASON_PAY_FINE").arg(item.maSach);
+    long long amount = item.tienPhat;
+    
+    HopThoaiThanhToan dialog(docGiaDuocChon, reason, amount, this);
+    if (dialog.exec() == QDialog::Accepted) {
+        std::string res = ThanhToanPhat(docGiaDuocChon, item.maSach.toStdString());
+        if (res.empty()) {
+            hienThiThongBao(LanguageManager::instance().getText("MSG_PAYMENT_SUCCESS"));
+            taiThongTinDocGia();
+            taiDanhSachSachMuon();
+            emit docGiaDaCapNhat();
+            nutThanhToan->setEnabled(false);
+        } else {
+             hienThiThongBao(QString::fromStdString(res), true);
+        }
     }
 }
 

@@ -6,6 +6,7 @@
 #include <QComboBox>
 #include <QPushButton>
 #include <QLabel>
+#include <QDateEdit>
 
 class HopThoaiThemDocGia : public QDialog {
     Q_OBJECT
@@ -34,6 +35,13 @@ private:
     QLabel *nhanPreviewHoTen;
 
     QComboBox *hopChonGioiTinh;
+    // Phase 2 Fields
+    QLineEdit *oNhapSDT;
+    QLineEdit *oNhapLop;
+    QLineEdit *oNhapEmail;
+    QDateEdit *oNhapNgaySinh;
+    QComboBox *hopChonLoaiDocGia;
+
     // Feature 5 Dates
     class QDateEdit *inputNgayLap;
     class QDateEdit *inputNgayHetHan;

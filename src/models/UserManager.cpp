@@ -1,4 +1,12 @@
+/**
+ * @file UserManager.cpp
+ * @path src/models/UserManager.cpp
+ * @description Quản lý hệ thống người dùng (Account Management).
+ * Xử lý: đăng nhập, phân quyền, mã hóa mật khẩu và lưu trữ tài khoản nhân viên.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #include "models/UserManager.h"
+
 #include "utils/AuditLogger.h"
 #include "utils/DatabaseManager.h"
 #include <QSqlQuery>
@@ -47,7 +55,7 @@ bool UserManager::login(const QString& username, const QString& password) {
             qDebug() << "[UserManager] Login success:" << username;
             
             // Log Login Action
-            AuditLogger::log("Đăng nhập", "HỆ THỐNG", QString::number(id), "Người dùng " + username + " đã đăng nhập");
+            AuditLogger::log(AuditLogger::ACTION_LOGIN, "HE_THONG", QString::number(id), "Người dùng " + username + " đã đăng nhập");
             
             emit userChanged(m_currentUser);
             return true;
@@ -63,7 +71,7 @@ bool UserManager::login(const QString& username, const QString& password) {
 
 void UserManager::logout() {
     if (m_loggedIn) {
-        AuditLogger::log("Đăng xuất", "HỆ THỐNG", QString::number(m_currentUser.id), "Người dùng " + m_currentUser.username + " đã đăng xuất");
+        AuditLogger::log(AuditLogger::ACTION_LOGOUT, "HE_THONG", QString::number(m_currentUser.id), "Người dùng " + m_currentUser.username + " đã đăng xuất");
     }
     m_loggedIn = false;
     m_currentUser = UserInfo();

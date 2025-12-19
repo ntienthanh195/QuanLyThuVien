@@ -5,7 +5,14 @@
  * @note AI Chú ý: Đây là file HEADER CHÍNH THỨC.
  *       Bỏ qua file trùng lặp tại include/views/WidgetMuonTraSach.h.
  */
+/**
+ * @file WidgetMuonTraSach.h
+ * @path bao_gom/giao_dien/WidgetMuonTraSach.h
+ * @description Header của Widget quản lý mượn trả sách (V2).
+ * @project Library Management System (QuanLyThuVien)
+ */
 #ifndef WIDGETMUONTRASACH_H
+
 #define WIDGETMUONTRASACH_H
 
 #include <QWidget>
@@ -120,8 +127,6 @@ private slots:
     // Mượn sách
     // Checkbox deleted
     void xuLyNutXacNhanMuon(bool skipConfirm = false);
-    void xuLyNutQuetMaSach();
-    void xuLyNutQuetMaDocGia();
     
     // Trả sách
     // Trả sách
@@ -131,7 +136,6 @@ private slots:
     void xuLyNutGiaHan(); // Extension slot
     void xuLyChonSachTra(int hang, int cot);
     void xuLyInLaiPhieu();
-    void xuLyInBatch();
 
     // Multilingual Support
     void capNhatNgonNgu();
@@ -141,7 +145,6 @@ private slots:
 private:
     void thieLapGiaoDien();
     void thieLapTabMuonSach();
-    void thieLapTabTraSach();
     void thieLapTabLichSu();
     
     // Thiết lập bảng
@@ -162,7 +165,6 @@ private:
     
     // Auto-Return Helpers
     PTRDG TimDocGiaDangMuonSach(const QString &input, QString &resolvedMaSach);
-    void xuLyReturnPressedMaSachTra();
     
     // Layout chính
     QVBoxLayout *boTriChinh;
@@ -176,7 +178,6 @@ private:
     QTableView *bangDocGia;
     DocGiaTableModel *modelDocGia;
     QLineEdit *oNhapTimDocGia;
-    QPushButton *nutTimDocGia;
     QPushButton *nutTrangTruoc;
     QPushButton *nutTrangSau;
     QPushButton *nutLamMoiDocGia; // New: Refresh button member
@@ -191,8 +192,6 @@ private:
     QAbstractItemModel *modelSachDangMuon;
     std::vector<ThongTinSachDangMuon_DTO> danhSachSachDangMuon;
     QLineEdit *oNhapISBN;
-    QPushButton *nutQuetMaSach;
-    QPushButton *nutQuetMaDocGia;
     // ck hopXacNhanMuon deleted
     QPushButton *nutXacNhanMuon;
     QPushButton *nutXacNhanTra;
@@ -207,13 +206,7 @@ private:
     int soDocGiaTrenTrang;
     int tongSoTrang;
     
-    // === TAB TRẢ SÁCH ===
-    QWidget *widgetTraSach;
-    QLineEdit *oNhapMaSachTra;
-    QPushButton *nutTraSachNhanh; // Nút xác nhận trả (hoặc Auto-Submit)
-    QPushButton *nutQuetMaSachTra;
-    QLabel *nhanTieuDeTraSach; // New: Return Tab Title
-    QLabel *nhanHuongDanTraSach; // New: Instruction Label
+    // === TAB TRẢ SÁCH (MERGED) ===
     
     // === TAB LỊCH SỬ ===
     QWidget *widgetLichSu;

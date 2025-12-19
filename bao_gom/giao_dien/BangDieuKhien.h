@@ -1,4 +1,11 @@
+/**
+ * @file BangDieuKhien.h
+ * @path bao_gom/giao_dien/BangDieuKhien.h
+ * @description Header của Widget Dashboard (Bảng điều khiển).
+ * @project Library Management System (QuanLyThuVien)
+ */
 #ifndef BANGDIEUKHIEN_H
+
 #define BANGDIEUKHIEN_H
 
 #include <QWidget>
@@ -64,6 +71,7 @@ private slots:
     void xuLyInDanhMucSach();
     void xuLyInPhieuMuon();
     void xuLyInPhieuTra();
+    void xuLyNhapDuLieuTongHop(); // NEW: Centralized Import
     
     // Export Log
     void xuatBaoCaoLog();
@@ -79,7 +87,7 @@ private:
     
     QWidget* taoTheTongQuan(const QString &tieuDe, const QString &giaTri, 
                             const QString &bieuTuong, const QColor &mauNen);
-    QWidget* taoTheNho(const QString &icon, const QString &soLieu, const QString &nhan, const QString &mau, QLabel **outLabelSoLieu = nullptr);
+    QWidget* taoTheNho(const QString &icon, const QString &soLieu, const QString &nhan, const QString &mau, QLabel **outLabelSoLieu = nullptr, QLabel **outLabelNhan = nullptr);
     QWidget* taoBangHoatDongGanDay();
     QWidget* taoPanelCanhBao();
 
@@ -88,9 +96,7 @@ private:
     void ghiNhatKy(const QString &hanhDong, const QString &noiDung);
     
     // Helper functions for stats calculation
-    int demDocGia(PTRDG root) const;
-    int demSachDangMuon() const;
-    int demSachQuaHan() const;
+    // REMOVED: Redundant helpers (using shared ThongKe logic now)
     
     // Widgets
     QGridLayout *boTriChinh;
@@ -129,10 +135,26 @@ private:
     QPushButton *nutMuonTraSach;
     QPushButton *nutXemBaoCao;
     QPushButton *nutInThe;
-    QPushButton *nutQuetMa;
     
     // Performance optimization
     QTimer *m_updateTimer = nullptr; // Debounce timer
+
+    // SMART UPDATE: Member pointers for dynamic translation
+    void retranslateUi(); // NEW: Central method to update texts
+    
+    // Header
+    QLabel *lblHello = nullptr;
+    QLabel *lblSubtitle = nullptr;
+    QLineEdit *inputSearch = nullptr;
+    
+    // Stat Card Titles
+    QLabel *lblTitleTongSach = nullptr;
+    QLabel *lblTitleTongDocGia = nullptr;
+    QLabel *lblTitleDangMuon = nullptr;
+    QLabel *lblTitleQuaHan = nullptr;
+    
+    // Panels
+    QLabel *lblTitleCanhBao = nullptr;
 };
 
 #endif // BANGDIEUKHIEN_H

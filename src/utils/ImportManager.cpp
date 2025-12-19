@@ -13,6 +13,11 @@ ImportManager::ImportManager(QObject *parent) : QObject(parent) {
     m_scriptPath = getScriptPath();
 }
 
+ImportManager& ImportManager::instance() {
+    static ImportManager _instance;
+    return _instance;
+}
+
 QString ImportManager::getPythonExecutable() {
     QString repoRoot = FilePathManager::getRootPath();
     

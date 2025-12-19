@@ -5,7 +5,14 @@
  * @note AI Chú ý: Đây là file HEADER CHÍNH THỨC.
  *       Bỏ qua file trùng lặp tại include/views/WidgetQuanLyDocGia.h.
  */
+/**
+ * @file WidgetQuanLyDocGia.h
+ * @path bao_gom/giao_dien/WidgetQuanLyDocGia.h
+ * @description Header của Widget quản lý hồ sơ học viên (V2).
+ * @project Library Management System (QuanLyThuVien)
+ */
 #ifndef WIDGETQUANLYDOCGIA_H
+
 #define WIDGETQUANLYDOCGIA_H
 
 #include <QWidget>

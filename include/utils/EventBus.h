@@ -1,4 +1,11 @@
+/**
+ * @file EventBus.h
+ * @path include/utils/EventBus.h
+ * @description Header của hệ thống Bus truyền tin (Singleton).
+ * @project Library Management System (QuanLyThuVien)
+ */
 #ifndef EVENTBUS_H
+
 #define EVENTBUS_H
 
 #include <QObject>
@@ -10,6 +17,8 @@ class EventBus : public QObject {
     Q_OBJECT
 public:
     static EventBus& instance();
+    
+    void emitDataChanged() { emit dataChanged(); }
 
 signals:
     // Độc giả
@@ -37,6 +46,9 @@ signals:
 
     // General: any data file or DB changed externally
     void dataChanged();
+
+    // Settings
+    void settingsUpdated();
 
 private:
     explicit EventBus(QObject* parent = nullptr);

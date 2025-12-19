@@ -8,6 +8,9 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += core
 TARGET = QuanLyThuVien
 TEMPLATE = app
 
+# Define source directory for IDE development (Phase 11)
+DEFINES += APP_SOURCE_DIR=\\\"$$PWD\\\"
+
 # Resources
 RESOURCES += resources/icons.qrc
 
@@ -130,7 +133,6 @@ SOURCES += \
     nguon/giao_dien/hop_thoai/HopThoaiThemBanSao.cpp \
     nguon/giao_dien/hop_thoai/HopThoaiThongKe.cpp \
     nguon/giao_dien/hop_thoai/HopThoaiTop10.cpp \
-    nguon/giao_dien/hop_thoai/HopThoaiInAn.cpp \
     nguon/giao_dien/hop_thoai/HopThoaiQuetMaVach.cpp \
     nguon/giao_dien/hop_thoai/HopThoaiHangDoiIn.cpp \
     nguon/giao_dien/hop_thoai/HopThoaiCauHinhIn.cpp \
@@ -146,7 +148,6 @@ HEADERS += \
     bao_gom/giao_dien/hop_thoai/HopThoaiThemBanSao.h \
     bao_gom/giao_dien/hop_thoai/HopThoaiThongKe.h \
     bao_gom/giao_dien/hop_thoai/HopThoaiTop10.h \
-    bao_gom/giao_dien/hop_thoai/HopThoaiInAn.h \
     bao_gom/giao_dien/hop_thoai/HopThoaiQuetMaVach.h \
     bao_gom/giao_dien/hop_thoai/HopThoaiHangDoiIn.h \
     bao_gom/giao_dien/hop_thoai/HopThoaiCauHinhIn.h \

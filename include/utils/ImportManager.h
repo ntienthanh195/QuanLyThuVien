@@ -20,6 +20,7 @@ public:
     };
 
     explicit ImportManager(QObject *parent = nullptr);
+    static ImportManager& instance(); // Singleton for easier access
 
     // Determines python executable path logic (system or venv)
     QString getPythonExecutable();

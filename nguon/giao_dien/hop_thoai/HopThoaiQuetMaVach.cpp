@@ -4,7 +4,7 @@
 #include "models/QuanLySach.h"
 #include "models/ThaoTacFile.h"
 #include "utils/FilePathManager.h"
-#include "utils/TransactionLogger.h"
+#include "utils/AuditLogger.h"
 #include <QMessageBox>
 #include "utils/LanguageManager.h"
 #include <QTimer>
@@ -264,7 +264,7 @@ void HopThoaiQuetMaVach::timKiemVaHienThi(const QString &ma) {
                             }
                         }
                         
-                        TransactionLogger::ghiLogTra(docGia, maSach, tenSach, true);
+                        AuditLogger::log(AuditLogger::ACTION_RETURN, "MUON_TRA", maSach, "Trả sách: " + tenSach);
                         
                         // Dữ liệu đã được đồng bộ SQL bên trong hàm TraSach
                         

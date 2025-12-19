@@ -25,6 +25,10 @@ HopThoaiCaiDat::HopThoaiCaiDat(QWidget *parent)
     , oSoNgayMuonToiDa(nullptr)
     , oSoLanGiaHanToiDa(nullptr)
     , oSoSachMuonToiDa(nullptr)
+    , lblThoiHanThe(nullptr)
+    , lblPhiMatSach(nullptr)
+    , oThoiHanThe(nullptr)
+    , oPhiMatSach(nullptr)
     , lblCheDoIn(nullptr)
     , lblMayInReceipt(nullptr)
     , lblMayInReport(nullptr)
@@ -62,6 +66,8 @@ void HopThoaiCaiDat::capNhatNgonNgu() {
     if (lblNgayMuon) lblNgayMuon->setText(LanguageManager::instance().getText("LBL_MAX_BORROW_DAYS") + ":");
     if (lblLanGiaHan) lblLanGiaHan->setText(LanguageManager::instance().getText("LBL_MAX_RENEWALS") + ":");
     if (lblSachMuon) lblSachMuon->setText(LanguageManager::instance().getText("LBL_MAX_BORROW_BOOKS") + ":");
+    if (lblThoiHanThe) lblThoiHanThe->setText(LanguageManager::instance().getText("LBL_CARD_VALIDITY_MONTHS"));
+    if (lblPhiMatSach) lblPhiMatSach->setText(LanguageManager::instance().getText("LBL_LOST_BOOK_FEE"));
     
     if (lblCheDoIn) lblCheDoIn->setText(LanguageManager::instance().getText("LBL_PRINT_MODE") + ":");
     if (oInYenLang) oInYenLang->setText(LanguageManager::instance().getText("CB_SILENT_PRINT"));
@@ -138,6 +144,24 @@ void HopThoaiCaiDat::thietLapGiaoDien() {
     formMuonTra->addRow(lblNgayMuon, oSoNgayMuonToiDa);
     formMuonTra->addRow(lblLanGiaHan, oSoLanGiaHanToiDa);
     formMuonTra->addRow(lblSachMuon, oSoSachMuonToiDa);
+
+    // New Fields Phase 8
+    oThoiHanThe = new QSpinBox();
+    oThoiHanThe->setRange(1, 120); // 1 month to 10 years
+    oThoiHanThe->setSuffix(" tháng");
+    oThoiHanThe->setStyleSheet("padding: 8px; background: #2b2b36; border: 1px solid #3E3E42; color: white;");
+
+    oPhiMatSach = new QSpinBox();
+    oPhiMatSach->setRange(0, 10000000); // Max 10tr
+    oPhiMatSach->setSingleStep(1000);
+    oPhiMatSach->setSuffix(" đ");
+    oPhiMatSach->setStyleSheet("padding: 8px; background: #2b2b36; border: 1px solid #3E3E42; color: white;");
+    
+    lblThoiHanThe = new QLabel(LanguageManager::instance().getText("LBL_CARD_VALIDITY_MONTHS"));
+    lblPhiMatSach = new QLabel(LanguageManager::instance().getText("LBL_LOST_BOOK_FEE"));
+
+    formMuonTra->addRow(lblThoiHanThe, oThoiHanThe);
+    formMuonTra->addRow(lblPhiMatSach, oPhiMatSach);
     
     tabs->addTab(tabMuonTra, LanguageManager::instance().getText("TAB_BORROW_RULES"));
 
@@ -212,6 +236,9 @@ void HopThoaiCaiDat::loadData() {
     oSoNgayMuonToiDa->setValue(store.getInt("SO_NGAY_MUON_TOI_DA", 7));
     oSoLanGiaHanToiDa->setValue(store.getInt("SO_LAN_GIA_HAN_TOI_DA", 1));
     if (oSoSachMuonToiDa) oSoSachMuonToiDa->setValue(store.getInt("SO_SACH_MUON_TOI_DA", 3));
+    
+    if (oThoiHanThe) oThoiHanThe->setValue(store.getInt("THOI_HAN_THE_THANG", 6));
+    if (oPhiMatSach) oPhiMatSach->setValue(store.getInt("PHI_MAT_SACH", 20000));
 
     // Print Config
     oInYenLang->setChecked(store.getBool("Print/Silent", false));
@@ -231,6 +258,8 @@ void HopThoaiCaiDat::luuCauHinh() {
     store.set("SO_NGAY_MUON_TOI_DA", oSoNgayMuonToiDa->value(), "int");
     store.set("SO_LAN_GIA_HAN_TOI_DA", oSoLanGiaHanToiDa->value(), "int");
     if (oSoSachMuonToiDa) store.set("SO_SACH_MUON_TOI_DA", oSoSachMuonToiDa->value(), "int");
+    if (oThoiHanThe) store.set("THOI_HAN_THE_THANG", oThoiHanThe->value(), "int");
+    if (oPhiMatSach) store.set("PHI_MAT_SACH", oPhiMatSach->value(), "int");
     
     // Save Print Config
     store.set("Print/Silent", oInYenLang->isChecked(), "bool");
@@ -247,19 +276,21 @@ void HopThoaiCaiDat::luuCauHinh() {
     PrintHelper::setCauHinh(cfg);
 
     // Log
-    AuditLogger::log("SETTINGS_UPDATE", "CAI_DAT", "", "Cap nhat cau hinh he thong");
+    AuditLogger::log(AuditLogger::ACTION_SETTINGS, "CAI_DAT", "", "Cap nhat cau hinh he thong (HopThoaiCaiDat)");
     
     QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), LanguageManager::instance().getText("MSG_SAVE_SETTINGS_SUCCESS"));
     accept();
 }
 
 void HopThoaiCaiDat::macDinh() {
-    oTenThuVien->setText("Thư Viện Chùa Chantarangsay");
-    oDiaChi->setText("P.Xuân Hòa, TP.HCM");
+    oTenThuVien->setText("PHÁT TRIỂN: CHĂM RỐCH THI");
+    oDiaChi->setText("AN GIANG");
     oTienPhatMoiNgay->setValue(5000);
     oSoNgayMuonToiDa->setValue(7);
     oSoLanGiaHanToiDa->setValue(1);
     if (oSoSachMuonToiDa) oSoSachMuonToiDa->setValue(3);
+    if (oThoiHanThe) oThoiHanThe->setValue(6);
+    if (oPhiMatSach) oPhiMatSach->setValue(20000);
     
     oInYenLang->setChecked(false);
     oMayInReceipt->setCurrentIndex(0);

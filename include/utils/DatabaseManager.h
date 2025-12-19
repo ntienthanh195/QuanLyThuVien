@@ -1,4 +1,11 @@
+/**
+ * @file DatabaseManager.h
+ * @path include/utils/DatabaseManager.h
+ * @description Header quản lý Database (Singleton).
+ * @project Library Management System (QuanLyThuVien)
+ */
 #ifndef DATABASEMANAGER_H
+
 #define DATABASEMANAGER_H
 
 #include <QString>

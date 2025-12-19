@@ -1,4 +1,11 @@
+/**
+ * @file ManHinhPreviewImport.h
+ * @path include/views/dialogs/ManHinhPreviewImport.h
+ * @description Header của màn hình xem trước Import dữ liệu.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #ifndef MANHINHPREVIEWIMPORT_H
+
 #define MANHINHPREVIEWIMPORT_H
 
 #include <QDialog>

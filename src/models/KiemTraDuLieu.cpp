@@ -1,4 +1,12 @@
+/**
+ * @file KiemTraDuLieu.cpp
+ * @path src/models/KiemTraDuLieu.cpp
+ * @description Tập hợp các hàm tiện ích để kiểm tra tính hợp lệ của dữ liệu đầu vào.
+ * Ví dụ: kiểm tra chuỗi rỗng, định dạng ISBN, kiểm tra ký tự đặc biệt.
+ * @project Library Management System (QuanLyThuVien)
+ */
 #include "models/KiemTraDuLieu.h"
+
 #include "utils/ThongBao.h"
 #include "utils/XuLyChuoi.h"
 #include "models/QuanLySach.h"
