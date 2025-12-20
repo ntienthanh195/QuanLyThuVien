@@ -58,9 +58,26 @@ int tinhSoNgayQuaHan(std::string ngayMuon, std::ostream& out){
     
     // Su dung SettingsManager thay vi hang so hardcode
     int soNgayMuonMax = SettingsManager::instance().getInt("SO_NGAY_MUON_TOI_DA", 7);
+    
+    // Feature: An cư kiết hạ (Vassa) - Cộng thêm 90 ngày nếu đang trong kỳ an cư
+    if (SettingsManager::instance().getBool("CHE_DO_AN_CU", false)) {
+        soNgayMuonMax += 90;
+    }
+
     int soNgayQuaHan = static_cast<int>(diff_days) - soNgayMuonMax;
     
     return soNgayQuaHan > 0 ? soNgayQuaHan : 0;            // tra ve 0 neu chua qua han
+}
+
+int LayNamPhatLich() {
+    return LayNamHienTai() + 543;
+}
+
+std::string ChuyenSangPhatLich(const std::string& ngayCE) {
+    int d, m, y;
+    if (!phanTichNgay(ngayCE, d, m, y)) return ngayCE;
+    int yBE = y + 543;
+    return ngayCE + " (PL " + std::to_string(yBE) + ")";
 }
 
 // Phan tich chuoi "dd/mm/yyyy" thanh cac so nguyen

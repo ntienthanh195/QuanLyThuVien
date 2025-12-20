@@ -173,13 +173,17 @@ void HopThoaiThemSach::thieLapGiaoDien() {
     oNhapTheLoai = new QLineEdit();
     oNhapTheLoai->setPlaceholderText(LanguageManager::instance().getText("PLACEHOLDER_CATEGORY"));
     oNhapTheLoai->setStyleSheet(kieuTruong);
-    // Auto-complete
-    QStringList goiYTheLoai = {"Văn học", "Khoa học", "Công nghệ", "Lịch sử", "Triết học",
-        "Kinh tế", "Tâm lý", "Nghệ thuật", "Thiếu nhi", "Giáo dục",
-        "Y học", "Thể thao", "Du lịch", "Ẩm thực", "Tôn giáo"};
+    // Auto-complete - Tối ưu cho Học viện Phật giáo Nam tông Khmer
+    QStringList goiYTheLoai = {
+        "Luật Tạng (Vinaya)", "Kinh Tạng (Sutta)", "Vi Diệu Pháp (Abhidhamma)",
+        "Chú giải (Atthakatha)", "Phụ chú giải (Tika)",
+        "Kinh Pali", "Kinh Khmer", "Văn hóa Khmer", "Ngữ pháp Pali",
+        "Triết học Phật giáo", "Lịch sử Phật giáo", "Tôn giáo học", 
+        "Việt học", "Nghệ thuật Phật giáo", "Kinh lá buông"
+    };
     QCompleter *completer = new QCompleter(goiYTheLoai, this);
     completer->setCaseSensitivity(Qt::CaseInsensitive);
-    completer->setFilterMode(Qt::MatchContains); // Search anywhere
+    completer->setFilterMode(Qt::MatchContains);
     oNhapTheLoai->setCompleter(completer);
     connect(oNhapTheLoai, &QLineEdit::textChanged, this, &HopThoaiThemSach::kiemTraTatCaTruong); // Validate
     

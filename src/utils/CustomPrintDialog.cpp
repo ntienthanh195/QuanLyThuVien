@@ -269,6 +269,13 @@ void CustomPrintDialog::updatePreview(QPrinter* printer) {
 }
 
 void CustomPrintDialog::onPrintClicked() {
+    if (m_printer && m_document) {
+        // Force color mode update before final print
+        m_printer->setColorMode( (m_colorCheckbox && m_colorCheckbox->isChecked()) ? QPrinter::Color : QPrinter::GrayScale );
+        
+        // Execute print directly to the configured printer
+        m_document->print(m_printer);
+    }
     done(PRINT_ACCEPTED);
 }
 

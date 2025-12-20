@@ -167,7 +167,7 @@ void HopThoaiSuaSach::thieLapGiaoDien() {
     soNamXuatBan->setButtonSymbols(QAbstractSpinBox::NoButtons);
     QLabel *nhanNam = new QLabel(LanguageManager::instance().getText("TABLE_HEADER_YEAR") + ":");
     nhanNam->setStyleSheet("font-weight: bold; color: #FFFFFF; font-size: 12px; min-width: 90px;");
-    boTriForm->addRow(nhanNam, nhanNam);
+    boTriForm->addRow(nhanNam, soNamXuatBan); // Fix: Add SpinBox, not Label twice
     
     soSoTrang = new QSpinBox();
     soSoTrang->setRange(1, 10000);
@@ -339,8 +339,8 @@ void HopThoaiSuaSach::xuLyNutLuu() {
         sachHienTai->ISBN, tenChuan, soTrang, tacGiaChuan, namXB, theLoaiChuan, viTriChuan, giaTien, nhaXuatBanChuan
     );
     
-    if (ketQua.find("Thành công") != std::string::npos || ketQua.find("thành công") != std::string::npos) {
-        // Dữ liệu đã được đồng bộ SQL bên trong CapNhatThongTinDauSach
+    if (ketQua.empty()) {
+        // Empty string means SUCCESS
         // Show Toast only
         ToastNotification::show(LanguageManager::instance().getText("MSG_UPDATE_SUCCESS_VAR").arg(QString::fromStdString(tenChuan)), ToastNotification::SUCCESS);
         

@@ -37,6 +37,9 @@ public:
     // Create schema tables if not exists
     bool createTables();
 
+    // Automatic normalization for book copy codes
+    void normalizeBookCodes();
+
     // Last error
     QSqlError lastError() const;
 

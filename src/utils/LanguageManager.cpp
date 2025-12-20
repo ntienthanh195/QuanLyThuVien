@@ -155,8 +155,8 @@ void LanguageManager::loadDictionary()
         {Language::English, "Import Data"}
     };
     m_dictionary["DASH_DESC_IMPORT"] = {
-        {Language::Vietnamese, "Nhập sách, độc giả từ file Excel cực nhanh."},
-        {Language::Khmer, "នាំចូលសៀវភៅ និងសិស្សពីឯកសារ Excel យ៉ាងរហ័ស។"},
+        {Language::Vietnamese, "Nhập sách, học viên từ file Excel cực nhanh."},
+        {Language::Khmer, "នាំចូលសៀវភៅ និងសិស្សពីឯកសារ Excel យ៉ាងរហ័ស।"},
         {Language::English, "Import books & students from Excel file instantly."}
     };
     m_dictionary["MSG_IMPORT_SUCCESS"] = {
@@ -804,7 +804,7 @@ void LanguageManager::loadDictionary()
         {Language::English, "Book Statistics"}
     };
     m_dictionary["GROUP_STATS_READERS"] = {
-        {Language::Vietnamese, "Thống Kê Độc Giả"},
+        {Language::Vietnamese, "Thống Kê Học Viên"},
         {Language::Khmer, "ស្ថិតិសិស្ស"},
         {Language::English, "Reader Statistics"}
     };
@@ -844,12 +844,12 @@ void LanguageManager::loadDictionary()
         {Language::English, "\n\nFirst name only letters/spaces allowed (max 50 chars)."}
     };
     m_dictionary["MSG_ERROR_UPDATE_FAILED"] = {
-        {Language::Vietnamese, "Đã xảy ra lỗi khi cập nhật độc giả:\n%1"},
+        {Language::Vietnamese, "Đã xảy ra lỗi khi cập nhật học viên:\n%1"},
         {Language::Khmer, "មានកំហុសក្នុងការកែប្រែទិន្នន័យសិស្ស:\n%1"},
         {Language::English, "Error updating reader:\n%1"}
     };
     m_dictionary["MSG_ERROR_ADD_FAILED"] = {
-        {Language::Vietnamese, "Đã xảy ra lỗi khi thêm độc giả:\n%1"},
+        {Language::Vietnamese, "Đã xảy ra lỗi khi thêm học viên:\n%1"},
         {Language::Khmer, "មានកំហុសក្នុងការបន្ថែមសិស្ស:\n%1"},
         {Language::English, "Error adding reader:\n%1"}
     };
@@ -1013,8 +1013,8 @@ void LanguageManager::loadDictionary()
     m_dictionary["MSG_CONFIRM_LOST_HTML"] = { {Language::Vietnamese, "Sách: <b>%1</b><br>Giá sách: %2 VNĐ<br>Phí phạt: %3 VNĐ<br><b>Tổng cộng: %4 VNĐ</b><br><br>Bạn có chắc chắn muốn báo mất sách này?"}, {Language::Khmer, "សៀវភៅ: <b>%1</b><br>តម្លៃ: %2 VNĐ<br>ពិន័យ: %3 VNĐ<br><b>សរុប: %4 VNĐ</b><br><br>តើអ្នកពិតជារចង់រាយការណ៍ថាបាត់សៀវភៅនេះមែនទេ?"}, {Language::English, "Book: <b>%1</b><br>Price: %2<br>Fine: %3<br><b>Total: %4</b><br><br>Report lost?"} };
     m_dictionary["MSG_LOST_RECORDED_TITLE"] = { {Language::Vietnamese, "Đã Ghi Nhận"}, {Language::Khmer, "បានកត់ត្រា"}, {Language::English, "Recorded"} };
     m_dictionary["MSG_LOST_RECORDED_SUCCESS"] = { {Language::Vietnamese, "Đã báo mất sách %1.<br>Thu phí: %4 VNĐ"}, {Language::Khmer, "បានរាយការណ៍ថាបាត់សៀវភៅ %1.<br>កម្រៃសេវា: %4 VNĐ"}, {Language::English, "Reported lost %1.<br>Total: %4"} };
-    m_dictionary["TITLE_READER_DETAILS"] = { {Language::Vietnamese, "Chi Tiết Độc Giả"}, {Language::Khmer, "ព័ត៌មានលម្អិតសិស្ស"}, {Language::English, "Reader Details"} };
-    m_dictionary["HEADER_READER_DETAILS"] = { {Language::Vietnamese, "CHI TIẾT ĐỘC GIẢ"}, {Language::Khmer, "ព័ត៌មានលម្អិតសិស្ស"}, {Language::English, "READER DETAILS"} };
+    m_dictionary["TITLE_READER_DETAILS"] = { {Language::Vietnamese, "Chi Tiết Học Viên"}, {Language::Khmer, "ព័ត៌មានលម្អិតសិស្ស"}, {Language::English, "Reader Details"} };
+    m_dictionary["HEADER_READER_DETAILS"] = { {Language::Vietnamese, "CHI TIẾT HỌC VIÊN"}, {Language::Khmer, "ព័ត៌មានលម្អិតសិស្ស"}, {Language::English, "READER DETAILS"} };
     m_dictionary["GROUP_HISTORY"] = { {Language::Vietnamese, "LỊCH SỬ MƯỢN TRẢ"}, {Language::Khmer, "ប្រវត្តិខ្ចីសង"}, {Language::English, "LOAN HISTORY"} };
     m_dictionary["BTN_RETURN_BOOK"] = { {Language::Vietnamese, "Trả Sách"}, {Language::Khmer, "សងសៀវភៅ"}, {Language::English, "Return Book"} };
     m_dictionary["BTN_REPORT_LOST"] = { {Language::Vietnamese, "Báo Mất"}, {Language::Khmer, "រាយការណ៍ថាបាត់"}, {Language::English, "Report Lost"} };
@@ -1075,35 +1075,35 @@ void LanguageManager::loadDictionary()
 
     // HopThoaiHangDoiIn
     m_dictionary["DIALOG_PRINT_QUEUE_TITLE"] = { {Language::Vietnamese, "Hàng Đợi In Thẻ Hàng Loạt"}, {Language::Khmer, "ជួររង់ចាំបោះពុម្ពប័ណ្ណជាក្រុម"}, {Language::English, "Batch Card Print Queue"} };
-    m_dictionary["HEADER_PRINT_QUEUE"] = { {Language::Vietnamese, "HÀNG ĐỢI IN THẺ ĐỘC GIẢ"}, {Language::Khmer, "ជួររង់ចាំបោះពុម្ពប័ណ្ណសិស្ស"}, {Language::English, "STUDENT CARD PRINT QUEUE"} };
+    m_dictionary["HEADER_PRINT_QUEUE"] = { {Language::Vietnamese, "HÀNG ĐỢI IN THẺ HỌC VIÊN"}, {Language::Khmer, "ជួររង់ចាំបោះពុម្ពប័ណ្ណសិស្ស"}, {Language::English, "STUDENT CARD PRINT QUEUE"} };
     m_dictionary["LBL_QUEUE_COUNT"] = { {Language::Vietnamese, "Số thẻ: %1"}, {Language::Khmer, "ចំនួនប័ណ្ណ: %1"}, {Language::English, "Card Count: %1"} };
     m_dictionary["LBL_QUEUE_PAGES"] = { {Language::Vietnamese, "Số trang A4: %1 (%2 cột)"}, {Language::Khmer, "ចំនួនទំព័រ A4: %1 (%2 ជួរឈរ)"}, {Language::English, "A4 Pages: %1 (%2 cols)"} };
     m_dictionary["LBL_QUEUE_COLUMNS"] = { {Language::Vietnamese, "Số cột:"}, {Language::Khmer, "ជួរឈរ:"}, {Language::English, "Columns:"} };
     m_dictionary["TOOLTIP_QUEUE_COLUMNS"] = { {Language::Vietnamese, "Số cột trên mỗi trang A4 (1-3)"}, {Language::Khmer, "ចំនួនជួរឈរលើទំព័រ A4 (1-3)"}, {Language::English, "Columns per A4 page (1-3)"} };
-    m_dictionary["BTN_ADD_READER_QUEUE"] = { {Language::Vietnamese, "Thêm độc giả"}, {Language::Khmer, "បន្ថែមសិស្ស"}, {Language::English, "Add Student"} };
+    m_dictionary["BTN_ADD_READER_QUEUE"] = { {Language::Vietnamese, "Thêm học viên"}, {Language::Khmer, "បន្ថែមសិស្ស"}, {Language::English, "Add Student"} };
     m_dictionary["BTN_ADD_BATCH_QUEUE"] = { {Language::Vietnamese, "Thêm nhiều"}, {Language::Khmer, "បន្ថែមច្រើន"}, {Language::English, "Add Batch"} };
     m_dictionary["BTN_DELETE_QUEUE"] = { {Language::Vietnamese, "Xóa"}, {Language::Khmer, "លុប"}, {Language::English, "Delete"} };
     m_dictionary["BTN_DELETE_ALL_QUEUE"] = { {Language::Vietnamese, "Xóa tất cả"}, {Language::Khmer, "លុបទាំងអស់"}, {Language::English, "Delete All"} };
     m_dictionary["BTN_PRINT_A4"] = { {Language::Vietnamese, "In A4"}, {Language::Khmer, "បោះពុម្ព A4"}, {Language::English, "Print A4"} };
     m_dictionary["BTN_EXPORT_PDF"] = { {Language::Vietnamese, "Xuất PDF"}, {Language::Khmer, "នាំចេញ PDF"}, {Language::English, "Export PDF"} };
-    m_dictionary["MSG_INPUT_READER_ID"] = { {Language::Vietnamese, "Nhập mã thẻ độc giả:"}, {Language::Khmer, "បញ្ចូលលេខកូដប័ណ្ណសិស្ស:"}, {Language::English, "Enter Student ID:"} };
-    m_dictionary["MSG_READER_LOCKED"] = { {Language::Vietnamese, "Độc giả này đã bị khóa!"}, {Language::Khmer, "សិស្សនេះត្រូវបានបិទ!"}, {Language::English, "This student is locked!"} };
-    m_dictionary["MSG_READER_ALREADY_QUEUED"] = { {Language::Vietnamese, "Độc giả này đã có trong hàng đợi!"}, {Language::Khmer, "សិស្សនេះមាននៅក្នុងជួររង់ចាំរួចហើយ!"}, {Language::English, "Student already in queue!"} };
-    m_dictionary["MSG_QUEUE_EMPTY_ADD"] = { {Language::Vietnamese, "Hàng đợi trống! Vui lòng thêm độc giả trước."}, {Language::Khmer, "ជួររង់ចាំទទេ! សូមបន្ថែមសិស្សជាមុនសិន។"}, {Language::English, "Queue empty! Please add students first."} };
-    m_dictionary["MSG_CONFIRM_ADD_BATCH"] = { {Language::Vietnamese, "Thêm %1 độc giả vào hàng đợi?"}, {Language::Khmer, "បន្ថែមសិស្ស %1 នាក់ទៅជួររង់ចាំ?"}, {Language::English, "Add %1 students to queue?"} };
+    m_dictionary["MSG_INPUT_READER_ID"] = { {Language::Vietnamese, "Nhập mã thẻ học viên:"}, {Language::Khmer, "បញ្ចូលលេខកូដប័ណ្ណសិស្ស:"}, {Language::English, "Enter Student ID:"} };
+    m_dictionary["MSG_READER_LOCKED"] = { {Language::Vietnamese, "Học viên này đã bị khóa!"}, {Language::Khmer, "សិស្សនេះត្រូវបានបិទ!"}, {Language::English, "This student is locked!"} };
+    m_dictionary["MSG_READER_ALREADY_QUEUED"] = { {Language::Vietnamese, "Học viên này đã có trong hàng đợi!"}, {Language::Khmer, "សិស្សនេះមាននៅក្នុងជួររង់ចាំរួចហើយ!"}, {Language::English, "Student already in queue!"} };
+    m_dictionary["MSG_QUEUE_EMPTY_ADD"] = { {Language::Vietnamese, "Hàng đợi trống! Vui lòng thêm học viên trước."}, {Language::Khmer, "ជួររង់ចាំទទេ! សូមបន្ថែមសិស្សជាមុនសិន។"}, {Language::English, "Queue empty! Please add students first."} };
+    m_dictionary["MSG_CONFIRM_ADD_BATCH"] = { {Language::Vietnamese, "Thêm %1 học viên vào hàng đợi?"}, {Language::Khmer, "បន្ថែមសិស្ស %1 នាក់ទៅជួររង់ចាំ?"}, {Language::English, "Add %1 students to queue?"} };
     m_dictionary["MSG_CONFIRM_PRINT_A4"] = { {Language::Vietnamese, "In %1 thẻ (%2 trang A4, %3 cột)?"}, {Language::Khmer, "បោះពុម្ពប័ណ្ណ %1 (%2 ទំព័រ A4, %3 ជួរឈរ)?"}, {Language::English, "Print %1 cards (%2 A4 pages, %3 cols)?"} };
     m_dictionary["MSG_QUEUE_EMPTY"] = { {Language::Vietnamese, "Hàng đợi trống!"}, {Language::Khmer, "ជួររង់ចាំទទេ!"}, {Language::English, "Queue is empty!"} };
     m_dictionary["MSG_CONFIRM_DELETE_ALL"] = { {Language::Vietnamese, "Xóa toàn bộ hàng đợi?"}, {Language::Khmer, "លុបជួររង់ចាំទាំងអស់?"}, {Language::English, "Clear entire queue?"} };
     m_dictionary["MSG_PRINT_SENT"] = { {Language::Vietnamese, "Đã gửi lệnh in!"}, {Language::Khmer, "បានផ្ញើការបោះពុម្ព!"}, {Language::English, "Print command sent!"} };
     m_dictionary["MSG_ADDED_READER"] = { {Language::Vietnamese, "Đã thêm: %1 %2 (Mã: %3)"}, {Language::Khmer, "បានបន្ថែម: %1 %2 (កូដ: %3)"}, {Language::English, "Added: %1 %2 (ID: %3)"} };
-    m_dictionary["MSG_ADDED_COUNT"] = { {Language::Vietnamese, "Đã thêm %1 độc giả!"}, {Language::Khmer, "បានបន្ថែមសិស្ស %1 នាក់!"}, {Language::English, "Added %1 students!"} };
-    m_dictionary["MSG_SELECT_DELETE"] = { {Language::Vietnamese, "Vui lòng chọn độc giả cần xóa!"}, {Language::Khmer, "សូមជ្រើសរើសសិស្សដើម្បីលុប!"}, {Language::English, "Please select student to delete!"} };
+    m_dictionary["MSG_ADDED_COUNT"] = { {Language::Vietnamese, "Đã thêm %1 học viên!"}, {Language::Khmer, "បានបន្ថែមសិស្ស %1 នាក់!"}, {Language::English, "Added %1 students!"} };
+    m_dictionary["MSG_SELECT_DELETE"] = { {Language::Vietnamese, "Vui lòng chọn học viên cần xóa!"}, {Language::Khmer, "សូមជ្រើសរើសសិស្សដើម្បីលុប!"}, {Language::English, "Please select student to delete!"} };
 
     // HopThoaiQuetMaVach
     m_dictionary["DIALOG_SCAN_TITLE"] = { {Language::Vietnamese, "Quét Mã (Barcode/QR Code)"}, {Language::Khmer, "ស្កេនកូដ (Barcode/QR Code)"}, {Language::English, "Scan Code (Barcode/QR)"} };
     m_dictionary["HEADER_SCAN_RETURN_SEARCH"] = { {Language::Vietnamese, "QUÉT MÃ TRẢ / TÌM KIẾM"}, {Language::Khmer, "ស្កេនសង / ស្វែងរក"}, {Language::English, "SCAN RETURN / SEARCH"} };
     m_dictionary["HEADER_SCAN_BOOK"] = { {Language::Vietnamese, "QUÉT MÃ SÁCH"}, {Language::Khmer, "ស្កេនកូដសៀវភៅ"}, {Language::English, "SCAN BOOK CODE"} };
-    m_dictionary["HEADER_SCAN_READER"] = { {Language::Vietnamese, "QUÉT THẺ ĐỘC GIẢ"}, {Language::Khmer, "ស្កេនប័ណ្ណសិស្ស"}, {Language::English, "SCAN STUDENT CARD"} };
+    m_dictionary["HEADER_SCAN_READER"] = { {Language::Vietnamese, "QUÉT THẺ HỌC VIÊN"}, {Language::Khmer, "ស្កេនប័ណ្ណសិស្ស"}, {Language::English, "SCAN STUDENT CARD"} };
     m_dictionary["MSG_SCAN_INSTRUCTION"] = { {Language::Vietnamese, "Sử dụng máy quét Barcode/QR hoặc nhập tay mã số bên dưới."}, {Language::Khmer, "ប្រើម៉ាស៊ីនស្កេន Barcode/QR ឬបញ្ចូលកូដដោយដៃខាងក្រោម។"}, {Language::English, "Use Barcode/QR scanner or enter code manually below."} };
     m_dictionary["MSG_PLEASE_SCAN"] = { {Language::Vietnamese, "Vui lòng quét mã..."}, {Language::Khmer, "សូមស្កេនកូដ..."}, {Language::English, "Please scan code..."} };
     m_dictionary["MSG_SEARCHING"] = { {Language::Vietnamese, " Đang tìm kiếm..."}, {Language::Khmer, " កំពុងស្វែងរក..."}, {Language::English, " Searching..."} };
@@ -1144,7 +1144,7 @@ void LanguageManager::loadDictionary()
     m_dictionary["SIDEBAR_TITLE"] = { {Language::Vietnamese, "THƯ VIỆN"}, {Language::Khmer, "បណ្ណាល័យ"}, {Language::English, "LIBRARY"} };
     m_dictionary["MENU_HOME"] = { {Language::Vietnamese, "Trang Chủ"}, {Language::Khmer, "ទំព័រដើម"}, {Language::English, "Home"} };
     m_dictionary["MENU_BOOKS"] = { {Language::Vietnamese, "Quản Lý Sách"}, {Language::Khmer, "គ្រប់គ្រងសៀវភៅ"}, {Language::English, "Book Mgmt"} };
-    m_dictionary["MENU_READERS"] = { {Language::Vietnamese, "Quản Lý Độc Giả"}, {Language::Khmer, "គ្រប់គ្រងសិស្ស"}, {Language::English, "Reader Mgmt"} };
+    m_dictionary["MENU_READERS"] = { {Language::Vietnamese, "Quản Lý Học Viên"}, {Language::Khmer, "គ្រប់គ្រងសិស្ស"}, {Language::English, "Reader Mgmt"} };
     m_dictionary["MENU_LOANS"] = { {Language::Vietnamese, "Mượn Trả Sách"}, {Language::Khmer, "ខ្ចី-សងសៀវភៅ"}, {Language::English, "Loan/Return"} };
     m_dictionary["MENU_LOAN"] = { {Language::Vietnamese, "Mượn Trả Sách"}, {Language::Khmer, "ខ្ចី-សងសៀវភៅ"}, {Language::English, "Loan/Return"} }; // Alias for BangDieuKhien compatibility
     m_dictionary["MENU_USERS"] = { {Language::Vietnamese, "Quản Lý Người Dùng"}, {Language::Khmer, "អ្នកប្រើប្រាស់"}, {Language::English, "User Mgmt"} };
@@ -1156,12 +1156,12 @@ void LanguageManager::loadDictionary()
     
     // MainWindow - Buttons & Tooltips
     m_dictionary["BTN_MENU_BOOKS"] = { {Language::Vietnamese, "QUẢN LÝ SÁCH"}, {Language::Khmer, "គ្រប់គ្រងសៀវភៅ"}, {Language::English, "BOOK MGMT"} };
-    m_dictionary["BTN_MENU_READERS"] = { {Language::Vietnamese, "QUẢN LÝ ĐỘC GIẢ"}, {Language::Khmer, "គ្រប់គ្រងសិស្ស"}, {Language::English, "READER MGMT"} };
+    m_dictionary["BTN_MENU_READERS"] = { {Language::Vietnamese, "QUẢN LÝ HỌC VIÊN"}, {Language::Khmer, "គ្រប់គ្រងសៀវភៅ"}, {Language::English, "READER MGMT"} };
     m_dictionary["BTN_MENU_LOANS"] = { {Language::Vietnamese, "MƯỢN - TRẢ SÁCH"}, {Language::Khmer, "ខ្ចី - សងសៀវភៅ"}, {Language::English, "LOAN - RETURN"} };
     m_dictionary["BTN_MENU_TOP10"] = { {Language::Vietnamese, "TOP 10 SÁCH"}, {Language::Khmer, "សៀវភៅកំពូលទាំង ១០"}, {Language::English, "TOP 10 BOOKS"} };
     m_dictionary["BTN_MENU_STATS"] = { {Language::Vietnamese, "THỐNG KÊ HỆ THỐNG"}, {Language::Khmer, "ស្ថិតិប្រព័ន្ធ"}, {Language::English, "SYSTEM STATISTICS"} };
     m_dictionary["BTN_MENU_BACKUP"] = { {Language::Vietnamese, "SAO LƯU DỮ LIỆU"}, {Language::Khmer, "បម្រុងទុកទិន្នន័យ"}, {Language::English, "BACKUP DATA"} };
-    m_dictionary["BTN_MENU_OVERDUE"] = { {Language::Vietnamese, "ĐỘC GIẢ QUÁ HẠN"}, {Language::Khmer, "សិស្សហួសកំណត់"}, {Language::English, "OVERDUE READERS"} };
+    m_dictionary["BTN_MENU_OVERDUE"] = { {Language::Vietnamese, "HỌC VIÊN QUÁ HẠN"}, {Language::Khmer, "សិស្សហួសកំណត់"}, {Language::English, "OVERDUE READERS"} };
     m_dictionary["BTN_MENU_ABOUT"] = { {Language::Vietnamese, "THÔNG TIN"}, {Language::Khmer, "ព័ត៌មាន"}, {Language::English, "INFORMATION"} };
     m_dictionary["BTN_MENU_EXIT"] = { {Language::Vietnamese, "THOÁT"}, {Language::Khmer, "ចាកចេញ"}, {Language::English, "EXIT"} };
 
@@ -1173,7 +1173,7 @@ void LanguageManager::loadDictionary()
     m_dictionary["CARD_TITLE_OVERDUE_BOOKS"] = { {Language::Vietnamese, "Sách Quá Hạn"}, {Language::Khmer, "សៀវភៅហួសកំណត់"}, {Language::English, "Overdue Books"} };
     m_dictionary["CARD_TITLE_WARNING_CARDS"] = { {Language::Vietnamese, "Thẻ Cảnh Báo"}, {Language::Khmer, "ប័ណ្ណព្រមាន"}, {Language::English, "Warning Cards"} };
     m_dictionary["CARD_TITLE_TOTAL_BOOKS"] = { {Language::Vietnamese, "Tổng số sách"}, {Language::Khmer, "សៀវភៅសរុប"}, {Language::English, "Total Books"} };
-    m_dictionary["CARD_TITLE_TOTAL_READERS"] = { {Language::Vietnamese, "Số độc giả"}, {Language::Khmer, "ចំនួនសិស្ស"}, {Language::English, "Total Readers"} };
+    m_dictionary["CARD_TITLE_TOTAL_READERS"] = { {Language::Vietnamese, "Số học viên"}, {Language::Khmer, "ចំនួនសិស្ស"}, {Language::English, "Total Readers"} };
     m_dictionary["CARD_TITLE_BORROWED"] = { {Language::Vietnamese, "Sách đang mượn"}, {Language::Khmer, "សៀវភៅកំពុងខ្ចី"}, {Language::English, "Books Borrowed"} };
     m_dictionary["CARD_TITLE_VISITS"] = { {Language::Vietnamese, "Lượt truy cập hôm nay"}, {Language::Khmer, "ការចូលមើលថ្ងៃនេះ"}, {Language::English, "Visits Today"} };
     
@@ -1187,7 +1187,7 @@ void LanguageManager::loadDictionary()
 
     // Dashboard - Quick Buttons
     m_dictionary["BTN_QUICK_ADD_BOOK"] = { {Language::Vietnamese, "Thêm Sách Mới"}, {Language::Khmer, "បន្ថែមសៀវភៅថ្មី"}, {Language::English, "Add New Book"} };
-    m_dictionary["BTN_QUICK_ADD_READER"] = { {Language::Vietnamese, "Đăng Ký Độc Giả"}, {Language::Khmer, "ចុះឈ្មោះសិស្ស"}, {Language::English, "Register Reader"} };
+    m_dictionary["BTN_QUICK_ADD_READER"] = { {Language::Vietnamese, "Đăng Ký Học Viên"}, {Language::Khmer, "ចុះឈ្មោះសិស្ស"}, {Language::English, "Register Reader"} };
     m_dictionary["BTN_QUICK_CREATE_LOAN"] = { {Language::Vietnamese, "Tạo Phiếu Mượn"}, {Language::Khmer, "បង្កើតប័ណ្ណខ្ចី"}, {Language::English, "Create Loan Slip"} };
     m_dictionary["BTN_QUICK_BACKUP"] = { {Language::Vietnamese, "Sao Lưu Dữ Liệu"}, {Language::Khmer, "បម្រុងទុកទិន្នន័យ"}, {Language::English, "Backup Data"} };
     m_dictionary["BTN_QUICK_SYSTEM_INFO"] = { {Language::Vietnamese, "Thông Tin Hệ Thống"}, {Language::Khmer, "ព័ត៌មានប្រព័ន្ធ"}, {Language::English, "System Info"} };
@@ -1203,7 +1203,7 @@ void LanguageManager::loadDictionary()
     m_dictionary["BTN_CONFIRM_SCAN"] = { {Language::Vietnamese, "XÁC NHẬN"}, {Language::Khmer, "យល់ព្រម"}, {Language::English, "CONFIRM"} };
     m_dictionary["BTN_USE"] = { {Language::Vietnamese, "SỬ DỤNG"}, {Language::Khmer, "ប្រើប្រាស់"}, {Language::English, "USE"} };
     m_dictionary["MSG_FOUND_BOOK"] = { {Language::Vietnamese, "Tìm thấy sách: "}, {Language::Khmer, "រកឃើញសៀវភៅ: "}, {Language::English, "Found book: "} };
-    m_dictionary["MSG_FOUND_READER"] = { {Language::Vietnamese, "Tìm thấy độc giả: "}, {Language::Khmer, "រកឃើញសិស្ស: "}, {Language::English, "Found student: "} };
+    m_dictionary["MSG_FOUND_READER"] = { {Language::Vietnamese, "Tìm thấy học viên: "}, {Language::Khmer, "រកឃើញសិស្ស: "}, {Language::English, "Found student: "} };
     m_dictionary["STATUS_LOCKED_ICON"] = { {Language::Vietnamese, "Bị khóa"}, {Language::Khmer, "ត្រូវបានបិទ"}, {Language::English, "Locked"} };
     m_dictionary["STATUS_ACTIVE_ICON"] = { {Language::Vietnamese, "Hoạt động"}, {Language::Khmer, "សកម្ម"}, {Language::English, "Active"} };
     m_dictionary["STATUS_UNKNOWN_ICON"] = { {Language::Vietnamese, "Không xác định"}, {Language::Khmer, "មិនស្គាល់"}, {Language::English, "Unknown"} };
@@ -1211,7 +1211,7 @@ void LanguageManager::loadDictionary()
     m_dictionary["GENDER_FEMALE"] = { {Language::Vietnamese, "Nữ"}, {Language::Khmer, "ស្រី"}, {Language::English, "Female"} };
     m_dictionary["LBL_BORROWING_COUNT"] = { {Language::Vietnamese, "Số sách đang mượn:"}, {Language::Khmer, "ចំនួនសៀវភៅកំពុងខ្ចី:"}, {Language::English, "Books borrowing:"} };
     m_dictionary["TITLE_BOOK_INFO"] = { {Language::Vietnamese, "THÔNG TIN SÁCH"}, {Language::Khmer, "ព័ត៌មានសៀវភៅ"}, {Language::English, "BOOK INFORMATION"} };
-    m_dictionary["TITLE_READER_INFO"] = { {Language::Vietnamese, "THÔNG TIN ĐỘC GIẢ"}, {Language::Khmer, "ព័ត៌មានសិស្ស"}, {Language::English, "STUDENT INFORMATION"} };
+    m_dictionary["TITLE_READER_INFO"] = { {Language::Vietnamese, "THÔNG TIN HỌC VIÊN"}, {Language::Khmer, "ព័ត៌មានសិស្ស"}, {Language::English, "STUDENT INFORMATION"} };
     m_dictionary["LBL_AUTHOR"] = { {Language::Vietnamese, "Tác giả:"}, {Language::Khmer, "អ្នកនិពន្ធ:"}, {Language::English, "Author:"} };
     m_dictionary["LBL_CATEGORY"] = { {Language::Vietnamese, "Thể loại:"}, {Language::Khmer, "ប្រភេទ:"}, {Language::English, "Category:"} };
     m_dictionary["LBL_PUBLISH_YEAR"] = { {Language::Vietnamese, "Năm xuất bản:"}, {Language::Khmer, "ឆ្នាំបោះពុម្ព:"}, {Language::English, "Publish Year:"} };
@@ -1224,15 +1224,15 @@ void LanguageManager::loadDictionary()
     m_dictionary["MSG_RETURN_SUCCESS_ICON"] = { {Language::Vietnamese, "Đã trả sách thành công!"}, {Language::Khmer, "បានសងសៀវភៅជោគជ័យ!"}, {Language::English, "Return success!"} };
     m_dictionary["MSG_RETURN_ERROR_ICON"] = { {Language::Vietnamese, "Lỗi trả sách: "}, {Language::Khmer, "កំហុសសងសៀវភៅ: "}, {Language::English, "Return Error: "} };
     m_dictionary["TITLE_RETURN_SUCCESS_HTML"] = { {Language::Vietnamese, "TRẢ SÁCH THÀNH CÔNG"}, {Language::Khmer, "សងសៀវភៅជោគជ័យ"}, {Language::English, "RETURN SUCCESSFUL"} };
-    m_dictionary["LBL_RETURN_READER"] = { {Language::Vietnamese, "Độc giả:"}, {Language::Khmer, "សិស្ស:"}, {Language::English, "Student:"} };
+    m_dictionary["LBL_RETURN_READER"] = { {Language::Vietnamese, "Học viên:"}, {Language::Khmer, "សិស្ស:"}, {Language::English, "Student:"} };
     m_dictionary["LBL_RETURN_BOOK"] = { {Language::Vietnamese, "Sách:"}, {Language::Khmer, "សៀវភៅ:"}, {Language::English, "Book:"} };
     m_dictionary["LBL_RETURN_BOOK_CODE"] = { {Language::Vietnamese, "Mã sách:"}, {Language::Khmer, "កូដសៀវភៅ:"}, {Language::English, "Book Code:"} };
     m_dictionary["LBL_BORROW_DATE"] = { {Language::Vietnamese, "Ngày mượn:"}, {Language::Khmer, "ថ្ងៃខ្ចី:"}, {Language::English, "Borrow Date:"} };
     m_dictionary["LBL_RETURN_DATE"] = { {Language::Vietnamese, "Ngày trả:"}, {Language::Khmer, "ថ្ងៃសង:"}, {Language::English, "Return Date:"} };
-    m_dictionary["MSG_RETURN_SUCCESS_BODY"] = { {Language::Vietnamese, "Đã trả sách thành công!\n\nĐộc giả: %1\nSách: %2"}, {Language::Khmer, "បានសងសៀវភៅជោគជ័យ!\n\nសិស្ស: %1\nសៀវភៅ: %2"}, {Language::English, "Return successful!\n\nStudent: %1\nBook: %2"} };
+    m_dictionary["MSG_RETURN_SUCCESS_BODY"] = { {Language::Vietnamese, "Đã trả sách thành công!\n\nHọc viên: %1\nSách: %2"}, {Language::Khmer, "បានសងសៀវភៅជោគជ័យ!\n\nសិស្ស: %1\nសៀវភៅ: %2"}, {Language::English, "Return successful!\n\nStudent: %1\nBook: %2"} };
     m_dictionary["MSG_NO_CODE_SCANNED"] = { {Language::Vietnamese, "Chưa quét được mã nào!"}, {Language::Khmer, "មិនទាន់បានស្កេនកូដណាមួយទេ!"}, {Language::English, "No code scanned!"} };
-    m_dictionary["MSG_READER_LIST_EMPTY"] = { {Language::Vietnamese, "Danh sách độc giả trống!"}, {Language::Khmer, "បញ្ជីសិស្សទទេ!"}, {Language::English, "Reader list is empty!"} };
-    m_dictionary["MSG_ALL_READERS_QUEUED"] = { {Language::Vietnamese, "Tất cả độc giả đang hoạt động đã có trong hàng đợi!"}, {Language::Khmer, "សិស្សសកម្មទាំងអស់មាននៅក្នុងជួររង់ចាំរួចហើយ!"}, {Language::English, "All active students are already in queue!"} };
+    m_dictionary["MSG_READER_LIST_EMPTY"] = { {Language::Vietnamese, "Danh sách học viên trống!"}, {Language::Khmer, "បញ្ជីសិស្សទទេ!"}, {Language::English, "Reader list is empty!"} };
+    m_dictionary["MSG_ALL_READERS_QUEUED"] = { {Language::Vietnamese, "Tất cả học viên đang hoạt động đã có trong hàng đợi!"}, {Language::Khmer, "សិស្សសកម្មទាំងអស់មាននៅក្នុងជួររង់ចាំរួចហើយ!"}, {Language::English, "All active students are already in queue!"} };
     m_dictionary["TITLE_ADD"] = { {Language::Vietnamese, "Thêm"}, {Language::Khmer, "បន្ថែម"}, {Language::English, "Add"} }; // Ensure simple ADD title exists
     m_dictionary["MSG_ERROR_SEARCH_YEAR_RANGE"] = {
         {Language::Vietnamese, "Lỗi khi tìm kiếm theo khoảng năm!"},
@@ -1683,7 +1683,7 @@ void LanguageManager::loadDictionary()
         {Language::English, "LIBRARY PRINTING"}
     };
     m_dictionary["GROUP_READER_CARDS"] = {
-        {Language::Vietnamese, "THẺ ĐỘC GIẢ"},
+        {Language::Vietnamese, "THẺ HỌC VIÊN"},
         {Language::Khmer, "ប័ណ្ណអ្នកអាន"},
         {Language::English, "READER CARDS"}
     };
@@ -1723,7 +1723,7 @@ void LanguageManager::loadDictionary()
         {Language::English, "Print card for selected student"}
     };
     m_dictionary["DESC_PRINT_CARD_CURRENT"] = {
-        {Language::Vietnamese, "In thẻ đơn cho độc giả đang chọn"},
+        {Language::Vietnamese, "In thẻ đơn cho học viên đang chọn"},
         {Language::Khmer, "បោះពុម្ពប័ណ្ណតែមួយសម្រាប់អ្នកអានដែលបានជ្រើសរើស"},
         {Language::English, "Print single card for selected reader"}
     };
@@ -1733,7 +1733,7 @@ void LanguageManager::loadDictionary()
         {Language::English, "Batch Print"}
     };
     m_dictionary["DESC_PRINT_CARD_BATCH"] = {
-        {Language::Vietnamese, "Danh sách thẻ nhiều độc giả"},
+        {Language::Vietnamese, "Danh sách thẻ nhiều học viên"},
         {Language::Khmer, "បញ្ជីប័ណ្ណអ្នកអានជាច្រើន"},
         {Language::English, "List of multiple reader cards"}
     };
@@ -1758,12 +1758,12 @@ void LanguageManager::loadDictionary()
         {Language::English, "Print barcode stamp for books"}
     };
     m_dictionary["BTN_LIST_READERS"] = {
-        {Language::Vietnamese, "DS Độc Giả"},
+        {Language::Vietnamese, "DS Học Viên"},
         {Language::Khmer, "បញ្ជីអ្នកអាន"},
         {Language::English, "Reader List"}
     };
     m_dictionary["DESC_LIST_READERS"] = {
-        {Language::Vietnamese, "Danh sách toàn bộ độc giả"},
+        {Language::Vietnamese, "Danh sách toàn bộ học viên"},
         {Language::Khmer, "បញ្ជីអ្នកអានទាំងអស់"},
         {Language::English, "List of all readers"}
     };
@@ -1904,13 +1904,13 @@ void LanguageManager::loadDictionary()
         {Language::English, "No books in the system!"}
     };
     m_dictionary["MSG_READER_NO_BORROW"] = {
-        {Language::Vietnamese, "Độc giả này chưa mượn sách nào!"},
-        {Language::Khmer, "អ្នកអាននេះមិនទាន់បានខ្ចីសៀវភៅទេ!"},
+        {Language::Vietnamese, "Học viên này chưa mượn sách nào!"},
+        {Language::Khmer, "សិស្សនេះមិនទាន់បានខ្ចីសៀវភៅទេ!"},
         {Language::English, "This reader has not borrowed any books!"}
     };
     m_dictionary["MSG_READER_NO_RETURN"] = {
-        {Language::Vietnamese, "Độc giả này không có sách nào đang mượn để trả!"},
-        {Language::Khmer, "អ្នកអាននេះមិនមានសៀវភៅណាមួយកំពុងខ្ចីដើម្បីសងទេ!"},
+        {Language::Vietnamese, "Học viên này không có sách nào đang mượn để trả!"},
+        {Language::Khmer, "សិស្សនេះមិនមានសៀវភៅណាមួយកំពុងខ្ចីដើម្បីសងទេ!"},
         {Language::English, "This reader has no books to return!"}
     };
     m_dictionary["MSG_NO_BOOKS_TO_RETURN"] = {
@@ -1969,13 +1969,13 @@ void LanguageManager::loadDictionary()
         {Language::English, "Printer Config"}
     };
     m_dictionary["GROUP_READER_MGMT"] = {
-        {Language::Vietnamese, "QUẢN LÝ ĐỘC GIẢ (READER)"},
-        {Language::Khmer, "ការគ្រប់គ្រងអ្នកអាន (READER)"},
+        {Language::Vietnamese, "QUẢN LÝ HỌC VIÊN"},
+        {Language::Khmer, "ការគ្រប់គ្រងសិស្ស"},
         {Language::English, "READER MANAGEMENT"}
     };
     m_dictionary["BTN_PRINT_CARD_SINGLE"] = {
-        {Language::Vietnamese, "In Thẻ Độc Giả"},
-        {Language::Khmer, "បោះពុម្ពប័ណ្ណអ្នកអាន"},
+        {Language::Vietnamese, "In Thẻ Học Viên"},
+        {Language::Khmer, "បោះពុម្ពប័ណ្ណសិស្ស"},
         {Language::English, "Print Reader Card"}
     };
     m_dictionary["DESC_PRINT_CARD_SINGLE"] = {
@@ -2054,7 +2054,7 @@ void LanguageManager::loadDictionary()
         {Language::English, "REPORTS & STATISTICS"}
     };
     m_dictionary["BTN_REPORT_READER"] = {
-        {Language::Vietnamese, "Báo Cáo Độc Giả"},
+        {Language::Vietnamese, "Báo Cáo Học Viên"},
         {Language::Khmer, "របាយការណ៍អ្នកអាន"},
         {Language::English, "Reader Report"}
     };
@@ -2074,12 +2074,12 @@ void LanguageManager::loadDictionary()
         {Language::English, "Import/Export, Stock"}
     };
     m_dictionary["MSG_SELECT_AT_LEAST_ONE_READER"] = {
-        {Language::Vietnamese, "Vui lòng chọn ít nhất 1 độc giả từ danh sách để in hàng loạt."},
+        {Language::Vietnamese, "Vui lòng chọn ít nhất 1 học viên từ danh sách để in hàng loạt."},
         {Language::Khmer, "សូមជ្រើសរើសយ៉ាងហោចណាស់អ្នកអាន 1 នាក់ពីបញ្ជីដើម្បីបោះពុម្ពច្រើន។"},
         {Language::English, "Please select at least 1 reader from list for batch printing."}
     };
     m_dictionary["MSG_CONFIRM_PRINT_READERS_COUNT"] = {
-        {Language::Vietnamese, "Bạn có chắc muốn in thẻ cho %1 độc giả đã chọn?"},
+        {Language::Vietnamese, "Bạn có chắc muốn in thẻ cho %1 học viên đã chọn?"},
         {Language::Khmer, "តើអ្នកប្រាកដថាចង់បោះពុម្ពប័ណ្ណសម្រាប់អ្នកអាន %1 ដែលបានជ្រើសរើសទេ?"},
         {Language::English, "Are you sure you want to print cards for %1 selected readers?"}
     };
@@ -2099,7 +2099,7 @@ void LanguageManager::loadDictionary()
         {Language::English, "Batch stamp printing engine is updating. Currently printing first book in selection."}
     };
     m_dictionary["MSG_SELECT_READER_FROM_LIST"] = {
-        {Language::Vietnamese, "Vui lòng chọn độc giả từ danh sách."},
+        {Language::Vietnamese, "Vui lòng chọn học viên từ danh sách."},
         {Language::Khmer, "សូមជ្រើសរើសអ្នកអានពីបញ្ជី។"},
         {Language::English, "Please select a reader from the list."}
     };
@@ -2124,7 +2124,7 @@ void LanguageManager::loadDictionary()
         {Language::English, "Payment Info"}
     };
     m_dictionary["LBL_READER_NAME"] = {
-        {Language::Vietnamese, "Độc giả"},
+        {Language::Vietnamese, "Học viên"},
         {Language::Khmer, "អ្នកអាន"},
         {Language::English, "Reader"}
     };
@@ -2234,7 +2234,7 @@ void LanguageManager::loadDictionary()
         {Language::English, "Reported lost book!"}
     };
     m_dictionary["MSG_SELECT_READER_FIRST"] = {
-        {Language::Vietnamese, "Vui lòng chọn độc giả trước!"},
+        {Language::Vietnamese, "Vui lòng chọn học viên trước!"},
         {Language::Khmer, "សូមជ្រើសរើសអ្នកអានជាមុនសិន!"},
         {Language::English, "Please select a reader first!"}
     };
@@ -2294,12 +2294,12 @@ void LanguageManager::loadDictionary()
         {Language::English, "Please select book to pay!"}
     };
     m_dictionary["MSG_SCAN_READER_FIRST"] = {
-        {Language::Vietnamese, "Vui lòng quét thẻ độc giả trước!"},
+        {Language::Vietnamese, "Vui lòng quét thẻ học viên trước!"},
         {Language::Khmer, "សូមស្កេនប័ណ្ណអ្នកអានជាមុនសិន!"},
         {Language::English, "Please scan reader card first!"}
     };
     m_dictionary["MSG_SCAN_READER_NOT_FOUND"] = {
-        {Language::Vietnamese, "Không tìm thấy độc giả có mã thẻ: %1\n\nVui lòng kiểm tra lại mã thẻ!"},
+        {Language::Vietnamese, "Không tìm thấy học viên có mã thẻ: %1\n\nVui lòng kiểm tra lại mã thẻ!"},
         {Language::Khmer, "រកមិនឃើញអ្នកអានដែលមានលេខកូដប័ណ្ណ: %1\n\nសូមពិនិត្យមើលលេខកូដប័ណ្ណម្តងទៀត!"},
         {Language::English, "Reader not found with card code: %1\n\nPlease check card code again!"}
     };
@@ -2309,8 +2309,8 @@ void LanguageManager::loadDictionary()
         {Language::English, "CONFIRM LOST BOOK"}
     };
     m_dictionary["MSG_CONFIRM_LOST_BODY"] = {
-        {Language::Vietnamese, "BÁO MẤT SÁCH là thao tác NGHIÊM TRỌNG!\n\nMã: %1\nTên: %2\n\nCHI PHÍ ĐỀN BÙ:\n━━━━━━━━━━━━━━━━━━━━\nGiá sách: %3 VNĐ\nPhí phạt: %4 VNĐ\n━━━━━━━━━━━━━━━━━━━━\nTỔNG CỘNG: %5 VNĐ\n\nĐộc giả sẽ bị ghi nợ số tiền này.\n\nBạn có chắc chắn?"},
-        {Language::Khmer, "ការរាយការណ៍សៀវភៅបាត់គឺជាសកម្មភាពធ្ងន់ធ្ងរ!\n\nលេខកូដ: %1\nឈ្មោះ: %2\n\nតម្លៃសំណង:\n━━━━━━━━━━━━━━━━━━━━\nតម្លៃសៀវភៅ: %3 ៛\nប្រាក់ពិន័យ: %4 ៛\n━━━━━━━━━━━━━━━━━━━━\nសរុប: %5 ៛\n\nអ្នកអាននឹងត្រូវបានកត់ត្រាបំណុលនេះ។\n\nតើអ្នកប្រាកដទេ?"},
+        {Language::Vietnamese, "BÁO MẤT SÁCH là thao tác NGHIÊM TRỌNG!\n\nMã: %1\nTên: %2\n\nCHI PHÍ ĐỀN BÙ:\n━━━━━━━━━━━━━━━━━━━━\nGiá sách: %3 VNĐ\nPhí phạt: %4 VNĐ\n━━━━━━━━━━━━━━━━━━━━\nTỔNG CỘNG: %5 VNĐ\n\nHọc viên sẽ bị ghi nợ số tiền này.\n\nBạn có chắc chắn?"},
+        {Language::Khmer, "ការរាយការណ៍សៀវភៅបាត់គឺជាសកម្មភាពធ្ងន់ធ្ងរ!\n\nលេខកូដ: %1\nឈ្មោះ: %2\n\nតម្លៃសំណង:\n━━━━━━━━━━━━━━━━━━━━\nតម្លៃសៀវភៅ: %3 ៛\nប្រាក់ពិន័យ: %4 ៛\n━━━━━━━━━━━━━━━━━━━━\nសរុប: %5 ៛\n\nអ្នកអាននឹងត្រូវបានកត់ត្រាបំណុលនេះ।\n\nតើអ្នកប្រាកដទេ?"},
         {Language::English, "REPORTING LOST BOOK is SERIOUS!\n\nCode: %1\nName: %2\n\nCOMPENSATION COST:\n━━━━━━━━━━━━━━━━━━━━\nBook Price: %3\nFine Fee: %4\n━━━━━━━━━━━━━━━━━━━━\nTOTAL: %5\n\nReader will be charged this amount.\n\nAre you sure?"}
     };
     m_dictionary["MSG_LOST_RECORDED_TITLE"] = {
@@ -2319,7 +2319,7 @@ void LanguageManager::loadDictionary()
         {Language::English, "Lost Book Recorded"}
     };
     m_dictionary["MSG_LOST_RECORDED_BODY"] = {
-        {Language::Vietnamese, "Đã ghi nhận mất sách: %1\n\nCHI TIẾT ĐỀN BÙ:\n━━━━━━━━━━━━━━━━━━━━\nGiá sách: %2 VNĐ\nPhí phạt: %3 VNĐ\n━━━━━━━━━━━━━━━━━━━━\nTỔNG CỘNG: %4 VNĐ\n\nĐộc giả cần thanh toán khoản nợ này."},
+        {Language::Vietnamese, "Đã ghi nhận mất sách: %1\n\nCHI TIẾT ĐỀN BÙ:\n━━━━━━━━━━━━━━━━━━━━\nGiá sách: %2 VNĐ\nPhí phạt: %3 VNĐ\n━━━━━━━━━━━━━━━━━━━━\nTỔNG CỘNG: %4 VNĐ\n\nHọc viên cần thanh toán khoản nợ này."},
         {Language::Khmer, "បានកត់ត្រាការបាត់សៀវភៅ: %1\n\nព័ត៌មានលម្អិតអំពីសំណង:\n━━━━━━━━━━━━━━━━━━━━\nតម្លៃសៀវភៅ: %2 ៛\nប្រាក់ពិន័យ: %3 ៛\n━━━━━━━━━━━━━━━━━━━━\nសរុប: %4 ៛\n\nអ្នកអានត្រូវបង់បំណុលនេះ។"},
         {Language::English, "Recorded lost book: %1\n\nCOMPENSATION DETAILS:\n━━━━━━━━━━━━━━━━━━━━\nBook Price: %2\nFine Fee: %3\n━━━━━━━━━━━━━━━━━━━━\nTOTAL: %4\n\nReader needs to pay this debt."}
     };
@@ -2339,17 +2339,17 @@ void LanguageManager::loadDictionary()
         {Language::English, "This book has no fines to pay (or returned on time)."}
     };
     m_dictionary["MSG_TAB_HISTORY_PLACEHOLDER"] = {
-        {Language::Vietnamese, "Lịch Sử Mượn Trả\n\nChức năng xem lịch sử đang được phát triển...\n\nSẽ hiển thị:\n- Tất cả giao dịch mượn/trả\n- Lọc theo độc giả\n- Lọc theo thời gian\n- Trạng thái: Đang mượn / Đã trả / Mất"},
+        {Language::Vietnamese, "Lịch Sử Mượn Trả\n\nChức năng xem lịch sử đang được phát triển...\n\nSẽ hiển thị:\n- Tất cả giao dịch mượn/trả\n- Lọc theo học viên\n- Lọc theo thời gian\n- Trạng thái: Đang mượn / Đã trả / Mất"},
         {Language::Khmer, "ប្រវត្តិខ្ចី-សង\n\nមុខងារមើលប្រវត្តិកំពុងត្រូវបានអភិវឌ្ឍ...\n\nនឹងបង្ហាញ:\n- រាល់ប្រតិបត្តិការខ្ចី/សង\n- ត្រងតាមអ្នកអាន\n- ត្រងតាមពេលវេលា\n- ស្ថានភាព: កំពុងខ្ចី / បានសង / បាត់"},
         {Language::English, "Borrow/Return History\n\nHistory view is under development...\n\nWill show:\n- All borrow/return transactions\n- Filter by reader\n- Filter by time\n- Status: Borrowing / Returned / Lost"}
     };
     m_dictionary["LBL_TOTAL_READERS"] = {
-        {Language::Vietnamese, "Tổng: %1 độc giả"},
+        {Language::Vietnamese, "Tổng: %1 học viên"},
         {Language::Khmer, "សរុប: %1 អ្នកអាន"},
         {Language::English, "Total: %1 readers"}
     };
     m_dictionary["GROUP_READER_INFO"] = {
-        {Language::Vietnamese, "THÔNG TIN ĐỘC GIẢ"},
+        {Language::Vietnamese, "THÔNG TIN HỌC VIÊN"},
         {Language::Khmer, "ព័ត៌មានអ្នកអាន"},
         {Language::English, "READER INFO"}
     };
@@ -2531,9 +2531,10 @@ void LanguageManager::loadDictionary()
     };
 
     // ==================== ABOUT SCREEN ====================
+    m_dictionary["HEADER_SYSTEM_NAME"] = { {Language::Vietnamese, "HỆ THỐNG QUẢN LÝ THƯ VIỆN"}, {Language::Khmer, "ប្រព័ន្ធគ្រប់គ្រងបណ្ណាល័យ"}, {Language::English, "LIBRARY MANAGEMENT SYSTEM"} };
     m_dictionary["TITLE_ABOUT"] = { {Language::Vietnamese, "Về Hệ Thống"}, {Language::Khmer, "អំពីប្រព័ន្ធ"}, {Language::English, "About System"} };
-    m_dictionary["LBL_VERSION"] = { {Language::Vietnamese, "Phiên bản 2.0.0 Pro"}, {Language::Khmer, "កំណែ 2.0.0 Pro"}, {Language::English, "Version 2.0.0 Pro"} };
-    m_dictionary["LBL_BUILD_DATE"] = { {Language::Vietnamese, "Ngày phát hành: Tháng 12, 2025"}, {Language::Khmer, "កាលបរិច្ឆេទចេញផ្សាយ: ខែធ្នូ ឆ្នាំ 2025"}, {Language::English, "Release Date: December, 2025"} };
+    m_dictionary["LBL_VERSION"] = { {Language::Vietnamese, "Phiên bản 2.1 (Premium)"}, {Language::Khmer, "កំណែ 2.1 (Premium)"}, {Language::English, "Version 2.1 (Premium)"} };
+    m_dictionary["LBL_BUILD_DATE"] = { {Language::Vietnamese, "Ngày xây dựng: 20/12/2025"}, {Language::Khmer, "កាលបរិច្ឆេទសាងសង់: 20/12/2025"}, {Language::English, "Build Date: 20/12/2025"} };
     m_dictionary["MSG_ABOUT_FEATURES_HTML"] = { 
         {Language::Vietnamese, "<p style='color: #B5B5C3; font-size: 14px; line-height: 1.6;'><b> Tính năng nổi bật:</b></p><ul style='margin-left: 20px; color: #D1D3E0; line-height: 1.6;'><li> <b>Giao diện:</b> Dark Mode hiện đại, Responsive, Web-like Animations.</li><li> <b>Dữ liệu:</b> Cây AVL (Học viên), Danh sách liên kết (Mượn trả), Mảng (Sách).</li><li> <b>Báo cáo:</b> Xuất PDF, In ấn Tem/Thẻ chuyên nghiệp.</li><li> <b>Tiện ích:</b> Tự động sao lưu, tìm kiếm thông minh, phím tắt.</li></ul>"}, 
         {Language::Khmer, "<p style='color: #B5B5C3; font-size: 14px; line-height: 1.6;'><b> លក្ខណៈពិសេស:</b></p><ul style='margin-left: 20px; color: #D1D3E0; line-height: 1.6;'><li> <b>ចំណុចប្រទាក់:</b> Dark Mode ទំនើប, Responsive.</li><li> <b>ទិន្នន័យ:</b> AVL Tree (សិស្ស), Linked List (ខ្ចី-សង), Array (សៀវភៅ).</li><li> <b>របាយការណ៍:</b> នាំចេញ PDF, បោះពុម្ពត្រា/ប័ណ្ណអាជីព.</li><li> <b>ឧបករណ៍ប្រើប្រាស់:</b> បម្រុងទុកដោយស្វ័យប្រវត្តិ, ស្វែងរកឆ្លាតវៃ.</li></ul>"}, 
@@ -2545,9 +2546,9 @@ void LanguageManager::loadDictionary()
         {Language::English, "<p style='color: #B5B5C3; font-size: 14px; line-height: 1.6;'><b> Tech Stack:</b></p><p style='margin-left: 20px; color: #3699FF;'>C++17 • Qt 6.10 • Custom UI Framework</p>"} 
     };
     m_dictionary["MSG_ABOUT_CREDIT"] = { 
-        {Language::Vietnamese, "Được phát triển bởi: <b>Chăm Rốch Thi</b>"}, 
-        {Language::Khmer, "អភិវឌ្ឍដោយ: <b>Chăm Rốch Thi</b>"}, 
-        {Language::English, "Developed by: <b>Chăm Rốch Thi</b>"} 
+        {Language::Vietnamese, "Phát triển bởi: <b>Chăm Rốch Thi</b> @ 2025"}, 
+        {Language::Khmer, "អភិវឌ្ឍដោយ: <b>Chăm Rốch Thi</b> @ 2025"}, 
+        {Language::English, "Developed by: <b>Chăm Rốch Thi</b> @ 2025"} 
     };
 
     // ==================== ADD COPY SCREEN ====================
@@ -2707,18 +2708,26 @@ void LanguageManager::loadDictionary()
     // === ABOUT DIALOG ===
     m_dictionary["HEADER_SYSTEM_NAME"] = { {Language::Vietnamese, "HỆ THỐNG QUẢN LÝ THƯ VIỆN"}, {Language::Khmer, "ប្រព័ន្ធគ្រប់គ្រងបណ្ណាល័យ"}, {Language::English, "LIBRARY MANAGEMENT SYSTEM"} };
     m_dictionary["TITLE_ABOUT"] = { {Language::Vietnamese, "Về Hệ Thống"}, {Language::Khmer, "អំពីប្រព័ន្ធ"}, {Language::English, "About System"} };
-    m_dictionary["LBL_VERSION"] = { {Language::Vietnamese, "Phiên bản: 2.0 (Premium)"}, {Language::Khmer, "កំណែ: 2.0 (Premium)"}, {Language::English, "Version: 2.0 (Premium)"} };
-    m_dictionary["LBL_BUILD_DATE"] = { {Language::Vietnamese, "Ngày xây dựng: 15/12/2025"}, {Language::Khmer, "កាលបរិច្ឆេទសាងសង់: 15/12/2025"}, {Language::English, "Build Date: 15/12/2025"} };
-    m_dictionary["MSG_ABOUT_FEATURES_HTML"] = { {Language::Vietnamese, "<b>Tính năng nổi bật:</b><br>- Đa ngôn ngữ (Việt - Khmer - Anh)<br>- Quản lý sách, độc giả, mượn trả<br>- Báo cáo thống kê chi tiết"}, {Language::Khmer, "<b>លក្ខណៈពិសេស:</b><br>- ពហុភាសា (វៀតណាម - ខ្មែរ - អង់គ្លេស)<br>- គ្រប់គ្រងសៀវភៅ អ្នកអាន ការខ្ចី<br>- របាយការណ៍ស្ថិតិលម្អិត"}, {Language::English, "<b>Features:</b><br>- Multi-language (Viet - Khmer - Eng)<br>- Manage books, readers, loans<br>- Detailed reports"} };
-    m_dictionary["MSG_ABOUT_TECH_HTML"] = { {Language::Vietnamese, "<b>Công nghệ:</b><br>- Qt 6.8 C++ Framework<br>- SQLite Database<br>- Modern UI/UX Design"}, {Language::Khmer, "<b>បច្ចេកវិទ្យា:</b><br>- Qt 6.8 C++ Framework<br>- SQLite Database<br>- Modern UI/UX Design"}, {Language::English, "<b>Tech Stack:</b><br>- Qt 6.8 C++ Framework<br>- SQLite Database<br>- Modern UI/UX Design"} };
-    m_dictionary["MSG_ABOUT_CREDIT"] = { {Language::Vietnamese, "Phát triển bởi Team Dev @ 2025"}, {Language::Khmer, "បង្កើតដោយ Team Dev @ 2025"}, {Language::English, "Developed by Team Dev @ 2025"} };
+    m_dictionary["LBL_VERSION"] = { {Language::Vietnamese, "Phiên bản: 2.1 (Premium)"}, {Language::Khmer, "កំណែ: 2.1 (Premium)"}, {Language::English, "Version: 2.1 (Premium)"} };
+    m_dictionary["LBL_BUILD_DATE"] = { {Language::Vietnamese, "Ngày xây dựng: 20/12/2025"}, {Language::Khmer, "កាលបរិច្ឆេទសាងសង់: 20/12/2025"}, {Language::English, "Build Date: 20/12/2025"} };
+    m_dictionary["MSG_ABOUT_FEATURES_HTML"] = { 
+        {Language::Vietnamese, "<b>Tính năng tiêu biểu (Premium):</b><ul style='margin-left:15px;'><li><b>Tam Tạng:</b> Quản lý Luật - Kinh - Vi Diệu Pháp chuyên sâu.</li><li><b>Địa phương hóa:</b> Tích hợp Phật lịch (B.E.), Đa ngôn ngữ Việt - Khmer.</li><li><b>Dữ liệu:</b> Cây AVL (Tăng sinh), DSLK (Mượn trả), Mảng (Sách).</li><li><b>Tiện ích:</b> Tự động sao lưu, In ấn chuyên nghiệp, Xuất PDF.</li></ul>"}, 
+        {Language::Khmer, "<b>លក្ខណៈពិសេស (Premium):</b><ul style='margin-left:15px;'><li><b>ព្រះត្រៃបិដក:</b> គ្រប់គ្រង វិន័យ សុត្ត អភិធម្ម.</li><li><b>ការធ្វើមូលដ្ឋានីយកម្ម:</b> រួមបញ្ចូលពុទ្ធសករាជ (ព.ស).</li><li><b>ទិន្នន័យ:</b> Tree AVL (សមណៈសិស្ស), DSLK, Array.</li><li><b>ឧបករណ៍:</b> បម្រុងទុកដោយស្វ័យប្រវត្តិ, នាំចេញ PDF.</li></ul>"}, 
+        {Language::English, "<b>Premium Features:</b><ul style='margin-left:15px;'><li><b>Tripitaka:</b> Specialized Vinaya - Sutta - Abhidhamma management.</li><li><b>Localization:</b> Buddhist Era (B.E.) integration.</li><li><b>Data Structures:</b> AVL Tree (Monks), Linked List, Array.</li><li><b>Utilities:</b> Auto Backup, Professional Printing, PDF Export.</li></ul>"} 
+    };
+    m_dictionary["MSG_ABOUT_TECH_HTML"] = { 
+        {Language::Vietnamese, "<b>Công nghệ sử dụng:</b><br>- Qt 6.8 C++ Framework (LTS)<br>- SQLite Database System<br>- Modern UI/UX Design & Animations"}, 
+        {Language::Khmer, "<b>បច្ចេកវិទ្យាដែលបានប្រើ:</b><br>- Qt 6.8 C++ Framework (LTS)<br>- SQLite Database System<br>- Modern UI/UX Design & Animations"}, 
+        {Language::English, "<b>Tech Stack:</b><br>- Qt 6.8 C++ Framework (LTS)<br>- SQLite Database System<br>- Modern UI/UX Design & Animations"} 
+    };
+    m_dictionary["MSG_ABOUT_CREDIT"] = { {Language::Vietnamese, "Phát triển bởi Chăm Rốch Thi @ 2025"}, {Language::Khmer, "បង្កើតដោយ Chăm Rốch Thi @ 2025"}, {Language::English, "Developed by Chăm Rốch Thi @ 2025"} };
     
     // === STATISTICS DIALOG ===
     m_dictionary["DIALOG_STATS_TITLE"] = { {Language::Vietnamese, "Thống Kê Tổng Quan"}, {Language::Khmer, "ស្ថិតិទូទៅ"}, {Language::English, "General Statistics"} };
     m_dictionary["TITLE_STATS_HEADER"] = { {Language::Vietnamese, "BẢNG THỐNG KÊ HOẠT ĐỘNG"}, {Language::Khmer, "តារាងស្ថិតិសកម្មភាព"}, {Language::English, "ACTIVITY STATISTICS"} };
     m_dictionary["MSG_STATS_NOTE_HTML"] = { {Language::Vietnamese, "<b>Lưu ý:</b> Dữ liệu được cập nhật theo thời gian thực."}, {Language::Khmer, "<b>ចំណាំ:</b> ទិន្នន័យត្រូវបានធ្វើបច្ចុប្បន្នភាពតាមពេលវេលាជាក់ស្តែង។"}, {Language::English, "<b>Note:</b> Data is updated in real-time."} };
     m_dictionary["GROUP_STATS_BOOKS"] = { {Language::Vietnamese, "Thống Kê Sách"}, {Language::Khmer, "ស្ថិតិសៀវភៅ"}, {Language::English, "Book Stats"} };
-    m_dictionary["GROUP_STATS_READERS"] = { {Language::Vietnamese, "Thống Kê Độc Giả"}, {Language::Khmer, "ស្ថិតិអ្នកអាន"}, {Language::English, "Reader Stats"} };
+    m_dictionary["GROUP_STATS_READERS"] = { {Language::Vietnamese, "Thống Kê Học Viên"}, {Language::Khmer, "ស្ថិតិសិស្ស"}, {Language::English, "Reader Stats"} };
     
     m_dictionary["LBL_TOTAL_TITLES"] = { {Language::Vietnamese, "Tổng đầu sách:"}, {Language::Khmer, "ចំណងជើងសរុប:"}, {Language::English, "Total Titles:"} };
     m_dictionary["LBL_TOTAL_COPIES"] = { {Language::Vietnamese, "Tổng bản sao:"}, {Language::Khmer, "ច្បាប់ចម្លងសរុប:"}, {Language::English, "Total Copies:"} };
@@ -2728,7 +2737,7 @@ void LanguageManager::loadDictionary()
     m_dictionary["LBL_BORROW_RATE"] = { {Language::Vietnamese, "Tỷ lệ cho mượn:"}, {Language::Khmer, "អត្រាខ្ចី:"}, {Language::English, "Borrow Rate:"} };
     m_dictionary["LBL_TOTAL_CATEGORIES"] = { {Language::Vietnamese, "Số thể loại:"}, {Language::Khmer, "ចំនួនប្រភេទ:"}, {Language::English, "Categories:"} };
     
-    m_dictionary["LBL_TOTAL_READERS"] = { {Language::Vietnamese, "Tổng độc giả:"}, {Language::Khmer, "អ្នកអានសរុប:"}, {Language::English, "Total Readers:"} };
+    m_dictionary["LBL_TOTAL_READERS"] = { {Language::Vietnamese, "Tổng học viên:"}, {Language::Khmer, "សិស្សសរុប:"}, {Language::English, "Total Readers:"} };
     m_dictionary["LBL_ACTIVE_READERS"] = { {Language::Vietnamese, "Đang hoạt động:"}, {Language::Khmer, "កំពុងសកម្ម:"}, {Language::English, "Active:"} };
     m_dictionary["LBL_LOCKED_READERS"] = { {Language::Vietnamese, "Bị khóa:"}, {Language::Khmer, "ត្រូវបានចាក់សោ:"}, {Language::English, "Locked:"} };
     m_dictionary["LBL_READERS_BORROWING"] = { {Language::Vietnamese, "Đang mượn sách:"}, {Language::Khmer, "កំពុងខ្ចីសៀវភៅ:"}, {Language::English, "Borrowing:"} };
@@ -2746,9 +2755,9 @@ void LanguageManager::loadDictionary()
     m_dictionary["TAB_LOANS"] = { {Language::Vietnamese, "Mượn Trả"}, {Language::Khmer, "ខ្ចី/សង"}, {Language::English, "Loans"} };
     
     m_dictionary["BTN_APPLY_IMPORT"] = { {Language::Vietnamese, "Xác Nhận Import"}, {Language::Khmer, "បញ្ជាក់ការនាំចូល"}, {Language::English, "Confirm Import"} };
-    m_dictionary["OPTION_MERGE"] = { {Language::Vietnamese, "Gộp dữ liệu (Merge)"}, {Language::Khmer, "បញ្ចូលទិន្នន័យ (Merge)"}, {Language::English, "Merge Data"} };
-    m_dictionary["OPTION_REPLACE"] = { {Language::Vietnamese, "Thay thế (Replace)"}, {Language::Khmer, "ជំនួស (Replace)"}, {Language::English, "Replace"} };
-    m_dictionary["OPTION_SKIP"] = { {Language::Vietnamese, "Bỏ qua trùng lặp (Skip)"}, {Language::Khmer, "រំលងស្ទួន (Skip)"}, {Language::English, "Skip Duplicates"} };
+    m_dictionary["OPTION_MERGE"] = { {Language::Vietnamese, "Gộp dữ liệu"}, {Language::Khmer, "បញ្ចូលទិន្នន័យ (Merge)"}, {Language::English, "Merge Data"} };
+    m_dictionary["OPTION_REPLACE"] = { {Language::Vietnamese, "Thay thế"}, {Language::Khmer, "ជំនួស (Replace)"}, {Language::English, "Replace"} };
+    m_dictionary["OPTION_SKIP"] = { {Language::Vietnamese, "Bỏ qua trùng lặp"}, {Language::Khmer, "រំលងស្ទួន (Skip)"}, {Language::English, "Skip Duplicates"} };
     
     m_dictionary["DIALOG_IMPORT_MODE_TITLE"] = { {Language::Vietnamese, "Chế Độ Import"}, {Language::Khmer, "របៀបនាំចូល"}, {Language::English, "Import Mode"} };
     m_dictionary["MSG_IMPORT_SUCCESS"] = { {Language::Vietnamese, "Import dữ liệu hoàn tất!"}, {Language::Khmer, "ការនាំចូលទិន្នន័យបានបញ្ចប់!"}, {Language::English, "Import completed!"} };
@@ -2926,8 +2935,8 @@ void LanguageManager::loadDictionary()
         {Language::English, "Renew"}
     };
     m_dictionary["DASH_ACTION_LOG"] = {
-        {Language::Vietnamese, "Log"},
-        {Language::Khmer, "Log"},
+        {Language::Vietnamese, "Nhật ký"},
+        {Language::Khmer, "កំណត់ហេតុ"},
         {Language::English, "Log"}
     };
     m_dictionary["DASH_STATUS_BORROWING"] = {
@@ -2947,7 +2956,7 @@ void LanguageManager::loadDictionary()
     };
     m_dictionary["STATUS_LOST"] = {
         {Language::Vietnamese, "Báo Mất"},
-        {Language::Khmer, "រាយការណ៍ថាបាត់ (Lost)"},
+        {Language::Khmer, "រាយការណ៍ថាបាត់"},
         {Language::English, "Reported Lost"}
     };
     m_dictionary["REASON_PAY_FINE"] = {
@@ -2956,8 +2965,8 @@ void LanguageManager::loadDictionary()
         {Language::English, "Pay fine for book: %1"}
     };
     m_dictionary["DASH_READER_PREFIX"] = {
-        {Language::Vietnamese, "Độc giả: "},
-        {Language::Khmer, "អ្នកអាន: "},
+        {Language::Vietnamese, "Học viên: "},
+        {Language::Khmer, "សិស្ស: "},
         {Language::English, "Reader: "}
     };
     m_dictionary["DASH_PANEL_ALERTS"] = {
@@ -2981,8 +2990,8 @@ void LanguageManager::loadDictionary()
         {Language::English, "Scan Barcode"}
     };
     m_dictionary["DASH_DESC_SCAN"] = {
-        {Language::Vietnamese, "Quét sách/độc giả"},
-        {Language::Khmer, "ស្កេនសៀវភៅ/អ្នកអាន"},
+        {Language::Vietnamese, "Quét sách/học viên"},
+        {Language::Khmer, "ស្កេនសៀវភៅ/សិស្ស"},
         {Language::English, "Scan books/readers"}
     };
     m_dictionary["DASH_TASK_BACKUP"] = {
@@ -3080,15 +3089,15 @@ void LanguageManager::loadDictionary()
     m_dictionary["GENDER_MALE"] = { {Language::Vietnamese, "Nam"}, {Language::Khmer, "ប្រុស"}, {Language::English, "Male"} };
     m_dictionary["GENDER_FEMALE"] = { {Language::Vietnamese, "Nữ"}, {Language::Khmer, "ស្រី"}, {Language::English, "Female"} };
 
-    m_dictionary["MSG_NO_READER_SELECTED"] = { {Language::Vietnamese, "<i>(Chưa chọn độc giả)</i>"}, {Language::Khmer, "<i>(មិនទាន់ជ្រើសរើសសិស្ស)</i>"}, {Language::English, "<i>(No reader selected)</i>"} };
-    m_dictionary["MSG_SELECT_READER_FIRST"] = { {Language::Vietnamese, "Vui lòng chọn độc giả trước!"}, {Language::Khmer, "សូមជ្រើសរើសសិស្សជាមុនសិន!"}, {Language::English, "Please select a reader first!"} };
+    m_dictionary["MSG_NO_READER_SELECTED"] = { {Language::Vietnamese, "<i>(Chưa chọn học viên)</i>"}, {Language::Khmer, "<i>(មិនទាន់ជ្រើសរើសសិស្ស)</i>"}, {Language::English, "<i>(No reader selected)</i>"} };
+    m_dictionary["MSG_SELECT_READER_FIRST"] = { {Language::Vietnamese, "Vui lòng chọn học viên trước!"}, {Language::Khmer, "សូមជ្រើសរើសសិស្សជាមុនសិន!"}, {Language::English, "Please select a reader first!"} };
     m_dictionary["MSG_PLEASE_SELECT_RETURN_BOOK"] = { {Language::Vietnamese, "Vui lòng chọn sách cần trả!"}, {Language::Khmer, "សូមជ្រើសរើសសៀវភៅដែលត្រូវសង!"}, {Language::English, "Please select a book to return!"} };
     m_dictionary["MSG_INVALID_SELECTION"] = { {Language::Vietnamese, "Dữ liệu chọn không hợp lệ!"}, {Language::Khmer, "ទិន្នន័យដែលបានជ្រើសរើសមិនត្រឹមត្រូវ!"}, {Language::English, "Invalid selection data!"} };
     
     m_dictionary["TITLE_NOT_FOUND"] = { {Language::Vietnamese, "Không Tìm Thấy"}, {Language::Khmer, "រកមិនឃើញ"}, {Language::English, "Not Found"} };
     m_dictionary["MSG_LOAN_INFO_NOT_FOUND"] = { {Language::Vietnamese, "Không tìm thấy thông tin mượn cho: %1\n\n- Nếu nhập Mã Sách: Sách chưa được mượn hoặc mã sai.\n- Nếu nhập ISBN: Có thể không có ai mượn hoặc có nhiều người cùng mượn (vui lòng nhập mã cụ thể)."}, {Language::Khmer, "រកមិនឃើញព័ត៌មានខ្ចីសម្រាប់: %1"}, {Language::English, "Loan info not found for: %1"} };
     m_dictionary["TITLE_LOGIC_ERROR"] = { {Language::Vietnamese, "Lỗi Logic"}, {Language::Khmer, "កំហុសតក្កវិជ្ជា"}, {Language::English, "Logic Error"} };
-    m_dictionary["MSG_LOGIC_ERROR_CONTENT"] = { {Language::Vietnamese, "Tìm thấy độc giả %1 nhưng không tìm thấy sách %2 trong danh sách mượn (Sync Error?)"}, {Language::Khmer, "រកឃើញសិស្ស %1 ប៉ុន្តែរកមិនឃើញសៀវភៅ %2"}, {Language::English, "Found reader %1 but not book %2 in loan list"} };
+    m_dictionary["MSG_LOGIC_ERROR_CONTENT"] = { {Language::Vietnamese, "Tìm thấy học viên %1 nhưng không tìm thấy sách %2 trong danh sách mượn (Lỗi Đồng Bộ?)"}, {Language::Khmer, "រកឃើញសិស្ស %1 ប៉ុន្តែរកមិនឃើញសៀវភៅ %2"}, {Language::English, "Found reader %1 but not book %2 in loan list"} };
     
     m_dictionary["TITLE_CONFIRM_RETURN"] = { {Language::Vietnamese, "Xác Nhận Trả Sách"}, {Language::Khmer, "បញ្ជាក់ការសងសៀវភៅ"}, {Language::English, "Confirm Return"} };
     m_dictionary["MSG_CONFIRM_RETURN_BODY"] = { {Language::Vietnamese, "Xác nhận trả sách:\n\nMã: %1\nTên: %2%3"}, {Language::Khmer, "បញ្ជាក់ការសងសៀវភៅ:\n\nកូដ: %1\nឈ្មោះ: %2%3"}, {Language::English, "Confirm return:\n\nCode: %1\nTitle: %2%3"} };
@@ -3107,8 +3116,8 @@ void LanguageManager::loadDictionary()
         {Language::English, "Book"}
     };
     m_dictionary["DASH_SEARCH_TYPE_READER"] = {
-        {Language::Vietnamese, "Độc Giả"},
-        {Language::Khmer, "អ្នកអាន"},
+        {Language::Vietnamese, "Học Viên"},
+        {Language::Khmer, "សិស្ស"},
         {Language::English, "Reader"}
     };
     m_dictionary["DASH_SEARCH_HINT"] = {
@@ -3127,18 +3136,18 @@ void LanguageManager::loadDictionary()
         {Language::English, "Copied ISBN <b>%1</b>.<br>Please Paste (Ctrl+V) into the book search box."}
     };
     m_dictionary["DASH_NAV_COPY_READER"] = {
-        {Language::Vietnamese, "Đã copy Mã Thẻ <b>%1</b>.<br>Vui lòng Paste (Ctrl+V) vào ô tìm kiếm độc giả."},
-        {Language::Khmer, "បានចម្លងលេខកូដប័ណ្ណ <b>%1</b>។<br>សូមបិទភ្ជាប់ (Ctrl+V) ក្នុងប្រអប់ស្វែងរកអ្នកអាន។"},
+        {Language::Vietnamese, "Đã copy Mã Thẻ <b>%1</b>.<br>Vui lòng Paste (Ctrl+V) vào ô tìm kiếm học viên."},
+        {Language::Khmer, "បានចម្លងលេខកូដប័ណ្ណ <b>%1</b>។<br>សូមបិទភ្ជាប់ (Ctrl+V) ក្នុងប្រអប់ស្វែងរកសិស្ស។"},
         {Language::English, "Copied Reader ID <b>%1</b>.<br>Please Paste (Ctrl+V) into the reader search box."}
     };
     m_dictionary["TITLE_INPUT_CARD"] = {
-        {Language::Vietnamese, "Nhập Mã Thẻ Độc Giả"},
-        {Language::Khmer, "បញ្ចូលលេខកូដកាតអ្នកអាន"},
+        {Language::Vietnamese, "Nhập Mã Thẻ Học Viên"},
+        {Language::Khmer, "បញ្ចូលលេខកូដកាតសិស្ស"},
         {Language::English, "Enter Reader Card ID"}
     };
     m_dictionary["LBL_INPUT_CARD_PRINT"] = {
-        {Language::Vietnamese, "Mã thẻ độc giả cần in:"},
-        {Language::Khmer, "លេខកូដកាតអ្នកអានដែលត្រូវបោះពុម្ព:"},
+        {Language::Vietnamese, "Mã thẻ học viên cần in:"},
+        {Language::Khmer, "លេខកូដកាតសិស្សដែលត្រូវបោះពុម្ព:"},
         {Language::English, "Reader Card ID to print:"}
     };
     m_dictionary["TITLE_CONFIRM_BULK_PRINT"] = {
@@ -3147,8 +3156,8 @@ void LanguageManager::loadDictionary()
         {Language::English, "Confirm Bulk Print"}
     };
     m_dictionary["MSG_CONFIRM_BULK_PRINT_BODY"] = {
-        {Language::Vietnamese, "In thẻ cho TẤT CẢ độc giả trong hệ thống?\n\nQuá trình này có thể mất vài phút."},
-        {Language::Khmer, "បោះពុម្ពកាតសម្រាប់អ្នកអានទាំងអស់ក្នុងប្រព័ន្ធ?\n\nដំណើរការនេះអាចចំណាយពេលពីរបីនាទី។"},
+        {Language::Vietnamese, "In thẻ cho TẤT CẢ học viên trong hệ thống?\n\nQuá trình này có thể mất vài phút."},
+        {Language::Khmer, "បោះពុម្ពកាតសម្រាប់សិស្សទាំងអស់ក្នុងប្រព័ន្ធ?\n\nដំណើរការនេះអាចចំណាយពេលពីរបីនាទី។"},
         {Language::English, "Print cards for ALL readers in the system?\n\nThis process may take a few minutes."}
     };
     m_dictionary["TITLE_INPUT_ISBN"] = {
@@ -3177,13 +3186,13 @@ void LanguageManager::loadDictionary()
         {Language::English, "Number of stamps to print:"}
     };
     m_dictionary["MSG_NO_READER_SYSTEM"] = {
-        {Language::Vietnamese, "Không có độc giả nào trong hệ thống!"},
-        {Language::Khmer, "មិនមានអ្នកអាននៅក្នុងប្រព័ន្ធទេ!"},
+        {Language::Vietnamese, "Không có học viên nào trong hệ thống!"},
+        {Language::Khmer, "មិនមានសិស្សនៅក្នុងប្រព័ន្ធទេ!"},
         {Language::English, "No readers in the system!"}
     };
     m_dictionary["MSG_READER_NOT_FOUND"] = {
-        {Language::Vietnamese, "Không tìm thấy độc giả với mã thẻ: %1"},
-        {Language::Khmer, "រកមិនឃើញអ្នកអានដែលមានលេខកូដកាត: %1"},
+        {Language::Vietnamese, "Không tìm thấy học viên với mã thẻ: %1"},
+        {Language::Khmer, "រកមិនឃើញសិស្សដែលមានលេខកូដកាត: %1"},
         {Language::English, "Reader not found with card ID: %1"}
     };
     m_dictionary["MSG_BOOK_NOT_FOUND_ISBN"] = {
@@ -3197,23 +3206,23 @@ void LanguageManager::loadDictionary()
         {Language::English, "No books in the system!"}
     };
     m_dictionary["LBL_INPUT_CARD_LOAN"] = {
-        {Language::Vietnamese, "Mã thẻ độc giả có sách đang mượn:"},
-        {Language::Khmer, "លេខកូដកាតអ្នកអានដែលមានសៀវភៅកំពុងខ្ចី:"},
+        {Language::Vietnamese, "Mã thẻ học viên có sách đang mượn:"},
+        {Language::Khmer, "លេខកូដកាតសិស្សដែលមានសៀវភៅកំពុងខ្ចី:"},
         {Language::English, "Card ID of reader having borrowed books:"}
     };
     m_dictionary["LBL_INPUT_CARD_RETURN"] = {
-        {Language::Vietnamese, "Mã thẻ độc giả vừa trả sách:"},
-        {Language::Khmer, "លេខកូដកាតអ្នកអានដែលទើបតែសងសៀវភៅ:"},
+        {Language::Vietnamese, "Mã thẻ học viên vừa trả sách:"},
+        {Language::Khmer, "លេខកូដកាតសិស្សដែលទើបតែសងសៀវភៅ:"},
         {Language::English, "Card ID of reader who just returned books:"}
     };
     m_dictionary["MSG_READER_NO_LOAN"] = {
-        {Language::Vietnamese, "Độc giả này chưa mượn sách nào!"},
-        {Language::Khmer, "អ្នកអាននេះមិនទាន់បានខ្ចីសៀវភៅទេ!"},
+        {Language::Vietnamese, "Học viên này chưa mượn sách nào!"},
+        {Language::Khmer, "សិស្សនេះមិនទាន់បានខ្ចីសៀវភៅទេ!"},
         {Language::English, "This reader hasn't borrowed any books!"}
     };
     m_dictionary["MSG_RETURN_SUCCESS_PRINT"] = {
-        {Language::Vietnamese, "Đã xác nhận trả sách cho độc giả: %1 %2\nIn biên lai?"},
-        {Language::Khmer, "បានបញ្ជាក់ការសងសៀវភៅសម្រាប់អ្នកអាន: %1 %2\nបោះពុម្ពបង្កាន់ដៃ?"},
+        {Language::Vietnamese, "Đã xác nhận trả sách cho học viên: %1 %2\nIn biên lai?"},
+        {Language::Khmer, "បានបញ្ជាក់ការសងសៀវភៅសម្រាប់សិស្ស: %1 %2\nបោះពុម្ពបង្កាន់ដៃ?"},
         {Language::English, "Confirmed return for reader: %1 %2\nPrint receipt?"}
     };
     m_dictionary["LBL_CONFIG_BARCODE_TITLE"] = {
@@ -3297,16 +3306,29 @@ void LanguageManager::loadDictionary()
         {Language::English, "Report exported successfully!"}
     };
 
+    m_dictionary["TABLE_HEADER_PUBLISHER"] = { {Language::Vietnamese, "Nhà Xuất Bản"}, {Language::Khmer, "អ្នកបោះពុម្ព"}, {Language::English, "Publisher"} };
     // === READER MODULE ===
     m_dictionary["TABLE_HEADER_STT"] = { {Language::Vietnamese, "STT"}, {Language::Khmer, "ល.រ"}, {Language::English, "No."} };
     m_dictionary["TABLE_HEADER_BORROWED"] = { {Language::Vietnamese, "Sách Đang Mượn"}, {Language::Khmer, "សៀវភៅកំពុងខ្ចី"}, {Language::English, "Borrowed Books"} };
     m_dictionary["TABLE_HEADER_OVERDUE"] = { {Language::Vietnamese, "Quá Hạn"}, {Language::Khmer, "ហួសកំណត់"}, {Language::English, "Overdue"} };
     m_dictionary["TABLE_HEADER_TOTAL_LOAN"] = { {Language::Vietnamese, "Tổng Mượn"}, {Language::Khmer, "សរុបការខ្ចី"}, {Language::English, "Total Loans"} };
+    m_dictionary["TABLE_HEADER_CODE"] = { {Language::Vietnamese, "Mã Thẻ"}, {Language::Khmer, "លេខកូដ"}, {Language::English, "Card ID"} };
+    m_dictionary["TABLE_HEADER_LASTNAME"] = { {Language::Vietnamese, "Họ Đệm"}, {Language::Khmer, "នាមត្រកូល"}, {Language::English, "Last Name"} };
+    m_dictionary["TABLE_HEADER_FIRSTNAME"] = { {Language::Vietnamese, "Tên"}, {Language::Khmer, "ឈ្មោះ"}, {Language::English, "First Name"} };
+    m_dictionary["TABLE_HEADER_CLASS"] = { {Language::Vietnamese, "Lớp"}, {Language::Khmer, "ថ្នាក់"}, {Language::English, "Class"} };
+    m_dictionary["TABLE_HEADER_PHONE"] = { {Language::Vietnamese, "SĐT"}, {Language::Khmer, "ទូរស័ព្ទ"}, {Language::English, "Phone"} };
+    m_dictionary["TABLE_HEADER_STATUS"] = { {Language::Vietnamese, "Trạng Thái"}, {Language::Khmer, "ស្ថានភាព"}, {Language::English, "Status"} };
+    m_dictionary["TABLE_HEADER_GENDER"] = { {Language::Vietnamese, "Giới Tính"}, {Language::Khmer, "ភេទ"}, {Language::English, "Gender"} };
+    m_dictionary["TABLE_HEADER_BOOKS"] = { {Language::Vietnamese, "Sách"}, {Language::Khmer, "សៀវភៅ"}, {Language::English, "Books"} };
+    m_dictionary["TABLE_HEADER_BOOK_CODE"] = { {Language::Vietnamese, "Mã Sách"}, {Language::Khmer, "លេខកូដសៀវភៅ"}, {Language::English, "Book Code"} };
+    m_dictionary["TABLE_HEADER_DATE_BORROW"] = { {Language::Vietnamese, "Ngày Mượn"}, {Language::Khmer, "ថ្ងៃខ្ចី"}, {Language::English, "Borrow Date"} };
+    m_dictionary["GENDER_MALE"] = { {Language::Vietnamese, "Nam"}, {Language::Khmer, "ប្រុស"}, {Language::English, "Male"} };
+    m_dictionary["GENDER_FEMALE"] = { {Language::Vietnamese, "Nữ"}, {Language::Khmer, "ស្រី"}, {Language::English, "Female"} };
 
     m_dictionary["LBL_DAYS_COUNT"] = { {Language::Vietnamese, "%1 ngày"}, {Language::Khmer, "%1 ថ្ងៃ"}, {Language::English, "%1 days"} };
-    m_dictionary["LBL_HINT_READER_DBLCLICK"] = { {Language::Vietnamese, "Mẹo: Nhấp đúp vào độc giả để xem chi tiết & in thẻ"}, {Language::Khmer, "គន្លឹះ: ចុចពីរដងលើអ្នកអានដើម្បីមើលព័ត៌មានលម្អិត និងបោះពុម្ពកាត"}, {Language::English, "Tip: Double-click reader to view details & print card"} };
+    m_dictionary["LBL_HINT_READER_DBLCLICK"] = { {Language::Vietnamese, "Mẹo: Nhấp đúp vào học viên để xem chi tiết & in thẻ"}, {Language::Khmer, "គន្លឹះ: ចុចពីរដងលើសិស្សដើម្បីមើលព័ត៌មានលម្អិត និងបោះពុម្ពកាត"}, {Language::English, "Tip: Double-click reader to view details & print card"} };
 
-    m_dictionary["BTN_ADD_READER"] = { {Language::Vietnamese, "Thêm Độc Giả"}, {Language::Khmer, "បន្ថែមអ្នកអាន"}, {Language::English, "Add Reader"} };
+    m_dictionary["BTN_ADD_READER"] = { {Language::Vietnamese, "Thêm Học Viên"}, {Language::Khmer, "បន្ថែមសិស្ស"}, {Language::English, "Add Reader"} };
     m_dictionary["BTN_IMPORT_EXCEL"] = { {Language::Vietnamese, "Nhập Excel"}, {Language::Khmer, "នាំចូល Excel"}, {Language::English, "Import Excel"} };
     m_dictionary["BTN_DETAILS"] = { {Language::Vietnamese, "Chi Tiết"}, {Language::Khmer, "លម្អិត"}, {Language::English, "Details"} };
     m_dictionary["BTN_LOCK_CARD"] = { {Language::Vietnamese, "Khóa Thẻ"}, {Language::Khmer, "បិទកាត"}, {Language::English, "Lock Card"} };
@@ -3314,37 +3336,37 @@ void LanguageManager::loadDictionary()
     m_dictionary["BTN_HISTORY"] = { {Language::Vietnamese, "Lịch Sử"}, {Language::Khmer, "ប្រវត្តិ"}, {Language::English, "History"} };
     
     m_dictionary["CTX_VIEW_DETAILS"] = { {Language::Vietnamese, "Xem Chi Tiết"}, {Language::Khmer, "មើលលម្អិត"}, {Language::English, "View Details"} };
-    m_dictionary["CTX_EDIT_READER"] = { {Language::Vietnamese, "Sửa Độc Giả"}, {Language::Khmer, "កែសម្រួលអ្នកអាន"}, {Language::English, "Edit Reader"} };
+    m_dictionary["CTX_EDIT_READER"] = { {Language::Vietnamese, "Sửa Học Viên"}, {Language::Khmer, "កែសម្រួលសិស្ស"}, {Language::English, "Edit Reader"} };
     m_dictionary["CTX_PRINT_CARD"] = { {Language::Vietnamese, "In Thẻ TV"}, {Language::Khmer, "បោះពុម្ពកាត"}, {Language::English, "Print Card"} };
-    m_dictionary["CTX_DELETE_READER"] = { {Language::Vietnamese, "Xóa Độc Giả"}, {Language::Khmer, "លុបអ្នកអាន"}, {Language::English, "Delete Reader"} };
+    m_dictionary["CTX_DELETE_READER"] = { {Language::Vietnamese, "Xóa Học Viên"}, {Language::Khmer, "លុបសិស្ស"}, {Language::English, "Delete Reader"} };
 
     m_dictionary["PLACEHOLDER_SEARCH_READER_FULL"] = { {Language::Vietnamese, "Nhập mã thẻ, họ, tên..."}, {Language::Khmer, "បញ្ចូលលេខកូដកាត នាមត្រកូល ឈ្មោះ..."}, {Language::English, "Enter ID, Last Name, First Name..."} };
     m_dictionary["FILTER_ALL_GENDER"] = { {Language::Vietnamese, "Tất cả giới tính"}, {Language::Khmer, "ភេទទាំងអស់"}, {Language::English, "All Genders"} };
     
     m_dictionary["MSG_CANNOT_DELETE"] = { {Language::Vietnamese, "Không Thể Xóa"}, {Language::Khmer, "មិនអាចលុបបាន"}, {Language::English, "Cannot Delete"} };
-    m_dictionary["MSG_CANNOT_DELETE_HAS_BOOKS"] = { {Language::Vietnamese, "Không thể xóa độc giả này!\n\nĐộc giả đang mượn %1 cuốn sách.\nVui lòng trả hết sách trước khi xóa."}, {Language::Khmer, "មិនអាចលុបអ្នកអាននេះបានទេ!\n\nអ្នកអានកំពុងខ្ចីសៀវភៅ %1 ក្បាល។\nសូមសងសៀវភៅទាំងអស់មុនពេលលុប។"}, {Language::English, "Cannot delete this reader!\n\nReader is borrowing %1 books.\nPlease return all books before deleting."} };
+    m_dictionary["MSG_CANNOT_DELETE_HAS_BOOKS"] = { {Language::Vietnamese, "Không thể xóa học viên này!\n\nHọc viên đang mượn %1 cuốn sách.\nVui lòng trả hết sách trước khi xóa."}, {Language::Khmer, "មិនអាចលុបសិស្សនេះបានទេ!\n\nសិស្សកំពុងខ្ចីសៀវភៅ %1 ក្បាល។\nសូមសងសៀវភៅទាំងអស់មុនពេលលុប។"}, {Language::English, "Cannot delete this reader!\n\nReader is borrowing %1 books.\nPlease return all books before deleting."} };
     m_dictionary["MSG_DELETE_CONFIRM_DETAILS"] = { {Language::Vietnamese, "Họ tên: %1 %2\nMã thẻ: %3\nTrạng thái: %4\nGiới tính: %5\n\nSố sách đang mượn: %6"}, {Language::Khmer, "ឈ្មោះ: %1 %2\nលេខកូដ: %3\nស្ថានភាព: %4\nភេទ: %5\n\nសៀវភៅកំពុងខ្ចី: %6"}, {Language::English, "Name: %1 %2\nID: %3\nStatus: %4\nGender: %5\n\nBorrowed Books: %6"} };
-    m_dictionary["MSG_ALREADY_LOCKED"] = { {Language::Vietnamese, "Thẻ độc giả này đã bị khóa rồi!"}, {Language::Khmer, "កាតអ្នកអាននេះត្រូវបានបិទហើយ!"}, {Language::English, "This reader card is already locked!"} };
+    m_dictionary["MSG_ALREADY_LOCKED"] = { {Language::Vietnamese, "Thẻ học viên này đã bị khóa rồi!"}, {Language::Khmer, "កាតសិស្សនេះត្រូវបានបិទហើយ!"}, {Language::English, "This reader card is already locked!"} };
     m_dictionary["TITLE_CONFIRM_LOCK"] = { {Language::Vietnamese, "Xác Nhận Khóa Thẻ"}, {Language::Khmer, "បញ្ជាក់ការបិទកាត"}, {Language::English, "Confirm Lock Card"} };
-    m_dictionary["MSG_CONFIRM_LOCK"] = { {Language::Vietnamese, "Bạn có chắc muốn khóa thẻ độc giả:\n%1 %2 (Mã: %3)?\n\nĐộc giả sẽ không thể mượn sách sau khi bị khóa."}, {Language::Khmer, "តើអ្នកពិតជាចង់បិទកាតអ្នកអាន:\n%1 %2 (លេខកូដ: %3)?\n\nអ្នកអាននឹងមិនអាចខ្ចីសៀវភៅបានទេបន្ទាប់ពីបិទ។"}, {Language::English, "Are you sure you want to lock reader card:\n%1 %2 (ID: %3)?\n\nReader cannot borrow books after locking."} };
-    m_dictionary["MSG_LOCK_SUCCESS"] = { {Language::Vietnamese, "Đã khóa thẻ độc giả!"}, {Language::Khmer, "បានបិទកាតអ្នកអាន!"}, {Language::English, "Reader card locked!"} };
-    m_dictionary["MSG_ALREADY_ACTIVE"] = { {Language::Vietnamese, "Thẻ độc giả này đang hoạt động bình thường!"}, {Language::Khmer, "កាតអ្នកអាននេះកំពុងដំណើរការធម្មតា!"}, {Language::English, "This reader card is active!"} };
+    m_dictionary["MSG_CONFIRM_LOCK"] = { {Language::Vietnamese, "Bạn có chắc muốn khóa thẻ học viên:\n%1 %2 (Mã: %3)?\n\nHọc viên sẽ không thể mượn sách sau khi bị khóa."}, {Language::Khmer, "តើអ្នកពិតជាចង់បិទកាតសិស្ស:\n%1 %2 (លេខកូដ: %3)?\n\nសិស្សនឹងមិនអាចខ្ចីសៀវភៅបានទេបន្ទាប់ពីបិទ។"}, {Language::English, "Are you sure you want to lock reader card:\n%1 %2 (ID: %3)?\n\nReader cannot borrow books after locking."} };
+    m_dictionary["MSG_LOCK_SUCCESS"] = { {Language::Vietnamese, "Đã khóa thẻ học viên!"}, {Language::Khmer, "បានបិទកាតសិស្ស!"}, {Language::English, "Reader card locked!"} };
+    m_dictionary["MSG_ALREADY_ACTIVE"] = { {Language::Vietnamese, "Thẻ học viên này đang hoạt động bình thường!"}, {Language::Khmer, "កាតសិស្សនេះកំពុងដំណើរការធម្មតា!"}, {Language::English, "This reader card is active!"} };
     m_dictionary["TITLE_CONFIRM_UNLOCK"] = { {Language::Vietnamese, "Xác Nhận Mở Khóa"}, {Language::Khmer, "បញ្ជាក់ការបើកកាត"}, {Language::English, "Confirm Unlock Card"} };
-    m_dictionary["MSG_CONFIRM_UNLOCK"] = { {Language::Vietnamese, "Bạn có chắc muốn mở khóa thẻ độc giả:\n%1 %2 (Mã: %3)?"}, {Language::Khmer, "តើអ្នកពិតជាចង់បើកកាតអ្នកអាន:\n%1 %2 (លេខកូដ: %3)?"}, {Language::English, "Are you sure you want to unlock reader card:\n%1 %2 (ID: %3)?"} };
-    m_dictionary["MSG_UNLOCK_SUCCESS"] = { {Language::Vietnamese, "Đã mở khóa thẻ độc giả!"}, {Language::Khmer, "បានបើកកាតអ្នកអាន!"}, {Language::English, "Reader card unlocked!"} };
+    m_dictionary["MSG_CONFIRM_UNLOCK"] = { {Language::Vietnamese, "Bạn có chắc muốn mở khóa thẻ học viên:\n%1 %2 (Mã: %3)?"}, {Language::Khmer, "តើអ្នកពិតជាចង់បើកកាតសិស្ស:\n%1 %2 (លេខកូដ: %3)?"}, {Language::English, "Are you sure you want to unlock reader card:\n%1 %2 (ID: %3)?"} };
+    m_dictionary["MSG_UNLOCK_SUCCESS"] = { {Language::Vietnamese, "Đã mở khóa thẻ học viên!"}, {Language::Khmer, "បានបើកកាតសិស្ស!"}, {Language::English, "Reader card unlocked!"} };
     
     m_dictionary["TITLE_HISTORY"] = { {Language::Vietnamese, "Lịch Sử"}, {Language::Khmer, "ប្រវត្តិ"}, {Language::English, "History"} };
     m_dictionary["MSG_FEATURE_DEVELOPING"] = { {Language::Vietnamese, "Chức năng xem lịch sử đang được phát triển..."}, {Language::Khmer, "មុខងារនេះកំពុងត្រូវបានអភិវឌ្ឍ..."}, {Language::English, "History feature is under development..."} };
     
-    m_dictionary["MSG_READER_BORROWING_INFO"] = { {Language::Vietnamese, "Độc giả %1 %2 đang mượn %3 cuốn sách.\n\nChức năng xem chi tiết đang được phát triển..."}, {Language::Khmer, "អ្នកអាន %1 %2 កំពុងខ្ចីសៀវភៅ %3 ក្បាល។\n\nមុខងារនេះកំពុងត្រូវបានអភិវឌ្ឍ..."}, {Language::English, "Reader %1 %2 is borrowing %3 books.\n\nDetail feature is under development..."} };
+    m_dictionary["MSG_READER_BORROWING_INFO"] = { {Language::Vietnamese, "Học viên %1 %2 đang mượn %3 cuốn sách.\n\nChức năng xem chi tiết đang được phát triển..."}, {Language::Khmer, "សិស្ស %1 %2 កំពុងខ្ចីសៀវភៅ %3 ក្បាល។\n\nមុខងារនេះកំពុងត្រូវបានអភិវឌ្ឍ..."}, {Language::English, "Reader %1 %2 is borrowing %3 books.\n\nDetail feature is under development..."} };
     m_dictionary["MSG_SELECTED_READER"] = { {Language::Vietnamese, "Đã chọn: %1 %2 (Mã: %3)"}, {Language::Khmer, "បានជ្រើសរើស: %1 %2 (លេខកូដ: %3)"}, {Language::English, "Selected: %1 %2 (ID: %3)"} };
-    m_dictionary["MSG_LOADED_READERS"] = { {Language::Vietnamese, "Đã tải %1 độc giả"}, {Language::Khmer, "បានផ្ទុកអ្នកអាន %1"}, {Language::English, "Loaded %1 readers"} };
+    m_dictionary["MSG_LOADED_READERS"] = { {Language::Vietnamese, "Đã tải %1 học viên"}, {Language::Khmer, "បានផ្ទុកសិស្ស %1"}, {Language::English, "Loaded %1 readers"} };
     
     m_dictionary["TITLE_SELECT_EXCEL"] = { {Language::Vietnamese, "Chọn file Excel để nhập"}, {Language::Khmer, "ជ្រើសរើសឯកសារ Excel"}, {Language::English, "Select Excel file to import"} };
     m_dictionary["MSG_PROCESSING_EXCEL"] = { {Language::Vietnamese, "Đang xử lý tập tin Excel..."}, {Language::Khmer, "កំពុងដំណើរការឯកសារ Excel..."}, {Language::English, "Processing Excel file..."} };
-    m_dictionary["MSG_ADD_READER_SUCCESS"] = { {Language::Vietnamese, "Đã thêm độc giả mới thành công!"}, {Language::Khmer, "បានបន្ថែមអ្នកអានថ្មីដោយជោគជ័យ!"}, {Language::English, "New reader added successfully!"} };
-    m_dictionary["MSG_UPDATE_READER_SUCCESS"] = { {Language::Vietnamese, "Đã cập nhật thông tin độc giả!"}, {Language::Khmer, "បានធ្វើបច្ចុប្បន្នភាពព័ត៌មានអ្នកអាន!"}, {Language::English, "Reader info updated!"} };
-    m_dictionary["MSG_DELETE_SUCCESS"] = { {Language::Vietnamese, "Đã xóa độc giả thành công!"}, {Language::Khmer, "បានលុបអ្នកអានដោយជោគជ័យ!"}, {Language::English, "Reader deleted successfully!"} };
+    m_dictionary["MSG_ADD_READER_SUCCESS"] = { {Language::Vietnamese, "Đã thêm học viên mới thành công!"}, {Language::Khmer, "បានបន្ថែមសិស្សថ្មីដោយជោគជ័យ!"}, {Language::English, "New reader added successfully!"} };
+    m_dictionary["MSG_UPDATE_READER_SUCCESS"] = { {Language::Vietnamese, "Đã cập nhật thông tin học viên!"}, {Language::Khmer, "បានធ្វើបច្ចុប្បន្នភាពព័ត៌មានសិស្ស!"}, {Language::English, "Reader info updated!"} };
+    m_dictionary["MSG_DELETE_SUCCESS"] = { {Language::Vietnamese, "Đã xóa học viên thành công!"}, {Language::Khmer, "បានលុបសិស្សដោយជោគជ័យ!"}, {Language::English, "Reader deleted successfully!"} };
     m_dictionary["TITLE_WARNING"] = { {Language::Vietnamese, "Cảnh Báo"}, {Language::Khmer, "ការព្រមាន"}, {Language::English, "Warning"} };
     m_dictionary["TITLE_INFO"] = { {Language::Vietnamese, "Thông Báo"}, {Language::Khmer, "ជូនដំណឹង"}, {Language::English, "Information"} };
     m_dictionary["FILTER_ALL"] = { {Language::Vietnamese, "Tất cả"}, {Language::Khmer, "ទាំងអស់"}, {Language::English, "All"} };
@@ -3360,6 +3382,8 @@ void LanguageManager::loadDictionary()
     m_dictionary["TABLE_HEADER_YEAR"] = { {Language::Vietnamese, "Năm XB"}, {Language::Khmer, "ឆ្នាំ"}, {Language::English, "Year"} };
     m_dictionary["TABLE_HEADER_PAGES"] = { {Language::Vietnamese, "Số Trang"}, {Language::Khmer, "ទំព័រ"}, {Language::English, "Pages"} };
     m_dictionary["TABLE_HEADER_ACTIONS"] = { {Language::Vietnamese, "Thao Tác"}, {Language::Khmer, "សកម្មភាព"}, {Language::English, "Actions"} };
+    m_dictionary["TABLE_HEADER_LOCATION"] = { {Language::Vietnamese, "Vị Trí"}, {Language::Khmer, "ទីតាំង"}, {Language::English, "Location"} };
+    m_dictionary["TABLE_HEADER_PRICE"] = { {Language::Vietnamese, "Giá Tiền"}, {Language::Khmer, "តម្លៃ"}, {Language::English, "Price"} };
 
     m_dictionary["BTN_ADD_BOOK"] = { {Language::Vietnamese, "Thêm Sách"}, {Language::Khmer, "បន្ថែមសៀវភៅ"}, {Language::English, "Add Book"} };
     m_dictionary["BTN_IMPORT"] = { {Language::Vietnamese, "Nhập Excel"}, {Language::Khmer, "នាំចូល Excel"}, {Language::English, "Import Excel"} };
@@ -3434,30 +3458,30 @@ void LanguageManager::loadDictionary()
     m_dictionary["MSG_ERROR_UPDATE_FAILED"] = { {Language::Vietnamese, "Cập nhật thất bại"}, {Language::Khmer, "ការធ្វើបច្ចុប្បន្នភាពបរាជ័យ"}, {Language::English, "Update failed"} };
     
     // === DIALOG READER VALIDATION ===
-    m_dictionary["DIALOG_ADD_READER_TITLE"] = { {Language::Vietnamese, "Thêm Độc Giả Mới"}, {Language::Khmer, "បន្ថែមអ្នកអានថ្មី"}, {Language::English, "Add New Reader"} };
-    m_dictionary["DIALOG_EDIT_READER_TITLE"] = { {Language::Vietnamese, "Sửa Thông Tin Độc Giả"}, {Language::Khmer, "កែសម្រួលព័ត៌មានអ្នកអាន"}, {Language::English, "Edit Reader Info"} };
-    m_dictionary["GROUP_READER_CODE"] = { {Language::Vietnamese, "Mã Thẻ Độc Giả"}, {Language::Khmer, "លេខកូដកាតអ្នកអាន"}, {Language::English, "Reader ID Card"} };
-    m_dictionary["GROUP_READER_INFO"] = { {Language::Vietnamese, "Thông Tin Độc Giả"}, {Language::Khmer, "ព័ត៌មានអ្នកអាន"}, {Language::English, "Reader Information"} };
+    m_dictionary["DIALOG_ADD_READER_TITLE"] = { {Language::Vietnamese, "Thêm Học Viên Mới"}, {Language::Khmer, "បន្ថែមសិស្សថ្មី"}, {Language::English, "Add New Reader"} };
+    m_dictionary["DIALOG_EDIT_READER_TITLE"] = { {Language::Vietnamese, "Sửa Thông Tin Học Viên"}, {Language::Khmer, "កែសម្រួលព័ត៌មានសិស្ស"}, {Language::English, "Edit Reader Info"} };
+    m_dictionary["GROUP_READER_CODE"] = { {Language::Vietnamese, "Mã Thẻ Học Viên"}, {Language::Khmer, "លេខកូដកាតសិស្ស"}, {Language::English, "Reader ID Card"} };
+    m_dictionary["GROUP_READER_INFO"] = { {Language::Vietnamese, "Thông Tin Học Viên"}, {Language::Khmer, "ព័ត៌មានសិស្ស"}, {Language::English, "Reader Information"} };
     m_dictionary["LBL_AUTO_CODE_HINT"] = { {Language::Vietnamese, "* Mã thẻ được tạo tự động"}, {Language::Khmer, "* លេខកូដត្រូវបានបង្កើតដោយស្វ័យប្រវត្តិ"}, {Language::English, "* ID is auto-generated"} };
     m_dictionary["LBL_HO_DEM"] = { {Language::Vietnamese, "Họ đệm *:"}, {Language::Khmer, "នាមត្រកូល *:"}, {Language::English, "Last Name *:"} };
     m_dictionary["LBL_TEN"] = { {Language::Vietnamese, "Tên *:"}, {Language::Khmer, "ឈ្មោះ *:"}, {Language::English, "First Name *:"} };
     m_dictionary["PLACEHOLDER_HO"] = { {Language::Vietnamese, "Nhập họ đệm..."}, {Language::Khmer, "បញ្ចូលនាមត្រកូល..."}, {Language::English, "Enter last name..."} };
     m_dictionary["PLACEHOLDER_TEN"] = { {Language::Vietnamese, "Nhập tên..."}, {Language::Khmer, "បញ្ចូលឈ្មោះ..."}, {Language::English, "Enter first name..."} };
-    m_dictionary["BTN_ADD_READER"] = { {Language::Vietnamese, "Thêm Độc Giả"}, {Language::Khmer, "បន្ថែមអ្នកអាន"}, {Language::English, "Add Reader"} };
-    m_dictionary["MSG_ADD_READER_PROCESSING"] = { {Language::Vietnamese, "⚙ Đang thêm độc giả..."}, {Language::Khmer, "⚙ កំពុងបន្ថែមអ្នកអាន..."}, {Language::English, "⚙ Adding reader..."} };
-    m_dictionary["MSG_ADD_READER_SUCCESS_VAR"] = { {Language::Vietnamese, "Đã thêm độc giả '%1 %2' thành công!"}, {Language::Khmer, "បានបន្ថែមអ្នកអាន '%1 %2' ដោយជោគជ័យ!"}, {Language::English, "Added reader '%1 %2' successfully!"} };
-    m_dictionary["MSG_ADD_READER_SUCCESS_LBL"] = { {Language::Vietnamese, "✓ Đã thêm độc giả: %1 %2"}, {Language::Khmer, "✓ បានបន្ថែមអ្នកអាន: %1 %2"}, {Language::English, "✓ Added reader: %1 %2"} };
+    m_dictionary["BTN_ADD_READER"] = { {Language::Vietnamese, "Thêm Học Viên"}, {Language::Khmer, "បន្ថែមអ្នកអាន"}, {Language::English, "Add Reader"} };
+    m_dictionary["MSG_ADD_READER_PROCESSING"] = { {Language::Vietnamese, "⚙ Đang thêm học viên..."}, {Language::Khmer, "⚙ កំពុងបន្ថែមសិស្ស..."}, {Language::English, "⚙ Adding reader..."} };
+    m_dictionary["MSG_ADD_READER_SUCCESS_VAR"] = { {Language::Vietnamese, "Đã thêm học viên '%1 %2' thành công!"}, {Language::Khmer, "បានបន្ថែមសិស្ស '%1 %2' ដោយជោគជ័យ!"}, {Language::English, "Added reader '%1 %2' successfully!"} };
+    m_dictionary["MSG_ADD_READER_SUCCESS_LBL"] = { {Language::Vietnamese, "✓ Đã thêm học viên: %1 %2"}, {Language::Khmer, "✓ បានបន្ថែមសិស្ស: %1 %2"}, {Language::English, "✓ Added reader: %1 %2"} };
     
-    m_dictionary["TITLE_EDIT_READER_HEADER"] = { {Language::Vietnamese, "CHỈNH SỬA THÔNG TIN ĐỘC GIẢ"}, {Language::Khmer, "កែសម្រួលព័ត៌មានអ្នកអាន"}, {Language::English, "EDIT READER INFORMATION"} };
+    m_dictionary["TITLE_EDIT_READER_HEADER"] = { {Language::Vietnamese, "CHỈNH SỬA THÔNG TIN HỌC VIÊN"}, {Language::Khmer, "កែសម្រួលព័ត៌មានសិស្ស"}, {Language::English, "EDIT READER INFORMATION"} };
     m_dictionary["LBL_READER_ID"] = { {Language::Vietnamese, "Mã thẻ:"}, {Language::Khmer, "លេខកូដ:"}, {Language::English, "ID:"} };
     m_dictionary["LBL_BORROWED_COUNT_HINT"] = { {Language::Vietnamese, "➤ Số sách đang mượn: %1"}, {Language::Khmer, "➤ សៀវភៅកំពុងខ្ចី: %1"}, {Language::English, "➤ Borrowing: %1"} };
-    m_dictionary["MSG_READER_NOT_FOUND"] = { {Language::Vietnamese, "Không tìm thấy độc giả!"}, {Language::Khmer, "រកមិនឃើញអ្នកអាន!"}, {Language::English, "Reader not found!"} };
+    m_dictionary["MSG_READER_NOT_FOUND"] = { {Language::Vietnamese, "Không tìm thấy học viên!"}, {Language::Khmer, "រកមិនឃើញសិស្ស!"}, {Language::English, "Reader not found!"} };
     m_dictionary["STATUS_ACTIVE"] = { {Language::Vietnamese, "Hoạt động"}, {Language::Khmer, "សកម្ម"}, {Language::English, "Active"} };
     m_dictionary["STATUS_LOCKED"] = { {Language::Vietnamese, "Khóa"}, {Language::Khmer, "បិទ"}, {Language::English, "Locked"} };
     // === STATISTICS DIALOG ===
     m_dictionary["STATS_MAIN_TITLE"] = { {Language::Vietnamese, "THỐNG KÊ TỔNG QUAN THƯ VIỆN"}, {Language::Khmer, "ស្ថិតិបណ្ណាល័យសរុប"}, {Language::English, "LIBRARY STATISTICS OVERVIEW"} };
     m_dictionary["STATS_BOOKS_GROUP"] = { {Language::Vietnamese, "Thống Kê Sách"}, {Language::Khmer, "ស្ថិតិសៀវភៅ"}, {Language::English, "Book Statistics"} };
-    m_dictionary["STATS_READERS_GROUP"] = { {Language::Vietnamese, "Thống Kê Độc Giả"}, {Language::Khmer, "ស្ថិតិសិស្ស"}, {Language::English, "Reader Statistics"} };
+    m_dictionary["STATS_READERS_GROUP"] = { {Language::Vietnamese, "Thống Kê Học Viên"}, {Language::Khmer, "ស្ថិតិសិស្ស"}, {Language::English, "Reader Statistics"} };
     
     // Books
     m_dictionary["LBL_TOTAL_TITLES"] = { {Language::Vietnamese, "Tổng đầu sách:"}, {Language::Khmer, "ចំនួនសៀវភៅសរុប:"}, {Language::English, "Total Titles:"} };
@@ -3469,7 +3493,7 @@ void LanguageManager::loadDictionary()
     m_dictionary["LBL_CATEGORIES_STAT"] = { {Language::Vietnamese, "Số thể loại:"}, {Language::Khmer, "ចំនួនប្រភេទ:"}, {Language::English, "Categories:"} };
     
     // Readers
-    m_dictionary["LBL_TOTAL_READERS_STAT"] = { {Language::Vietnamese, "Tổng độc giả:"}, {Language::Khmer, "សិស្សសរុប:"}, {Language::English, "Total Readers:"} };
+    m_dictionary["LBL_TOTAL_READERS_STAT"] = { {Language::Vietnamese, "Tổng học viên:"}, {Language::Khmer, "សិស្សសរុប:"}, {Language::English, "Total Readers:"} };
     m_dictionary["LBL_ACTIVE_STAT"] = { {Language::Vietnamese, "Đang hoạt động:"}, {Language::Khmer, "កំពុងសកម្ម:"}, {Language::English, "Active:"} };
     m_dictionary["LBL_LOCKED_STAT"] = { {Language::Vietnamese, "Bị khóa thẻ:"}, {Language::Khmer, "បានចាក់សោ:"}, {Language::English, "Locked:"} };
     m_dictionary["LBL_READERS_BORROWING_STAT"] = { {Language::Vietnamese, "Đang mượn sách:"}, {Language::Khmer, "កំពុងខ្ចីសៀវភៅ:"}, {Language::English, "Borrowing Books:"} };
@@ -3478,7 +3502,7 @@ void LanguageManager::loadDictionary()
 
     // Charts
     m_dictionary["CHART_BOOK_STATUS"] = { {Language::Vietnamese, "Phân Bố Trạng Thái Sách"}, {Language::Khmer, "ការចែកចាយស្ថានភាពសៀវភៅ"}, {Language::English, "Book Status Distribution"} };
-    m_dictionary["CHART_READER_STATUS"] = { {Language::Vietnamese, "Trạng Thái Độc Giả"}, {Language::Khmer, "ស្ថានភាពសិស្ស"}, {Language::English, "Reader Status"} };
+    m_dictionary["CHART_READER_STATUS"] = { {Language::Vietnamese, "Trạng Thái Học Viên"}, {Language::Khmer, "ស្ថានភាពសិស្ស"}, {Language::English, "Reader Status"} };
     
     m_dictionary["BTN_CLOSE"] = { {Language::Vietnamese, "Đóng"}, {Language::Khmer, "បិទ"}, {Language::English, "Close"} };
     
@@ -3487,4 +3511,29 @@ void LanguageManager::loadDictionary()
     m_dictionary["FILTER_LOCKED"] = { {Language::Vietnamese, "Bị khóa"}, {Language::Khmer, "ត្រូវបានបិទ"}, {Language::English, "Locked"} };
     m_dictionary["LBL_CARD_VALIDITY_MONTHS"] = { {Language::Vietnamese, "Thời hạn thẻ (tháng):"}, {Language::Khmer, "សុពលភាពប័ណ្ណ (ខែ):"}, {Language::English, "Card Validity (months):"} };
     m_dictionary["LBL_LOST_BOOK_FEE"] = { {Language::Vietnamese, "Phí mất sách:"}, {Language::Khmer, "ថ្លៃបាត់សៀវភៅ:"}, {Language::English, "Lost Book Fee:"} };
+    m_dictionary["STATUS_LOST_DEBT"] = { {Language::Vietnamese, "Đã báo mất (Nợ: %1)"}, {Language::Khmer, "បានរាយការណ៍ថាបាត់ (ជំពាក់: %1)"}, {Language::English, "Reported Lost (Debt: %1)"} };
+    m_dictionary["STATUS_LOST_PAID"] = { {Language::Vietnamese, "Đã mất (Đã đền bù)"}, {Language::Khmer, "បានបាត់ (សងរួច)"}, {Language::English, "Lost (Compensated)"} };
+
+    // === MISSING KEYS (RUNTIME LOGS) ===
+    m_dictionary["PLACEHOLDER_BOOK_TITLE"] = { {Language::Vietnamese, "Nhập tên sách..."}, {Language::Khmer, "បញ្ចូលឈ្មោះសៀវភៅ..."}, {Language::English, "Enter book title..."} };
+    m_dictionary["PLACEHOLDER_CATEGORY"] = { {Language::Vietnamese, "VD: Luật Tạng, Kinh Tạng, Pali, Khmer..."}, {Language::Khmer, "ឧទាហរណ៍: វិន័យបិដក, សុត្តន្តបិដក..."}, {Language::English, "Ex: Vinaya, Sutta, Pali..."} };
+    m_dictionary["LBL_COPY_COUNT"] = { {Language::Vietnamese, "Số lượng bản sao:"}, {Language::Khmer, "ចំនួនច្បាប់ចម្លង:"}, {Language::English, "Copy Count:"} };
+    
+    m_dictionary["READER_TYPE_STUDENT"] = { {Language::Vietnamese, "Học viên"}, {Language::Khmer, "សិស្ស"}, {Language::English, "Student"} };
+    m_dictionary["READER_TYPE_TEACHER"] = { {Language::Vietnamese, "Giảng viên"}, {Language::Khmer, "គ្រូបង្រៀន"}, {Language::English, "Teacher"} };
+    
+    m_dictionary["PLACEHOLDER_CLASS"] = { {Language::Vietnamese, "Nhập lớp..."}, {Language::Khmer, "បញ្ចូលថ្នាក់..."}, {Language::English, "Enter class..."} };
+    m_dictionary["PLACEHOLDER_PHONE"] = { {Language::Vietnamese, "Nhập SĐT..."}, {Language::Khmer, "បញ្ចូលលេខទូរស័ព្ទ..."}, {Language::English, "Enter phone..."} };
+    m_dictionary["PLACEHOLDER_EMAIL"] = { {Language::Vietnamese, "Nhập email..."}, {Language::Khmer, "បញ្ចូលអ៊ីមែល..."}, {Language::English, "Enter email..."} };
+    
+    m_dictionary["LBL_READER_TYPE"] = { {Language::Vietnamese, "Phân loại:"}, {Language::Khmer, "ប្រភេទ:"}, {Language::English, "Type:"} };
+    m_dictionary["LBL_CLASS"] = { {Language::Vietnamese, "Lớp:"}, {Language::Khmer, "ថ្នាក់:"}, {Language::English, "Class:"} };
+    m_dictionary["LBL_PHONE"] = { {Language::Vietnamese, "SĐT:"}, {Language::Khmer, "ទូរស័ព្ទ:"}, {Language::English, "Phone:"} };
+    m_dictionary["LBL_EMAIL"] = { {Language::Vietnamese, "Email:"}, {Language::Khmer, "អ៊ីមែល:"}, {Language::English, "Email:"} };
+    m_dictionary["LBL_DOB"] = { {Language::Vietnamese, "Ngày sinh:"}, {Language::Khmer, "ថ្ងៃកំណើត:"}, {Language::English, "Date of Birth:"} };
+    
+    // Advanced Features
+    m_dictionary["GROUP_HISTORY"] = { {Language::Vietnamese, "Lịch sử Mượn Trả"}, {Language::Khmer, "ប្រវត្តិនៃការខ្ចីនិងសង"}, {Language::English, "Borrowing History"} };
+    m_dictionary["GROUP_STATS_READERS"] = { {Language::Vietnamese, "Thống Kê Xu Hướng"}, {Language::Khmer, "ស្ថិតិនិន្នាការ"}, {Language::English, "Trend Statistics"} };
+    m_dictionary["BTN_EXPORT_PDF"] = { {Language::Vietnamese, "Xuất PDF"}, {Language::Khmer, "នាំចេញជា PDF"}, {Language::English, "Export PDF"} };
 }

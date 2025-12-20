@@ -16,6 +16,7 @@
 #include <QFile>
 #include <QDir>
 #include <QFileInfo>
+#include "utils/XuLyChuoi.h"
 
 DatabaseManager& DatabaseManager::instance() {
     static DatabaseManager inst;
@@ -403,7 +404,49 @@ bool DatabaseManager::createTables() {
         return false;
     }
 
+    // Run automatic normalization for book codes
+    normalizeBookCodes();
+
     return ok;
+}
+
+void DatabaseManager::normalizeBookCodes() {
+    if (!m_db.isOpen()) return;
+
+    qDebug() << "[DatabaseManager] Checking for book code normalization...";
+    
+    QSqlQuery query(m_db);
+    // Select all copy IDs from ban_sao
+    if (!query.exec("SELECT id, ma_sach FROM ban_sao")) {
+        qWarning() << "[DatabaseManager] Failed to select book codes for normalization:" << query.lastError().text();
+        return;
+    }
+
+    int count = 0;
+    QSqlQuery updateQuery(m_db);
+    
+    while (query.next()) {
+        int id = query.value(0).toInt();
+        std::string maSach = query.value(1).toString().toStdString();
+        std::string normalized = ChuanHoaMaBanSao(maSach);
+        
+        if (normalized != maSach) {
+            updateQuery.prepare("UPDATE ban_sao SET ma_sach = :ma WHERE id = :id");
+            updateQuery.bindValue(":ma", QString::fromStdString(normalized));
+            updateQuery.bindValue(":id", id);
+            
+            if (updateQuery.exec()) {
+                count++;
+                qDebug() << "[DatabaseManager] Normalized book code:" << QString::fromStdString(maSach) << "->" << QString::fromStdString(normalized);
+            } else {
+                qWarning() << "[DatabaseManager] Failed to update book code:" << query.lastError().text();
+            }
+        }
+    }
+
+    if (count > 0) {
+        qDebug() << "[DatabaseManager] Automatically normalized" << count << "book code(s).";
+    }
 }
 
 DatabaseManager::~DatabaseManager() {

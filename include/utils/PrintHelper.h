@@ -39,8 +39,8 @@ public:
     // Cấu hình in
     struct PrintConfig {
         // ═══ THÔNG TIN THƯ VIỆN ═══
-        QString tenThuVien = "HỌC VIỆN PHẬT GIÁO NAM TÔNG CẦN THƠ";
-        QString tenVietTat = "HVPG NAMTONG CANTHO";
+        QString tenThuVien = "HỌC VIỆN PHẬT GIÁO NAM TÔNG KHMER";
+        QString tenVietTat = "HVPGNTK";
         QString loiChao = "Xin cảm ơn!";
         
         // ═══ THIẾT LẬP IN ═══
@@ -121,6 +121,7 @@ public:
     static bool inPhieuTraTuDong(PTRDG docGia, const QString& maSach, const QString& tenSach,
                                   const QString& ngayTra, QWidget* parent = nullptr, bool forcePreview = false);
     static bool inBienLaiPhat(PTRDG docGia, const QString& lyDo, long long soTien, QWidget* parent = nullptr);
+    static bool xuatLichSuMuonTraToPDF(PTRDG docGia, QWidget* parent = nullptr); // NEW
 
     // ===== HELPER FUNCTIONS =====
     static QString taoMaVachHTML(const QString& maSo, int fontSize = 48);

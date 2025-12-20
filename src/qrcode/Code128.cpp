@@ -53,20 +53,6 @@ QVector<bool> Code128::encode(const QString &text) {
     int startCode = useC ? CODE128_C_START : CODE128_B_START;
     int checkSum = startCode;
     
-    // Add Start Pattern
-    auto addPattern = [&](int idx) {
-        if (idx < 0 || idx > 106) return;
-        if (idx == 106) {
-           // Stop pattern 2,3,3,1,1,1,2
-           int stopPat[] = {2,3,3,1,1,1,2};
-           for (int w : stopPat) {
-               bool bar = (result.isEmpty()) ? true : !result.last(); // Alternating logic? No.
-               // wait, we construct Bar/Space sequence.
-               // Actually logic: B S B S B S (B S B S B S B for stop)
-           }
-        }
-    };
-    
     QVector<int> codes;
     codes.append(startCode);
 
@@ -96,33 +82,33 @@ QVector<bool> Code128::encode(const QString &text) {
     // Start with Bar.
     
     for (int code : codes) {
-        if (code == CODE128_STOP) {
-            // Stop: 2 3 3 1 1 1 2 (B S B S B S B)
-            int widths[] = {2,3,3,1,1,1,2};
-            bool isBar = true;
-            for (int w : widths) {
-                for (int k=0; k<w; ++k) result.append(isBar);
-                isBar = !isBar;
-            }
-        } else {
-            // Standard: 6 widths
-            // Handle Start codes from manual defines if table is short
-            int const* p = nullptr;
-            int manualStartB[] = {2,1,1,2,1,4};
-            int manualStartC[] = {2,1,1,2,3,2};
-            
-            if (code < 103) p = patterns[code];
-            else if (code == 104) p = manualStartB;
-            else if (code == 105) p = manualStartC;
-            
-            if (p) {
+            if (code == 106) {
+                // STOP: 2 3 3 1 1 1 2 (B S B S B S B)
+                static const int stopPat[] = {2,3,3,1,1,1,2};
                 bool isBar = true;
-                for (int i=0; i<6; ++i) {
-                     for (int k=0; k<p[i]; ++k) result.append(isBar);
-                     isBar = !isBar;
+                for (int w : stopPat) {
+                    for (int k=0; k<w; ++k) result.append(isBar);
+                    isBar = !isBar;
+                }
+            } else {
+                const int* p = nullptr;
+                static const int manualStartA[] = {2,1,1,4,1,2};
+                static const int manualStartB[] = {2,1,1,2,1,4};
+                static const int manualStartC[] = {2,1,1,2,3,2};
+
+                if (code >= 0 && code < 103) p = patterns[code];
+                else if (code == 103) p = manualStartA;
+                else if (code == 104) p = manualStartB;
+                else if (code == 105) p = manualStartC;
+
+                if (p) {
+                    bool isBar = true;
+                    for (int i=0; i<6; ++i) {
+                        for (int k=0; k<p[i]; ++k) result.append(isBar);
+                        isBar = !isBar;
+                    }
                 }
             }
-        }
     }
 
     return result;

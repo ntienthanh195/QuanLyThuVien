@@ -204,6 +204,7 @@ void HopThoaiCauHinhIn::setupUi() {
 
         // Đồng bộ ngược lại PrintHelper toàn cục ngay lập tức
         PrintHelper::setCauHinh(m_config);
+        PrintHelper::reloadCauHinh(); // CRITICAL: Force cache refresh from new settings
 
         // Ensure output dirs exist or attempt to create
         QString pdfBase = m_config.pdfOutputDir.isEmpty() ?

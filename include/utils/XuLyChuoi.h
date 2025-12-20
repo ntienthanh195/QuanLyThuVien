@@ -92,6 +92,7 @@ bool TachTruong(const std::string& dong, char kyTuPhanCach, std::string mangKetQ
 int TachTokenKhoangTrang(const std::string& chuoi, std::string mangToken[], int soTokenToiDa);
 
 // Tach thong tin tu ma sach
+std::string ChuanHoaMaBanSao(const std::string& maBanSao); // Chuan hoa: 123-001 -> 123-1
 std::string TachISBNTuMaSach(const std::string& maSach);  // Lay ISBN tu "ISBN-123" -> "ISBN"
 int LaySoHauToMaSach(PTRDMS nodeSach);  // Lay so tu "ISBN-123" -> 123
 

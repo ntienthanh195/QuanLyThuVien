@@ -189,7 +189,7 @@ ManHinhChiTietSach::ManHinhChiTietSach(PTRDS book, QWidget *parent)
     , dongBanSaoDuocChon(-1)
 {
     setWindowTitle(LanguageManager::instance().getText("TITLE_BOOK_DETAILS"));
-    setMinimumSize(750, 550);
+    setMinimumSize(600, 450); // Reduced from 750x550
     thietLapGiaoDien();
     thietLapKetNoi();
     taiThongTinSach();
@@ -208,7 +208,7 @@ void ManHinhChiTietSach::thietLapGiaoDien() {
     // Title
     QLabel *titleLabel = new QLabel(LanguageManager::instance().getText("HEADER_BOOK_DETAILS"), this);
     QFont titleFont;
-    titleFont.setPointSize(14); // Reduced size
+    titleFont.setPointSize(12); // Reduced from 14
     titleFont.setBold(true);
     titleLabel->setFont(titleFont);
     titleLabel->setAlignment(Qt::AlignCenter);
@@ -242,11 +242,30 @@ void ManHinhChiTietSach::thietLapGiaoDien() {
         "}"
     );
     
-    QVBoxLayout *infoLayout = new QVBoxLayout(infoGroup);
-    nhanTongQuat = new QLabel(this);
-    nhanTongQuat->setWordWrap(true);
-    nhanTongQuat->setStyleSheet("padding: 10px; font-size: 11pt; line-height: 1.5; color: #E0E0E0;");
-    infoLayout->addWidget(nhanTongQuat);
+    QGridLayout *infoLayout = new QGridLayout(infoGroup);
+    infoLayout->setSpacing(10);
+    
+    auto addInfoRow = [&](const QString &lblKey, QLabel* &valLabel, int row, int col) {
+        QLabel *l = new QLabel(LanguageManager::instance().getText(lblKey) + ":", this);
+        l->setStyleSheet("color: #b5b5c3; font-weight: 500; font-size: 11px;");
+        valLabel = new QLabel("--", this);
+        valLabel->setStyleSheet("color: #ffffff; font-weight: 600; font-size: 13px;");
+        infoLayout->addWidget(l, row, col * 2);
+        infoLayout->addWidget(valLabel, row, col * 2 + 1);
+    };
+
+    addInfoRow("LBL_TITLE", lblTenSach, 0, 0);
+    addInfoRow("LBL_AUTHOR", lblTacGia, 0, 1);
+    addInfoRow("LBL_ISBN", lblISBN, 1, 0);
+    addInfoRow("LBL_CATEGORY", lblTheLoai, 1, 1);
+    addInfoRow("TABLE_HEADER_PUBLISHER", lblNXB, 2, 0);
+    addInfoRow("LBL_PUBLISH_YEAR", lblNamXB, 2, 1);
+    addInfoRow("LBL_PAGE_COUNT", lblSoTrang, 3, 0);
+    addInfoRow("LBL_PRICE", lblGiaTien, 3, 1);
+
+    infoLayout->setColumnStretch(1, 1);
+    infoLayout->setColumnStretch(3, 1);
+
     mainLayout->addWidget(infoGroup);
     
     // Copies table group
@@ -299,12 +318,12 @@ void ManHinhChiTietSach::thietLapGiaoDien() {
         "   border: 1px solid #323248;"
         "   border-radius: 6px;"
         "   gridline-color: #2b2b40;"
-        "   font-size: 10pt;"
+        "   font-size: 9pt;" // Reduced from 10pt
         "   selection-background-color: #3699ff;"
         "   selection-color: #ffffff;"
         "}"
         "QTableView::item {"
-        "   padding: 8px;"
+        "   padding: 4px;" // Reduced from 8px
         "}"
         "QTableView::item:selected {"
         "   background-color: #3699ff;"
@@ -313,7 +332,7 @@ void ManHinhChiTietSach::thietLapGiaoDien() {
         "QHeaderView::section {"
         "   background-color: #2b2b40;"
         "   color: #b5b5c3;"
-        "   padding: 10px;"
+        "   padding: 6px;" // Reduced from 10px
         "   border: none;"
         "   border-bottom: 2px solid #323248;"
         "   font-weight: 600;"
@@ -476,40 +495,17 @@ void ManHinhChiTietSach::thietLapKetNoi() {
 void ManHinhChiTietSach::taiThongTinSach() {
     if (!sachDuocChon) return;
     
-    QString info = QString(
-        "<b>%1:</b> %2<br>"
-        "<b>%3:</b> %4<br>"
-        "<b>%5:</b> %6<br>"
-        "<b>%7:</b> %8<br>"
-        "<b>%9:</b> %10<br>"
-        "<b>%11:</b> %12"
-    )
-    .arg(LanguageManager::instance().getText("LBL_TITLE"))
-    .arg(QString::fromStdString(sachDuocChon->tenSach))
-    .arg(LanguageManager::instance().getText("LBL_AUTHOR"))
-    .arg(QString::fromStdString(sachDuocChon->tacGia))
-    .arg(LanguageManager::instance().getText("LBL_ISBN"))
-    .arg(QString::fromStdString(sachDuocChon->ISBN))
-    .arg(LanguageManager::instance().getText("LBL_CATEGORY"))
-    .arg(QString::fromStdString(sachDuocChon->theLoai))
-    .arg(LanguageManager::instance().getText("LBL_PUBLISH_YEAR"))
-    .arg(sachDuocChon->namXuatBan)
-    .arg(LanguageManager::instance().getText("LBL_PAGE_COUNT"))
-    .arg(sachDuocChon->soTrang);
+    lblTenSach->setText(QString::fromStdString(sachDuocChon->tenSach));
+    lblTacGia->setText(QString::fromStdString(sachDuocChon->tacGia));
+    lblISBN->setText(QString::fromStdString(sachDuocChon->ISBN));
+    lblTheLoai->setText(QString::fromStdString(sachDuocChon->theLoai));
+    lblNXB->setText(QString::fromStdString(sachDuocChon->NhaXuatBan));
+    lblNamXB->setText(QString::number(sachDuocChon->namXuatBan));
+    lblSoTrang->setText(QString::number(sachDuocChon->soTrang));
     
-    // Feature: Display Publisher (Phase 2)
-    info += QString("<br><b>%1:</b> %2")
-        .arg(LanguageManager::instance().getText("TABLE_HEADER_PUBLISHER"))
-        .arg(QString::fromStdString(sachDuocChon->NhaXuatBan));
-    
-    // Feature: Display Price
     QLocale locale(QLocale::Vietnamese, QLocale::Vietnam);
-    QString giaTienStr = locale.toCurrencyString((double)sachDuocChon->giaTien, "VNĐ");
-    info += QString("<br><b>%1:</b> <span style='color: #78C2AD; font-weight: bold;'>%2</span>")
-        .arg(LanguageManager::instance().getText("LBL_PRICE"))
-        .arg(giaTienStr);
-    
-    nhanTongQuat->setText(info);
+    lblGiaTien->setText(locale.toCurrencyString((double)sachDuocChon->giaTien, "VNĐ"));
+    lblGiaTien->setStyleSheet("color: #78C2AD; font-weight: bold; font-size: 13px;");
 }
 
 void ManHinhChiTietSach::taiDanhSachBanSao() {
@@ -528,7 +524,7 @@ void ManHinhChiTietSach::taiDanhSachBanSao() {
     }
 
     // Use uniform row height for performance
-    bangBanSao->verticalHeader()->setDefaultSectionSize(45);
+    bangBanSao->verticalHeader()->setDefaultSectionSize(35); // Reduced from 45
 
     // refresh model
     if (modelBanSao) { if (auto m = dynamic_cast<BanSaoTableModel*>(modelBanSao)) m->refresh(); }
@@ -727,7 +723,7 @@ void ManHinhChiTietSach::khiNhanInTem() {
     
     QPushButton *btnSelected = msgBox.addButton("Chỉ in các bản sao ĐÃ CHỌN", QMessageBox::ActionRole);
     QPushButton *btnAll = msgBox.addButton("In TOÀN BỘ bản sao đầu sách", QMessageBox::ActionRole);
-    QPushButton *btnCancel = msgBox.addButton(LanguageManager::instance().getText("BTN_CANCEL"), QMessageBox::RejectRole);
+    msgBox.addButton(LanguageManager::instance().getText("BTN_CANCEL"), QMessageBox::RejectRole);
     
     msgBox.setDefaultButton(btnSelected);
     msgBox.exec();

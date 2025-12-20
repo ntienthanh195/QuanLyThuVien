@@ -310,8 +310,8 @@ void CuaSoChinh::thieLapMenuBen() {
     widgetTieuDe->setFixedHeight(headerHeight);
     widgetTieuDe->setStyleSheet(
         "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-        "stop:0 rgba(54, 153, 255, 0.1), stop:1 #1E1E2D); "
-        "border-bottom: 2px solid rgba(54, 153, 255, 0.3);"
+        "stop:0 rgba(244, 164, 96, 0.1), stop:1 #1E1E2D); "
+        "border-bottom: 2px solid #FFD700;" // Gold accent border
     );
     
     int headerMargin = ResponsiveHelper::getScaledMargin(15, screenSize);
@@ -324,19 +324,19 @@ void CuaSoChinh::thieLapMenuBen() {
     nutToggleSidebar->setFixedSize(40, 40);
     nutToggleSidebar->setStyleSheet(
         "QPushButton {"
-        "    background-color: rgba(54, 153, 255, 0.15);"
-        "    color: #3699FF;"
-        "    border: 1px solid rgba(54, 153, 255, 0.3);"
+        "    background-color: rgba(244, 164, 96, 0.15);" // Saffron alpha
+        "    color: #F4A460;" // Saffron
+        "    border: 1px solid rgba(244, 164, 96, 0.3);"
         "    border-radius: 8px;"
         "    font-size: 20px;"
         "    font-weight: bold;"
         "}"
         "QPushButton:hover {"
-        "    background-color: rgba(54, 153, 255, 0.25);"
-        "    border: 1px solid #3699FF;"
+        "    background-color: rgba(244, 164, 96, 0.25);"
+        "    border: 1px solid #F4A460;"
         "}"
         "QPushButton:pressed {"
-        "    background-color: rgba(54, 153, 255, 0.35);"
+        "    background-color: rgba(244, 164, 96, 0.35);"
         "}"
     );
     connect(nutToggleSidebar, &QPushButton::clicked, this, &CuaSoChinh::toggleSidebar);
@@ -374,32 +374,32 @@ void CuaSoChinh::thieLapMenuBen() {
     boTriToggle->addWidget(btnLang);
     boTriTieuDe->addLayout(boTriToggle);
     
-    // Logo - Đơn giản hơn, icon đơn sắc
+    // Logo - Đơn giản hơn, icon đơn sắc - CHUYỂN SANG MÀU CAM NGHỆ (Saffron)
     int logoFontSize = ResponsiveHelper::getScaledFontSize(28, screenSize);
-    QLabel *nhanLogo = new QLabel("▣");
+    QLabel *nhanLogo = new QLabel("☸"); // Dharmachakra Symbol
     nhanLogo->setObjectName("LogoLabel");
     nhanLogo->setStyleSheet(QString(
         "font-size: %1px;"
-        "color: #0078D4;"
+        "color: #F4A460;" // Saffron
         "background: transparent;"
         "font-weight: 300;"
     ).arg(logoFontSize));
     nhanLogo->setAlignment(Qt::AlignCenter);
     
-    // Tên hệ thống - Segoe UI, simple
-    // Tên hệ thống - Segoe UI, simple
-    int titleFontSize = ResponsiveHelper::getScaledFontSize(13, screenSize);
-    nhanTieuDe = new QLabel("QUẢN LÝ THƯ VIỆN");
+    // Tên hệ thống - Segoe UI, simple - THÊM TÊN HỌC VIỆN SONG NGỮ
+    int titleFontSize = ResponsiveHelper::getScaledFontSize(11, screenSize);
+    nhanTieuDe = new QLabel(LanguageManager::instance().getText("HEADER_SYSTEM_NAME"));
     nhanTieuDe->setObjectName("TitleLabel");
     nhanTieuDe->setStyleSheet(QString(
         "font-size: %1px;"
-        "font-weight: 600;"
-        "color: #CCCCCC;"
+        "font-weight: 700;"
+        "color: #FFD700;" // Gold
         "text-align: center;"
-        "letter-spacing: 1px;"
+        "letter-spacing: 0.5px;"
         "background: transparent;"
     ).arg(titleFontSize));
     nhanTieuDe->setAlignment(Qt::AlignCenter);
+    nhanTieuDe->setWordWrap(true);
     
     boTriTieuDe->addWidget(nhanLogo);
     boTriTieuDe->addWidget(nhanTieuDe);
@@ -413,29 +413,35 @@ void CuaSoChinh::thieLapMenuBen() {
     
     danhSachMenu = new QListWidget();
     danhSachMenu->setObjectName("MenuList");
+    danhSachMenu->setProperty("collapsed", false);
     danhSachMenu->setStyleSheet(QString(
         "QListWidget#MenuList {"
         "    background: #1E1E2D;"
         "    border: none;"
         "    outline: none;"
-        "    border-right: 1px solid rgba(255, 255, 255, 0.05);"
+        "    border-right: 1px solid rgba(244, 164, 96, 0.1);"
         "}"
         "QListWidget#MenuList::item {"
         "    padding: %1px 15px;"
         "    margin: 4px 12px;"
-        "    color: #9CA3AF;"
+        "    color: #A0A0A0;"
         "    border: none;"
         "    border-radius: 10px;"
         "    font-size: %2px;"
         "    font-weight: 500;"
         "}"
+        "QListWidget#MenuList[collapsed=\"true\"]::item {"
+        "    padding: 12px 0px;"
+        "    margin: 4px 8px;"
+        "    border-radius: 8px;"
+        "}"
         "QListWidget#MenuList::item:hover {"
-        "    background-color: rgba(255, 255, 255, 0.05);"
-        "    color: #E0E0E0;"
+        "    background-color: rgba(244, 164, 96, 0.08);"
+        "    color: #F4A460;"
         "}"
         "QListWidget#MenuList::item:selected {"
-        "    background-color: rgba(54, 153, 255, 0.15);"
-        "    color: #3699FF;"
+        "    background-color: rgba(244, 164, 96, 0.18);"
+        "    color: #FFD700;"
         "    font-weight: 700;"
         "}"
     ).arg(menuPadding).arg(menuFontSize));
@@ -756,133 +762,63 @@ void CuaSoChinh::toggleSidebar() {
     
     int targetWidth = sidebarDangMoRong ? sidebarWidthMax : sidebarWidthMin;
     
-    // Config Animation
+    // Web-Standard Easing: OutQuint starts fast and settles very smoothly
     QPropertyAnimation *widthAnim = new QPropertyAnimation(khungMenuBen, "maximumWidth");
-    widthAnim->setDuration(300); // Slower for premium feel (Web-like)
+    widthAnim->setDuration(300); // 300ms + OutQuint = Perfect Web feel
     widthAnim->setStartValue(khungMenuBen->width());
     widthAnim->setEndValue(targetWidth);
+    widthAnim->setEasingCurve(QEasingCurve::OutQuint); 
     
-    // "InOutQuad" provides a much smoother acceleration/deceleration curve
-    widthAnim->setEasingCurve(QEasingCurve::InOutQuad); 
-    
-    // UI Elements
     QLabel *logoLabel = khungMenuBen->findChild<QLabel*>("LogoLabel");
     QLabel *titleLabel = khungMenuBen->findChild<QLabel*>("TitleLabel");
     
     QStringList menuTexts = {
-        "▣  " + LanguageManager::instance().getText("MENU_DASHBOARD"),
-        "▤  " + LanguageManager::instance().getText("MENU_BOOKS"),
-        "◉  " + LanguageManager::instance().getText("MENU_READERS"),
-        "⇄  " + LanguageManager::instance().getText("MENU_LOANS"),
-        "𐄷  " + LanguageManager::instance().getText("MENU_USERS"),
-        "⚙  " + LanguageManager::instance().getText("MENU_SETTINGS"),
-        "ⓘ  " + LanguageManager::instance().getText("MENU_ABOUT")
+        "  " + LanguageManager::instance().getText("MENU_DASHBOARD"),
+        "  " + LanguageManager::instance().getText("MENU_BOOKS"),
+        "  " + LanguageManager::instance().getText("MENU_READERS"),
+        "  " + LanguageManager::instance().getText("MENU_LOANS"),
+        "  " + LanguageManager::instance().getText("MENU_USERS"),
+        "  " + LanguageManager::instance().getText("MENU_SETTINGS"),
+        "  " + LanguageManager::instance().getText("MENU_ABOUT")
     };
 
-    // LOGIC: Sequence matters for smoothness
-    
-    if (sidebarDangMoRong) {
-        // EXPANDING:
-        // 1. Start expanding width immediately
-        // 2. Show text only AFTER animation (or halfway) to avoid text clipping/overflow ugliness
-        
-        nutToggleSidebar->setText("☰"); // Change icon immediately
-        
-        connect(widthAnim, &QPropertyAnimation::finished, [this, logoLabel, titleLabel, menuTexts]() {
-            // Show full details AFTER expansion finishes
-             if (logoLabel) logoLabel->show();
-             if (titleLabel) titleLabel->show();
-             if (btnLang) btnLang->show(); // SHOW Language Button
-             
-             for (int i = 0; i < danhSachMenu->count() && i < menuTexts.size(); ++i) {
-                danhSachMenu->item(i)->setText(menuTexts[i]);
-             }
-             
-             // Enforce exact width to prevent layout glitches
-             khungMenuBen->setMinimumWidth(sidebarWidthMax);
-        });
+    // Performance: Switch state before animation starts
+    danhSachMenu->setProperty("collapsed", !sidebarDangMoRong);
+    danhSachMenu->style()->unpolish(danhSachMenu);
+    danhSachMenu->style()->polish(danhSachMenu);
 
-        // Restore Full Padding Stylesheet
-        int menuPadding = ResponsiveHelper::getScaledSpacing(15, ResponsiveHelper::detectScreenSize());
-        int menuFontSize = ResponsiveHelper::getScaledFontSize(14, ResponsiveHelper::detectScreenSize());
-        danhSachMenu->setStyleSheet(QString(
-            "QListWidget#MenuList {"
-            "    background: #1E1E2D;"
-            "    border: none;"
-            "    outline: none;"
-            "    border-right: 1px solid rgba(255, 255, 255, 0.05);"
-            "}"
-            "QListWidget#MenuList::item {"
-            "    padding: 12px 15px;"
-            "    margin: 4px 12px;" 
-            "    color: #9CA3AF;"
-            "    border: none;"
-            "    border-radius: 10px;"
-            "    font-size: %2px;"
-            "    font-weight: 500;"
-            "}"
-            "QListWidget#MenuList::item:hover {"
-            "    background-color: rgba(255, 255, 255, 0.05);"
-            "    color: #E0E0E0;"
-            "}"
-            "QListWidget#MenuList::item:selected {"
-            "    background-color: rgba(54, 153, 255, 0.15);"
-            "    color: #3699FF;"
-            "    font-weight: 700;"
-            "}"
-        ).arg(menuPadding).arg(menuFontSize));
+    if (sidebarDangMoRong) {
+        // When expanding: Start width first, show text halfway for "fade-in" feel
+        QTimer::singleShot(150, this, [this, logoLabel, titleLabel, menuTexts]() {
+            if (!sidebarDangMoRong) return; // Abort if user toggled back fast
+            
+            if (logoLabel) logoLabel->show();
+            if (titleLabel) titleLabel->show();
+            if (btnLang) btnLang->show();
+            
+            for (int i = 0; i < danhSachMenu->count() && i < menuTexts.size(); ++i) {
+               danhSachMenu->item(i)->setText(menuTexts[i]);
+            }
+        });
         
+        connect(widthAnim, &QPropertyAnimation::finished, [this]() {
+            khungMenuBen->setMinimumWidth(sidebarWidthMax);
+        });
     } else {
-        // COLLAPSING:
-        // 1. Hide text IMMEDIATELY (so it doesn't wrap/glitch during shrink)
-        // 2. Start shrinking width
-        
-        // Hide complex elements immediately to avoid overlap during shrink
+        // When collapsing: Hide complex stuff IMMEDIATELY
         if (logoLabel) logoLabel->hide();
         if (titleLabel) titleLabel->hide();
-        if (btnLang) btnLang->hide(); // HIDE Language Button to prevent overlap
-        
-        nutToggleSidebar->setText("☰");
+        if (btnLang) btnLang->hide();
         
         for (int i = 0; i < danhSachMenu->count(); ++i) {
-             // Keep only the icon, clear the text
-             // We can't clear text easily without removing item content
-             // So we just set empty text
              danhSachMenu->item(i)->setText("");
         }
-
-        // Apply Compact Stylesheet (Less padding/margin to fit Icon)
-        int menuFontSize = ResponsiveHelper::getScaledFontSize(14, ResponsiveHelper::detectScreenSize());
-        danhSachMenu->setStyleSheet(QString(
-            "QListWidget#MenuList {"
-            "    background: #1E1E2D;"
-            "    border: none;"
-            "    outline: none;"
-            "    border-right: 1px solid rgba(255, 255, 255, 0.05);"
-            "}"
-            "QListWidget#MenuList::item {"
-            "    padding: 12px 0px;"     /* Zero side padding */
-            "    margin: 4px 4px;"       /* Minimal margin */
-            "    color: #9CA3AF;"
-            "    border: none;"
-            "    border-radius: 10px;"
-            "    font-size: %1px;"
-            "    font-weight: 500;"
-            "}"
-             "QListWidget#MenuList::item:hover {"
-            "    background-color: rgba(255, 255, 255, 0.05);"
-            "}"
-            "QListWidget#MenuList::item:selected {"
-            "    background-color: rgba(54, 153, 255, 0.15);"
-            "    color: #3699FF;"
-            "}"
-        ).arg(menuFontSize));
-        
     }
     
-    // Sync minimum width during animation to avoid jitter
+    // Smooth Sync: Update min/max together to prevent jitter
     connect(widthAnim, &QPropertyAnimation::valueChanged, [this](const QVariant &value) {
-        khungMenuBen->setMinimumWidth(value.toInt());
+        int w = value.toInt();
+        khungMenuBen->setMinimumWidth(w);
     });
     
     widthAnim->start(QAbstractAnimation::DeleteWhenStopped);

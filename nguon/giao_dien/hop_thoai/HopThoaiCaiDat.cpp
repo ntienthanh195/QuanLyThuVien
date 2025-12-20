@@ -29,12 +29,6 @@ HopThoaiCaiDat::HopThoaiCaiDat(QWidget *parent)
     , lblPhiMatSach(nullptr)
     , oThoiHanThe(nullptr)
     , oPhiMatSach(nullptr)
-    , lblCheDoIn(nullptr)
-    , lblMayInReceipt(nullptr)
-    , lblMayInReport(nullptr)
-    , oInYenLang(nullptr)
-    , oMayInReceipt(nullptr)
-    , oMayInReport(nullptr)
     , nutLuu(nullptr)
     , nutHuy(nullptr)
     , nutMacDinh(nullptr)
@@ -56,7 +50,6 @@ void HopThoaiCaiDat::capNhatNgonNgu() {
     if (tabs) {
         tabs->setTabText(0, LanguageManager::instance().getText("TAB_GENERAL_INFO"));
         tabs->setTabText(1, LanguageManager::instance().getText("TAB_BORROW_RULES"));
-        tabs->setTabText(2, LanguageManager::instance().getText("TAB_PRINT_CONFIG"));
     }
     
     if (lblTenThuVien) lblTenThuVien->setText(LanguageManager::instance().getText("LBL_LIBRARY_NAME") + ":");
@@ -69,17 +62,11 @@ void HopThoaiCaiDat::capNhatNgonNgu() {
     if (lblThoiHanThe) lblThoiHanThe->setText(LanguageManager::instance().getText("LBL_CARD_VALIDITY_MONTHS"));
     if (lblPhiMatSach) lblPhiMatSach->setText(LanguageManager::instance().getText("LBL_LOST_BOOK_FEE"));
     
-    if (lblCheDoIn) lblCheDoIn->setText(LanguageManager::instance().getText("LBL_PRINT_MODE") + ":");
-    if (oInYenLang) oInYenLang->setText(LanguageManager::instance().getText("CB_SILENT_PRINT"));
-    if (lblMayInReceipt) lblMayInReceipt->setText(LanguageManager::instance().getText("LBL_PRINTER_RECEIPT") + ":");
-    if (lblMayInReport) lblMayInReport->setText(LanguageManager::instance().getText("LBL_PRINTER_REPORT") + ":");
     
     if (nutLuu) nutLuu->setText(LanguageManager::instance().getText("BTN_SAVE_CHANGES"));
     if (nutHuy) nutHuy->setText(LanguageManager::instance().getText("BTN_CANCEL"));
     if (nutMacDinh) nutMacDinh->setText(LanguageManager::instance().getText("BTN_RESTORE_DEFAULT"));
 
-    if (oMayInReceipt && oMayInReceipt->count() > 0) oMayInReceipt->setItemText(0, LanguageManager::instance().getText("OPTION_SYSTEM_DEFAULT"));
-    if (oMayInReport && oMayInReport->count() > 0) oMayInReport->setItemText(0, LanguageManager::instance().getText("OPTION_SYSTEM_DEFAULT"));
 }
 
 void HopThoaiCaiDat::thietLapGiaoDien() {
@@ -165,37 +152,6 @@ void HopThoaiCaiDat::thietLapGiaoDien() {
     
     tabs->addTab(tabMuonTra, LanguageManager::instance().getText("TAB_BORROW_RULES"));
 
-    // TAB 3: IN ẤN (New Integration)
-    QWidget *tabInAn = new QWidget();
-    QFormLayout *formInAn = new QFormLayout(tabInAn);
-    formInAn->setSpacing(15);
-
-    oInYenLang = new QCheckBox(LanguageManager::instance().getText("CB_SILENT_PRINT"));
-    oInYenLang->setStyleSheet("QCheckBox { color: #e0e0e0; }");
-
-    oMayInReceipt = new QComboBox();
-    oMayInReceipt->setStyleSheet("padding: 8px; background: #2b2b36; border: 1px solid #3E3E42; color: white;");
-    
-    oMayInReport = new QComboBox();
-    oMayInReport->setStyleSheet("padding: 8px; background: #2b2b36; border: 1px solid #3E3E42; color: white;");
-
-    // Populate Printers
-    QString defaultPrinterText = LanguageManager::instance().getText("OPTION_SYSTEM_DEFAULT");
-    QStringList printers = QPrinterInfo::availablePrinterNames();
-    oMayInReceipt->addItem(defaultPrinterText);
-    oMayInReport->addItem(defaultPrinterText);
-    oMayInReceipt->addItems(printers);
-    oMayInReport->addItems(printers);
-
-    lblCheDoIn = new QLabel(LanguageManager::instance().getText("LBL_PRINT_MODE") + ":");
-    lblMayInReceipt = new QLabel(LanguageManager::instance().getText("LBL_PRINTER_RECEIPT") + ":");
-    lblMayInReport = new QLabel(LanguageManager::instance().getText("LBL_PRINTER_REPORT") + ":");
-
-    formInAn->addRow(lblCheDoIn, oInYenLang);
-    formInAn->addRow(lblMayInReceipt, oMayInReceipt);
-    formInAn->addRow(lblMayInReport, oMayInReport);
-
-    tabs->addTab(tabInAn, LanguageManager::instance().getText("TAB_PRINT_CONFIG"));
     
     mainLayout->addWidget(tabs);
 
@@ -240,14 +196,6 @@ void HopThoaiCaiDat::loadData() {
     if (oThoiHanThe) oThoiHanThe->setValue(store.getInt("THOI_HAN_THE_THANG", 6));
     if (oPhiMatSach) oPhiMatSach->setValue(store.getInt("PHI_MAT_SACH", 20000));
 
-    // Print Config
-    oInYenLang->setChecked(store.getBool("Print/Silent", false));
-    
-    QString receiptPrinter = store.getString("Print/Receipt", "");
-    QString reportPrinter = store.getString("Print/Report", "");
-    
-    if (!receiptPrinter.isEmpty()) oMayInReceipt->setCurrentText(receiptPrinter);
-    if (!reportPrinter.isEmpty()) oMayInReport->setCurrentText(reportPrinter);
 }
 
 void HopThoaiCaiDat::luuCauHinh() {
@@ -261,19 +209,6 @@ void HopThoaiCaiDat::luuCauHinh() {
     if (oThoiHanThe) store.set("THOI_HAN_THE_THANG", oThoiHanThe->value(), "int");
     if (oPhiMatSach) store.set("PHI_MAT_SACH", oPhiMatSach->value(), "int");
     
-    // Save Print Config
-    store.set("Print/Silent", oInYenLang->isChecked(), "bool");
-    store.set("Print/Receipt", oMayInReceipt->currentText());
-    store.set("Print/Report", oMayInReport->currentText());
-
-    // Apply to PrintHelper immediately
-    PrintHelper::PrintConfig cfg = PrintHelper::getCauHinh();
-    cfg.tenThuVien = oTenThuVien->text();
-    QString defaultPrinterText = LanguageManager::instance().getText("OPTION_SYSTEM_DEFAULT");
-    cfg.printerReceipt = oMayInReceipt->currentText() == defaultPrinterText ? "" : oMayInReceipt->currentText();
-    cfg.printerReport = oMayInReport->currentText() == defaultPrinterText ? "" : oMayInReport->currentText();
-    cfg.silentPrint = oInYenLang->isChecked();
-    PrintHelper::setCauHinh(cfg);
 
     // Log
     AuditLogger::log(AuditLogger::ACTION_SETTINGS, "CAI_DAT", "", "Cap nhat cau hinh he thong (HopThoaiCaiDat)");
@@ -292,7 +227,4 @@ void HopThoaiCaiDat::macDinh() {
     if (oThoiHanThe) oThoiHanThe->setValue(6);
     if (oPhiMatSach) oPhiMatSach->setValue(20000);
     
-    oInYenLang->setChecked(false);
-    oMayInReceipt->setCurrentIndex(0);
-    oMayInReport->setCurrentIndex(0);
 }

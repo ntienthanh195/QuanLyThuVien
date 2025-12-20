@@ -646,6 +646,28 @@ std::string TachISBNTuMaSach(const std::string& maSach) {
     return maSach.substr(0, viTriGachNgang);
 }
 
+// Chuan hoa ma ban sao: "ISBN-001" -> "ISBN-1"
+std::string ChuanHoaMaBanSao(const std::string& maBanSao) {
+    if (maBanSao.empty()) return "";
+    
+    size_t viTriGachNgang = maBanSao.find_last_of('-');
+    if (viTriGachNgang == std::string::npos || viTriGachNgang == maBanSao.length() - 1) {
+        return maBanSao; // Khong phai dinh dang 'Prefix-Suffix'
+    }
+    
+    std::string prefix = maBanSao.substr(0, viTriGachNgang);
+    std::string suffix = maBanSao.substr(viTriGachNgang + 1);
+    
+    // Kiem tra neu suffix la so
+    int soHauTo = -1;
+    if (ChuyenChuoiThanhSoNguyen(suffix, soHauTo, true)) {
+        // Chuyen nguoc lai thanh chuoi de loai bo leading zeros
+        return prefix + "-" + std::to_string(soHauTo);
+    }
+    
+    return maBanSao; // Khong phai so, giu nguyen
+}
+
 // Lay so hau to tu ma sach (vd: "ISBN-123" -> 123)
 int LaySoHauToMaSach(PTRDMS nodeSach) {
     if (!nodeSach || nodeSach->maSach.empty()) {

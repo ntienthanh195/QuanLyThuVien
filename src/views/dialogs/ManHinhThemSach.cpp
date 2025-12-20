@@ -12,6 +12,7 @@
 #include <QDateTime>
 #include <QShortcut>
 #include <QTimer>
+#include "utils/ToastNotification.h"
 #include "utils/LanguageManager.h"
 
 ManHinhThemSach::ManHinhThemSach(QWidget *parent)
@@ -505,15 +506,17 @@ void ManHinhThemSach::khiNhanLuu() {
     if (result.empty()) {
         hienThiThanhCong(LanguageManager::instance().getText("MSG_SUCCESS_ADD_BOOK_TITLE")); // Simplify success message or use keys
         
-        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), 
-            LanguageManager::instance().getText("MSG_SUCCESS_ADD_BOOK_BODY_HTML")
-                .arg(name).arg(author).arg(copies));
+        ToastNotification::show(
+           LanguageManager::instance().getText("MSG_SUCCESS_ADD_BOOK_BODY_HTML")
+                .arg(name).arg(author).arg(copies),
+           ToastNotification::SUCCESS
+        );
         
         emit sachDaThem();
         accept();
     } else {
         hienThiLoi(Utf8Helper::fromStdString(result));
-        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_ERROR"), Utf8Helper::fromStdString(result));
+        ToastNotification::show(Utf8Helper::fromStdString(result), ToastNotification::ERROR);
     }
 }
 
@@ -553,28 +556,22 @@ void ManHinhThemSach::setupTabOrder() {
 }
 
 void ManHinhThemSach::clearAllFields() {
-    // Confirm before clearing
-    QMessageBox::StandardButton reply = QMessageBox::question(this,
-        LanguageManager::instance().getText("MSG_CONFIRM_CLEAR_FORM_TITLE"),
-        LanguageManager::instance().getText("MSG_CONFIRM_CLEAR_FORM_BODY"),
-        QMessageBox::Yes | QMessageBox::No);
+    // Clear without confirmation
+    nhapISBN->clear();
+    nhapTenSach->clear();
+    nhapTacGia->clear();
+    chonTheLoai->setCurrentIndex(0);
+    nhapNamXuatBan->setValue(QDateTime::currentDateTime().date().year());
+    nhapSoTrang->setValue(100);
+    nhapSoBanSao->setValue(1);
+    nhapViTri->clear();
+    nhanTrangThai->clear();
+    nhapISBN->setFocus();
     
-    if (reply == QMessageBox::Yes) {
-        nhapISBN->clear();
-        nhapTenSach->clear();
-        nhapTacGia->clear();
-        chonTheLoai->setCurrentIndex(0);
-        nhapNamXuatBan->setValue(QDateTime::currentDateTime().date().year());
-        nhapSoTrang->setValue(100);
-        nhapSoBanSao->setValue(1);
-        nhapViTri->clear();
+    // Visual feedback
+    hienThiThanhCong(LanguageManager::instance().getText("MSG_FORM_CLEARED"));
+    ToastNotification::show(LanguageManager::instance().getText("MSG_FORM_CLEARED"), ToastNotification::INFO);
+    QTimer::singleShot(2000, [this]() {
         nhanTrangThai->clear();
-        nhapISBN->setFocus();
-        
-        // Visual feedback
-        hienThiThanhCong(LanguageManager::instance().getText("MSG_FORM_CLEARED"));
-        QTimer::singleShot(2000, [this]() {
-            nhanTrangThai->clear();
-        });
-    }
+    });
 }

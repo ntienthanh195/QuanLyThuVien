@@ -50,7 +50,11 @@
 
 
 WidgetMuonTraSach::WidgetMuonTraSach(QWidget *cha) 
-    : QWidget(cha), docGiaHienTai(nullptr), sachDangChonMuon(nullptr), banSaoDangChon(nullptr), m_batchPrintTimer(nullptr) {
+    : QWidget(cha)
+    , m_batchPrintTimer(nullptr)
+    , docGiaHienTai(nullptr)
+    , sachDangChonMuon(nullptr)
+    , banSaoDangChon(nullptr) {
     thieLapGiaoDien();
     // thieLapTabTraSach(); // REMOVED: Now merged into Borrow logic
 
@@ -161,7 +165,7 @@ public:
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override {
         if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
             switch (section) {
-            case 0: return QStringLiteral("STT");
+            case 0: return LanguageManager::instance().getText("TABLE_HEADER_STT");
             case 1: return LanguageManager::instance().getText("TABLE_HEADER_CODE");
             case 2: return LanguageManager::instance().getText("TABLE_HEADER_LASTNAME");
             case 3: return LanguageManager::instance().getText("TABLE_HEADER_FIRSTNAME");
@@ -227,9 +231,9 @@ public:
                  // 2. Sách Báo Mất (Status 2) - [NEW FIX]
                  if (dto.trangThai == 2) {
                      if (!dto.daThanhToan) {
-                          return QString("Đã báo mất (Nợ: %1)").arg(QLocale(QLocale::Vietnamese).toString((qint64)dto.tienPhat));
+                          return LanguageManager::instance().getText("STATUS_LOST_DEBT").arg(QLocale(QLocale::Vietnamese).toString((qint64)dto.tienPhat));
                      }
-                     return "Đã mất (Đã đền bù)";
+                     return LanguageManager::instance().getText("STATUS_LOST_PAID");
                  }
                  
                  // 3. Sách Đang Mượn (Status 0)

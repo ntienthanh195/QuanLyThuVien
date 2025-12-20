@@ -57,7 +57,9 @@ xcopy /E /I tools release\tools
 ```
 
 > [!IMPORTANT]
-> Tính năng **Import Excel** yêu cầu máy tính người dùng phải có **Python**. Ứng dụng sẽ tự động tải thư viện cần thiết nếu lần đầu sử dụng trên máy mới.
+> **Tính năng Di Động (Zero-Configuration Portability):**
+> 1. **Chuẩn hóa Database:** Ứng dụng tự động sửa lỗi mã sách cũ vào lần chạy đầu tiên trên máy mới.
+> 2. **Tự sửa lỗi Python (Self-Healing):** Nếu máy tính người dùng bị khóa quyền cài đặt Python (như trên MSYS2), ứng dụng sẽ tự tạo môi trường ảo (`.venv`) và tự cài thư viện `openpyxl` bên trong. Người dùng không cần thao tác tay.
 
 ### Bước 5: Tạo Cấu Trúc Thư Mục Cuối Cùng
 
@@ -73,6 +75,7 @@ release/
 ├── libgcc_s_seh-1.dll
 ├── libstdc++-6.dll
 ├── libwinpthread-1.dll
+├── tools/                         (Chứa script Python - RẤT QUAN TRỌNG)
 ├── platforms/
 │   └── qwindows.dll
 ├── styles/

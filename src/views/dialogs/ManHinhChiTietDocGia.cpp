@@ -20,11 +20,14 @@
 #include <QModelIndex>
 #include <QDate>
 #include "utils/PrintHelper.h"
-#include "utils/PrintHelper.h"
+#include <QMap>
 #include "utils/XuLyChuoi.h"
 #include "utils/SettingsManager.h" // Add missing include
 #include "utils/LanguageManager.h"
+#include "utils/ToastNotification.h"
 #include <QLocale>
+#include <QPainter>
+#include <QPainterPath>
 
 // Model for Borrowed Books table
 class SachMuonTableModel : public QAbstractTableModel {
@@ -100,25 +103,21 @@ ManHinhChiTietDocGia::ManHinhChiTietDocGia(PTRDG reader, QWidget *parent)
     , docGiaDuocChon(reader)
     , bangSachMuon(nullptr)
     , modelSachMuon(nullptr)
-    , nutThanhLy(nullptr)
     , nutSua(nullptr)
     , nutThuHoi(nullptr)
     , nutBaoMat(nullptr)
-    , nutXoaBanSao(nullptr)
     , nutLamMoi(nullptr)
     , nutInThe(nullptr)
+    , nutXuatPDF(nullptr)
     , nutDong(nullptr)
-    , nhanTongQuat(nullptr)
-    , nhanTrangThai(nullptr)
     , dongSachDuocChon(-1)
 {
     setWindowTitle(LanguageManager::instance().getText("TITLE_READER_DETAILS"));
-    setMinimumSize(850, 600);
+    setMinimumSize(800, 600); // Larger to "mở cái lịch sử đó ra"
     thietLapGiaoDien();
     thietLapKetNoi();
     taiThongTinDocGia();
     taiDanhSachSachMuon();
-    capNhatTongQuat();
 }
 
 ManHinhChiTietDocGia::~ManHinhChiTietDocGia() {
@@ -135,7 +134,7 @@ void ManHinhChiTietDocGia::thietLapGiaoDien() {
     // Title
     QLabel *titleLabel = new QLabel(LanguageManager::instance().getText("HEADER_READER_DETAILS"), this);
     QFont titleFont;
-    titleFont.setPointSize(16);
+    titleFont.setPointSize(14); // Reduced from 16
     titleFont.setBold(true);
     titleLabel->setFont(titleFont);
     titleLabel->setAlignment(Qt::AlignCenter);
@@ -147,9 +146,9 @@ void ManHinhChiTietDocGia::thietLapGiaoDien() {
     infoGroup->setStyleSheet(
         "QGroupBox {"
         "   border: 1px solid #323248;"
-        "   border-radius: 6px;"
+        "   border-radius: 8px;"
         "   margin-top: 10px;"
-        "   padding-top: 15px;"
+        "   padding: 15px;"
         "   font-weight: bold;"
         "   background-color: #2b2b40;"
         "   color: #ffffff;"
@@ -165,11 +164,34 @@ void ManHinhChiTietDocGia::thietLapGiaoDien() {
         "}"
     );
     
-    QVBoxLayout *infoLayout = new QVBoxLayout(infoGroup);
-    nhanTongQuat = new QLabel(this);
-    nhanTongQuat->setWordWrap(true);
-    nhanTongQuat->setStyleSheet("padding: 10px; font-size: 11pt; line-height: 1.5; color: #E0E0E0;");
-    infoLayout->addWidget(nhanTongQuat);
+    QGridLayout *infoLayout = new QGridLayout(infoGroup);
+    infoLayout->setSpacing(10);
+    
+    auto addInfoRow = [&](const QString &lblKey, QLabel* &valLabel, int row, int col) {
+        QLabel *l = new QLabel(LanguageManager::instance().getText(lblKey) + ":", this);
+        l->setStyleSheet("color: #b5b5c3; font-weight: 500; font-size: 11px;");
+        valLabel = new QLabel("--", this);
+        valLabel->setStyleSheet("color: #ffffff; font-weight: 600; font-size: 13px;");
+        infoLayout->addWidget(l, row, col * 2);
+        infoLayout->addWidget(valLabel, row, col * 2 + 1);
+    };
+
+    addInfoRow("LBL_READER_ID", lblMaThe, 0, 0);
+    addInfoRow("LBL_FULLNAME", lblHoTen, 0, 1);
+    addInfoRow("LBL_READER_TYPE", lblLoaiDocGia, 0, 2);
+    
+    addInfoRow("LBL_CLASS", lblLop, 1, 0);
+    addInfoRow("TABLE_HEADER_GENDER", lblGioiTinh, 1, 1);
+    addInfoRow("LBL_STATUS", lblTrangThai, 1, 2);
+
+    addInfoRow("LBL_DOB", lblNgaySinh, 2, 0);
+    addInfoRow("LBL_PHONE", lblSDT, 2, 1);
+    addInfoRow("LBL_EMAIL", lblEmail, 2, 2);
+
+    infoLayout->setColumnStretch(1, 1);
+    infoLayout->setColumnStretch(3, 1);
+    infoLayout->setColumnStretch(5, 1);
+
     mainLayout->addWidget(infoGroup);
     
     // Borrowed Books Group
@@ -197,12 +219,12 @@ void ManHinhChiTietDocGia::thietLapGiaoDien() {
         "   border: 1px solid #323248;"
         "   border-radius: 6px;"
         "   gridline-color: #2b2b40;"
-        "   font-size: 10pt;"
+        "   font-size: 9pt;" // Reduced from 10pt
         "   selection-background-color: #3699ff;"
         "   selection-color: #ffffff;"
         "}"
         "QTableView::item {"
-        "   padding: 8px;"
+        "   padding: 4px;" // Reduced from 8px
         "}"
         "QTableView::item:selected {"
         "   background-color: #3699ff;"
@@ -211,7 +233,7 @@ void ManHinhChiTietDocGia::thietLapGiaoDien() {
         "QHeaderView::section {"
         "   background-color: #2b2b40;"
         "   color: #b5b5c3;"
-        "   padding: 10px;"
+        "   padding: 6px;" // Reduced from 10px
         "   border: none;"
         "   border-bottom: 2px solid #323248;"
         "   font-weight: 600;"
@@ -219,7 +241,9 @@ void ManHinhChiTietDocGia::thietLapGiaoDien() {
     );
 
     booksLayout->addWidget(bangSachMuon);
-    mainLayout->addWidget(booksGroup);
+    mainLayout->addWidget(booksGroup, 1); // Give it weight to expand
+
+    // Advanced History Chart removed by user request ("xấu quá")
     
     // Status label
     nhanTrangThai = new QLabel("", this);
@@ -334,6 +358,11 @@ void ManHinhChiTietDocGia::thietLapGiaoDien() {
         "QPushButton:hover { background-color: #4A93E3; }"
     );
     
+    nutXuatPDF = new QPushButton("📄 " + LanguageManager::instance().getText("BTN_EXPORT_PDF"), this); // Need to check if key exists or use hardcoded
+    nutXuatPDF->setMinimumHeight(40);
+    nutXuatPDF->setCursor(Qt::PointingHandCursor);
+    nutXuatPDF->setStyleSheet(nutInThe->styleSheet());
+    
     nutDong = new QPushButton(LanguageManager::instance().getText("BTN_CLOSE"), this);
     nutDong->setMinimumHeight(40);
     nutDong->setCursor(Qt::PointingHandCursor);
@@ -356,6 +385,7 @@ void ManHinhChiTietDocGia::thietLapGiaoDien() {
     buttonLayout->addWidget(nutThanhToan); // NEW
     buttonLayout->addWidget(nutLamMoi);
     buttonLayout->addWidget(nutInThe);
+    buttonLayout->addWidget(nutXuatPDF);
     buttonLayout->addStretch();
     buttonLayout->addWidget(nutDong);
     mainLayout->addLayout(buttonLayout);
@@ -370,6 +400,11 @@ void ManHinhChiTietDocGia::thietLapKetNoi() {
     connect(nutBaoMat, &QPushButton::clicked, this, &ManHinhChiTietDocGia::khiNhanBaoMat);
     connect(nutThanhToan, &QPushButton::clicked, this, &ManHinhChiTietDocGia::khiNhanThanhToan); // NEW
     connect(nutInThe, &QPushButton::clicked, this, &ManHinhChiTietDocGia::khiNhanInThe);
+    connect(nutXuatPDF, &QPushButton::clicked, this, [this]() {
+        if (docGiaDuocChon) {
+            PrintHelper::xuatLichSuMuonTraToPDF(docGiaDuocChon, this);
+        }
+    });
     
     if (bangSachMuon->selectionModel()) {
         connect(bangSachMuon->selectionModel(), &QItemSelectionModel::currentChanged,
@@ -380,39 +415,24 @@ void ManHinhChiTietDocGia::thietLapKetNoi() {
 void ManHinhChiTietDocGia::taiThongTinDocGia() {
     if (!docGiaDuocChon) return;
     
-    QString status = (docGiaDuocChon->data.TrangThai == 1) ? "<span style='color:#27ae60'>" + LanguageManager::instance().getText("STATUS_ACTIVE") + "</span>" : "<span style='color:#f64e60'>" + LanguageManager::instance().getText("STATUS_LOCKED") + "</span>";
-    QString gender = (docGiaDuocChon->data.Phai) ? LanguageManager::instance().getText("GENDER_FEMALE") : LanguageManager::instance().getText("GENDER_MALE");
+    lblMaThe->setText(QString::number(docGiaDuocChon->data.MaThe));
+    lblHoTen->setText(QString::fromStdString(docGiaDuocChon->data.Ho + " " + docGiaDuocChon->data.Ten));
     
-    // Phase 2: Show all fields
     QString typeStr = (docGiaDuocChon->data.LoaiDocGia == 0) ? LanguageManager::instance().getText("READER_TYPE_STUDENT") : LanguageManager::instance().getText("READER_TYPE_TEACHER");
+    lblLoaiDocGia->setText(typeStr);
     
-    // Construct HTML manually to ensure all fields are shown without relying on old template
-    QString info = QString(
-        "<table width='100%' cellspacing='5'>"
-        "<tr><td width='30%%'><b>%1:</b></td><td>%2</td></tr>" // Ma The
-        "<tr><td><b>%3:</b></td><td>%4</td></tr>" // Ho Ten
-        "<tr><td><b>%5:</b></td><td>%6</td></tr>" // Loai Doc Gia
-        "<tr><td><b>%7:</b></td><td>%8</td></tr>" // Lop
-        "<tr><td><b>%9:</b></td><td>%10</td></tr>" // Gioi Tinh
-        "<tr><td><b>%11:</b></td><td>%12</td></tr>" // Ngay Sinh
-        "<tr><td><b>%13:</b></td><td>%14</td></tr>" // SDT
-        "<tr><td><b>%15:</b></td><td>%16</td></tr>" // Email
-        "<tr><td><b>%17:</b></td><td>%18</td></tr>" // Trang Thai
-        "<tr><td><b>%19:</b></td><td>%20</td></tr>" // Sach Dang Muon
-        "</table>"
-    )
-    .arg(LanguageManager::instance().getText("LBL_READER_ID")).arg(docGiaDuocChon->data.MaThe)
-    .arg(LanguageManager::instance().getText("LBL_FULLNAME")).arg(QString::fromStdString(docGiaDuocChon->data.Ho + " " + docGiaDuocChon->data.Ten))
-    .arg(LanguageManager::instance().getText("LBL_READER_TYPE")).arg(typeStr)
-    .arg(LanguageManager::instance().getText("LBL_CLASS")).arg(QString::fromStdString(docGiaDuocChon->data.Lop))
-    .arg(LanguageManager::instance().getText("TABLE_HEADER_GENDER")).arg(gender)
-    .arg(LanguageManager::instance().getText("LBL_DOB")).arg(QString::fromStdString(docGiaDuocChon->data.NgaySinh))
-    .arg(LanguageManager::instance().getText("LBL_PHONE")).arg(QString::fromStdString(docGiaDuocChon->data.SDT))
-    .arg(LanguageManager::instance().getText("LBL_EMAIL")).arg(QString::fromStdString(docGiaDuocChon->data.Email))
-    .arg(LanguageManager::instance().getText("LBL_STATUS")).arg(status)
-    .arg(LanguageManager::instance().getText("LBL_BORROWED_COUNT")).arg(docGiaDuocChon->data.soSachDangMuon);
+    lblLop->setText(QString::fromStdString(docGiaDuocChon->data.Lop));
+    
+    QString gender = (docGiaDuocChon->data.Phai) ? LanguageManager::instance().getText("GENDER_FEMALE") : LanguageManager::instance().getText("GENDER_MALE");
+    lblGioiTinh->setText(gender);
+    
+    QString status = (docGiaDuocChon->data.TrangThai == 1) ? LanguageManager::instance().getText("STATUS_ACTIVE") : LanguageManager::instance().getText("STATUS_LOCKED");
+    lblTrangThai->setText(status);
+    lblTrangThai->setStyleSheet(docGiaDuocChon->data.TrangThai == 1 ? "color: #27ae60; font-weight: bold;" : "color: #f64e60; font-weight: bold;");
 
-    nhanTongQuat->setText(info);
+    lblNgaySinh->setText(QString::fromStdString(docGiaDuocChon->data.NgaySinh));
+    lblSDT->setText(QString::fromStdString(docGiaDuocChon->data.SDT));
+    lblEmail->setText(QString::fromStdString(docGiaDuocChon->data.Email));
 }
 
 void ManHinhChiTietDocGia::taiDanhSachSachMuon() {
@@ -526,7 +546,7 @@ void ManHinhChiTietDocGia::khiNhanThuHoi() {
     ThongTinMuon item = danhSachMuonVec[dongSachDuocChon];
     // Check status int
     if (!item.nodeMuonTra || item.nodeMuonTra->data.TrangThai != 0) {
-        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"), LanguageManager::instance().getText("MSG_WARN_RETURN_NOT_BORROWED"));
+        ToastNotification::show(LanguageManager::instance().getText("MSG_WARN_RETURN_NOT_BORROWED"), ToastNotification::WARNING);
         return;
     }
 
@@ -557,7 +577,7 @@ void ManHinhChiTietDocGia::khiNhanBaoMat() {
     ThongTinMuon item = danhSachMuonVec[dongSachDuocChon];
     // Check status int
     if (!item.nodeMuonTra || item.nodeMuonTra->data.TrangThai != 0) {
-        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"), LanguageManager::instance().getText("MSG_WARN_LOST_NOT_BORROWED"));
+        ToastNotification::show(LanguageManager::instance().getText("MSG_WARN_LOST_NOT_BORROWED"), ToastNotification::WARNING);
         return;
     }
 
@@ -585,12 +605,11 @@ void ManHinhChiTietDocGia::khiNhanBaoMat() {
         std::string res = BaoMatSach(docGiaDuocChon, item.maSach.toStdString(), dsDauSach, soLuongDauSach);
         if (res.empty()) {
             // Success
-            QMessageBox::information(this, LanguageManager::instance().getText("MSG_LOST_RECORDED_TITLE"),
-                LanguageManager::instance().getText("MSG_LOST_RECORDED_SUCCESS")
-                    .arg(item.maSach)
-                    .arg(QLocale(QLocale::Vietnamese).toString((qint64)giaSach))
-                    .arg(QLocale(QLocale::Vietnamese).toString((qint64)phiPhat))
-                    .arg(QLocale(QLocale::Vietnamese).toString((qint64)tongPhat)));
+            ToastNotification::show(LanguageManager::instance().getText("MSG_LOST_RECORDED_SUCCESS")
+                .arg(item.maSach)
+                .arg(QLocale(QLocale::Vietnamese).toString((qint64)giaSach))
+                .arg(QLocale(QLocale::Vietnamese).toString((qint64)phiPhat))
+                .arg(QLocale(QLocale::Vietnamese).toString((qint64)tongPhat)), ToastNotification::SUCCESS);
             
             taiThongTinDocGia(); // Refresh reader stats
             taiDanhSachSachMuon(); // Refresh book list
@@ -653,18 +672,12 @@ void ManHinhChiTietDocGia::khiNhanThanhToan() {
 void ManHinhChiTietDocGia::hienThiThongBao(const QString &message, bool isError) {
     if (!nhanTrangThai) return;
     
-    // Simple text update. For Toast, we might want to use ToastNotification if available later.
-    // Ideally we should use ToastNotification like in other dialogs, but for now label is sufficient as per design.
-    // Or we can upgrade to ToastNotification if requested? 
-    // User requested "mấy cái này: Walkthrough - UX Enhancements (Enter Key & Toasts)" just before.
-    // So I should probably use ToastNotification here too!
-    
-    // Check if we have ToastNotification include? No.
-    // Let's stick to label logic consistent with ManHinhChiTietSach first.
     nhanTrangThai->setText((isError ? "❌ " : "✅ ") + message);
     nhanTrangThai->setStyleSheet(
         QString("color: %1; font-weight: bold; padding: 4px; background-color: %2; border-radius: 4px; font-size: 13px;")
         .arg(isError ? "#e74c3c" : "#27ae60")
-        .arg(isError ? "#2b2b40" : "#2b2b40") // Dark bg
+        .arg("#2b2b40") // Dark bg
     );
+    
+    ToastNotification::show(message, isError ? ToastNotification::ERROR : ToastNotification::SUCCESS);
 }

@@ -297,47 +297,53 @@ QString PrintHelper::taoHTMLTemSach(const QString& maSach, const QString& tenSac
     PrintConfig cfg = getCauHinh();
     
     int numBlocks = cfg.blocks.size();
-    if (numBlocks == 0) return "";
+    if (numBlocks == 0) {
+        qWarning() << "[PrintHelper] ⚠️ Label layout is empty (no blocks defined)";
+        return "";
+    }
 
-    // Calculate total height used by text blocks (approximate)
-    // 1pt = 0.3528mm. Let's assume some padding.
+    // 1. Calculate space usage
+    // We assume 1pt text roughly takes 0.6mm (safer than 0.35mm to account for padding/wrapping)
     double totalTextHeightMm = 0;
     int textBlockCount = 0;
     for (const auto& block : cfg.blocks) {
         if (block.type == "text") {
-            totalTextHeightMm += (block.fontSize * 0.5); // Approx mm height including leading
+            totalTextHeightMm += (block.fontSize * 0.6); 
             textBlockCount++;
         }
     }
 
-    double remainingHeightMm = cfg.labelHeight - totalTextHeightMm - 2.0; // 2mm safety margin
-    if (remainingHeightMm < 5.0) remainingHeightMm = 5.0; // Minimum floor
+    double remainingHeightMm = cfg.labelHeight - totalTextHeightMm - 1.5; // 1.5mm safety
+    if (remainingHeightMm < 6.0) remainingHeightMm = 6.0; // Force min barcode height (Scannable)
 
     double padding = (cfg.labelWidth < 25) ? 0.3 : 1.0; // Minimal padding for micro labels
 
     // 2. Start HTML
+    // We use attributes like width='...' instead of style='width: ...' where possible
+    // because QTextDocument (Qt's HTML renderer) respects attributes better than CSS.
+    // We also use 'table-layout: fixed' to force dimensions.
+    
+    double usableWidthMm = cfg.labelWidth - (padding * 2.0);
+
     QString html = QString(
-        "<div style='"
-        " width: %1mm; height: %2mm; max-width: %1mm; max-height: %2mm;"
+        "<div width='%1mm' height='%2mm' style='"
+        " width: %1mm; height: %2mm;"
         " border: %3;" 
         " margin: 0; padding: %4mm;"
         " font-family: \"%5\", sans-serif;"
         " background: #fff;"
         " box-sizing: border-box;"
-        " page-break-inside: avoid;"
-        " overflow: hidden;"
         "'>"
-        "<table width='100%%' height='100%%' border='0' cellspacing='0' cellpadding='0' style='table-layout: fixed; width: 100%%; height: 100%%;'>"
+        "<table width='%6mm' border='0' cellspacing='0' cellpadding='0' style='table-layout: fixed; width: %6mm;'>"
     ).arg(cfg.labelWidth).arg(cfg.labelHeight)
-     .arg(cfg.showBorder ? "0.2mm solid #000" : "none")
+     .arg(cfg.showBorder ? "0.1mm solid #000" : "none")
      .arg(padding)
-     .arg(cfg.fontFamily);
+     .arg(cfg.fontFamily)
+     .arg(usableWidthMm);
 
     for (const auto& block : cfg.blocks) {
         QString content = "";
-        QString style = QString("font-size: %1pt; %2 text-align: %3; line-height: 1.0; overflow: hidden; white-space: nowrap;")
-                        .arg(block.fontSize).arg(block.bold ? "font-weight: bold;" : "").arg(block.textAlign);
-
+        
         if (block.type == "text") {
             if (block.field == "tenDonVi") content = cfg.tenVietTat.isEmpty() ? cfg.tenThuVien : cfg.tenVietTat;
             else if (block.field == "tenSach") content = tenSach;
@@ -349,25 +355,34 @@ QString PrintHelper::taoHTMLTemSach(const QString& maSach, const QString& tenSac
             if (cfg.labelHeight < 12) fontSize = qMax(5, fontSize - 2);
             else if (cfg.labelHeight < 15) fontSize = qMax(6, fontSize - 1);
 
-            QString adjustedStyle = QString("font-size: %1pt; %2 text-align: %3; line-height: 0.9; overflow: hidden; white-space: nowrap;")
+            // Removed white-space: nowrap to prevent horizontal expansion
+            // Instead we use overflow: hidden (though partially ignored) and line-height control
+            QString adjustedStyle = QString("font-size: %1pt; %2 text-align: %3; line-height: 1.1; overflow: hidden;")
                             .arg(fontSize).arg(block.bold ? "font-weight: bold;" : "").arg(block.textAlign);
 
-            html += QString("<tr><td style='%1'>%2</td></tr>").arg(adjustedStyle).arg(content);
+            html += QString("<tr><td style='%1' width='%2mm'>%3</td></tr>")
+                    .arg(adjustedStyle).arg(usableWidthMm).arg(content);
         } 
         else if (block.type == "barcode") {
+            // FIXED: Ensure barcode has a dedicated row with fixed height to prevent layout collapse
             double hBarcode = remainingHeightMm; 
-            double barcodeWidthMm = cfg.labelWidth * cfg.barcodeWidthRatio;
+            double barcodeWidthMm = usableWidthMm * cfg.barcodeWidthRatio;
             
-            // For tiny labels, ensure barcode is at least 70% of height if possible
-            if (cfg.labelHeight < 12 && hBarcode < 6.0) hBarcode = 6.0;
+            // Safety: Barcode must have minimum height (5mm) for scanners
+            if (hBarcode < 5.0) hBarcode = 5.0;
 
             QString barcodeBase64 = generateBarcodeBase64(maSach, hBarcode, cfg.barcodeDPI, barcodeWidthMm);
             
+            // FIXED: Convert MM to Logical Pixels for HTML attributes (1mm ~ 3.78px at 96 DPI)
+            // This ensures exact sizing because QTextDocument respects integer attributes better than CSS units.
+            int wPx = qRound(barcodeWidthMm * 3.7795); 
+            int hPx = qRound(hBarcode * 3.7795);
+
             html += QString(
-                "<tr><td align='%1' valign='middle' height='100%%' style='padding: 0.2mm 0;'>"
-                "  <img src='data:image/png;base64,%2' style='height: %3mm; max-width: 100%%; image-rendering: pixelated;' />"
+                "<tr><td align='%1' valign='middle' style='padding: 1.0mm 0;' width='%2mm'>"
+                "  <img src='data:image/png;base64,%3' width='%4' height='%5' style='display: block; margin: 0 auto; image-rendering: pixelated;' />"
                 "</td></tr>"
-            ).arg(block.textAlign).arg(barcodeBase64).arg(hBarcode);
+            ).arg(block.textAlign).arg(usableWidthMm).arg(barcodeBase64).arg(wPx).arg(hPx);
         }
     }
 
@@ -433,7 +448,7 @@ bool PrintHelper::inNhieuTemSachBatch(const QList<QPair<PTRDS, int>>& list, QWid
                 rowOpen = true;
             }
             
-            html += QString("<td width='%1mm' align='center' valign='top' style='padding:0;'>").arg(cfg.labelWidth);
+            html += QString("<td width='%1mm' align='center' valign='top' style='padding:0; width:%1mm;'>").arg(cfg.labelWidth);
             
             QString priceStr = "";
             if (cfg.showPrice) {
@@ -457,7 +472,7 @@ bool PrintHelper::inNhieuTemSachBatch(const QList<QPair<PTRDS, int>>& list, QWid
             rowOpen = true;
         }
         
-        html += QString("<td width='%1mm' align='center' valign='middle' class='end-marker'>-- HẾT --</td>").arg(cfg.labelWidth);
+        html += QString("<td width='%1mm' align='center' valign='middle' class='end-marker' style='width:%1mm;'>-- HẾT --</td>").arg(cfg.labelWidth);
         
         if ((currentCell + 1) % cols == 0) {
             html += "</tr>";
@@ -720,112 +735,67 @@ bool PrintHelper::inBienLaiPhat(PTRDG docGia, const QString& lyDo, long long soT
 // ===== HELPER FUNCTIONS =====
 // Helper to generate barcode image (Code128 preferred)
 // Parameters now use mm for physical dimensions, converted to px based on target DPI
-static QImage generateBarcodeImage(const QString &text, double heightMm, double maxWidthMm = 0, int targetDPI = 300) {
-    // 1. Generate Code128 Pattern
+// Helper to generate barcode image (Pure Pixel approach for 100% compatibility)
+static QImage generateBarcodeImage(const QString &text, int height = 150) {
     QVector<bool> pattern = Code128::encode(text);
     if (pattern.isEmpty()) return QImage();
 
-    // ═══════════════════════════════════════════════════════════════
-    // 2. CODE 128 BEST PRACTICES (mm-based with DPI conversion)
-    // ═══════════════════════════════════════════════════════════════
+    // Industry Standard Reference: 3px per module, 10x quiet zone
+    int moduleW = 3; 
+    int quietZone = 10 * moduleW;
+    int totalWidth = (pattern.size() * moduleW) + (2 * quietZone);
     
-    // DPI Conversion Helper: mm to pixels
-    // Formula: pixels = (mm / 25.4) * DPI
-    auto mmToPx = [targetDPI](double mm) -> int {
-        return qRound((mm / 25.4) * targetDPI);
-    };
-    
-    // Default Module Width
-    // - ISO 15417 recommends: 0.25mm - 1.016mm
-    // - For 300 DPI, 0.25mm is 3 pixels (Thinner, as requested)
-    double moduleWidthMm = 0.25; 
-    
-    // Auto-Scaling Logic (NEW)
-    // If maxWidthMm is provided, check if we need to shrink module width
-    if (maxWidthMm > 0) {
-        // Calculate minimum required width at default 0.33mm
-        // Width = (11 * L + overhead) * X + QuietZones
-        // Exact pattern size:
-        int numModules = pattern.size();
-        double quietZoneTotalMm = 12.0 * moduleWidthMm * 2; // 12X on both sides
-        double totalRequiredMm = (numModules * moduleWidthMm) + quietZoneTotalMm;
-        
-        if (totalRequiredMm > maxWidthMm) {
-            // Need to shrink
-            // Formula: maxWidthMm = (numModules * X) + (24 * X) = X * (numModules + 24)
-            // X = maxWidthMm / (numModules + 24)
-            double calculatedModuleWidth = maxWidthMm / (numModules + 24);
-            
-            // Enforce minimum readable size (ISO minimum is usually 0.17mm or 0.25mm depending on scanner)
-            // But user requires it to fit. Let's floor at 0.17mm (High density) for 300DPI
-            if (calculatedModuleWidth < 0.17) calculatedModuleWidth = 0.17; 
-            
-            moduleWidthMm = calculatedModuleWidth;
-        }
-    }
-    
-    // Quiet Zone: 12X
-    double quietZoneMm = 12.0 * moduleWidthMm;
-    
-    // Convert to pixels for rendering
-    int moduleWidthPx = mmToPx(moduleWidthMm);
-    int quietZonePx = mmToPx(quietZoneMm);
-    int heightPx = mmToPx(heightMm);
-    
-    // Ensure minimum pixel values (prevent zero-width at low DPI)
-    if (moduleWidthPx < 1) moduleWidthPx = 1; // Allow 1px for high density
-    if (quietZonePx < 5) quietZonePx = 5;
-    if (heightPx < 30) heightPx = 30; // Min height 30px
-    
-    int totalWidthPx = (pattern.size() * moduleWidthPx) + (2 * quietZonePx);
-    
-    QImage image(totalWidthPx, heightPx, QImage::Format_ARGB32);
-    image.fill(Qt::white); // White background (required for contrast)
+    // Use ARGB32 - Most compatible format for Qt renderers
+    QImage image(totalWidth, height, QImage::Format_ARGB32);
+    image.fill(Qt::white);
     
     QPainter painter(&image);
     painter.setPen(Qt::NoPen);
-    painter.setBrush(Qt::black); // Black bars
+    painter.setBrush(Qt::black);
     
-    // Render bars
-    int x = quietZonePx;
+    int x = quietZone;
     for (bool isBar : pattern) {
         if (isBar) {
-            painter.drawRect(x, 0, moduleWidthPx, heightPx);
+            painter.drawRect(x, 0, moduleW, height);
         }
-        x += moduleWidthPx;
+        x += moduleW;
     }
+    painter.end();
     
     return image;
 }
 
-// Helper to expose Barcode Base64 generation (mm-based)
+// Helper to expose Barcode Base64 generation
 QString PrintHelper::generateBarcodeBase64(const QString &text, double heightMm, int targetDPI, double maxWidthMm) {
-    QString cacheKey = QString("%1_%2_%3_%4").arg(text).arg(heightMm).arg(targetDPI).arg(maxWidthMm);
-    if (s_barcodeCache.contains(cacheKey)) return s_barcodeCache[cacheKey];
+    Q_UNUSED(heightMm); Q_UNUSED(targetDPI); Q_UNUSED(maxWidthMm);
+    QString cleanText = text.trimmed();
+    if (cleanText.isEmpty()) return "";
 
-    QImage barcodeImg = generateBarcodeImage(text, heightMm, maxWidthMm, targetDPI);
+    if (s_barcodeCache.contains(cleanText)) return s_barcodeCache[cleanText];
+
+    // Always generate high-res (150px) for cache
+    QImage barcodeImg = generateBarcodeImage(cleanText, 150);
     if (barcodeImg.isNull()) return "";
 
     QByteArray byteArray;
     QBuffer buffer(&byteArray);
     buffer.open(QIODevice::WriteOnly);
     barcodeImg.save(&buffer, "PNG");
-    QString base64 = byteArray.toBase64();
     
-    s_barcodeCache[cacheKey] = base64;
+    QString base64 = byteArray.toBase64();
+    s_barcodeCache[cleanText] = base64;
     return base64;
 }
 
 QString PrintHelper::taoMaVachHTML(const QString& maSo, int fontSize) {
-    // Default: 12mm height
-    double heightMm = (fontSize > 0) ? (fontSize * 0.2646) : 12.0; 
-    int targetDPI = 600; // High precision
+    QString base64 = generateBarcodeBase64(maSo, 0);
+    if (base64.isEmpty()) return "";
+
+    // Standard display height 40-50px. CSS will scale the 150px image down.
+    int displayH = (fontSize > 0) ? fontSize : 40;
     
-    // Auto-fit to 35mm if not specified
-    QString base64 = generateBarcodeBase64(maSo, heightMm, targetDPI, 35.0); 
-    
-    return QString("<img src='data:image/png;base64,%1' style='height:%2mm; max-width:100%%; image-rendering: pixelated;' />")
-            .arg(base64).arg(heightMm);
+    return QString("<img src='data:image/png;base64,%1' style='height:%2px; max-width:100%%; image-rendering: pixelated; display: block; margin: 0 auto;' />")
+            .arg(base64).arg(displayH);
 }
 
 QString PrintHelper::taoMaQRHTML(const QString& maSo, int size) {
@@ -979,8 +949,11 @@ void PrintHelper::setCauHinh(const PrintConfig& config) {
 }
 
 void PrintHelper::reloadCauHinh() {
-    s_configLoaded = false; // Force reload on next getCauHinh()
-    getCauHinh(); // Reload immediately
+    qDebug() << "[PrintHelper] 🔄 Reloading configuration and clearing caches...";
+    s_configLoaded = false; 
+    s_barcodeCache.clear(); // CRITICAL: Clear cache so new dimensions/text take effect
+    s_qrCache.clear();
+    getCauHinh(); // Practical reload
 }
 
 // Flag moved to top
@@ -1021,17 +994,33 @@ PrintHelper::PrintConfig PrintHelper::getCauHinh() {
         cfg.fontFamily = SettingsManager::instance().getString("Print/FontFamily", "Times New Roman");
         cfg.barcodeWidthRatio = SettingsManager::instance().getDouble("Print/BarcodeWidthRatio", 0.9);
 
-        // Load blocks or use default
+        // ═══ DYNAMIC LAYOUT RECONSTRUCTION ═══
+        // Force rebuild of blocks list to ensure settings like showLibName take effect!
+        cfg.blocks.clear();
         QString blocksJson = SettingsManager::instance().getString("Print/LabelBlocks", "");
-        if (blocksJson.isEmpty()) {
-            // Default Layout: Lib Name -> Book Title -> Barcode -> Price -> Code
-            cfg.blocks.append({"text", "tenDonVi", "top", 7, true, "center"});
-            cfg.blocks.append({"text", "tenSach", "middle", 9, true, "center"});
+        
+        if (blocksJson.isEmpty() || blocksJson == "[]" || blocksJson == "{}") {
+            qDebug() << "[PrintHelper] 🧩 Building dynamic layout (LibName:" << cfg.showLibName << ", Title:" << cfg.showBookTitle << ", Price:" << cfg.showPrice << ")";
+            
+            if (cfg.showLibName) cfg.blocks.append({"text", "tenDonVi", "top", 7, true, "center"});
+            if (cfg.showBookTitle) cfg.blocks.append({"text", "tenSach", "middle", 9, true, "center"});
+            
+            // Barcode (Mandatory Line 3)
             cfg.blocks.append({"barcode", "maBanSao", "middle", 0, false, "center"});
+            // Human Code (Line 4)
             cfg.blocks.append({"text", "maBanSao", "bottom", 8, true, "center"});
+            
+            if (cfg.showPrice) cfg.blocks.append({"text", "giaTien", "bottom", 8, true, "center"});
         } else {
-            // TODO: Parse JSON if implemented in SettingsManager
-            // For now, hard-coded default if no specific logic exists for JSON parsing here
+            // Future JSON parsing logic here
+        }
+        
+        // FAIL-SAFE: If after all logic we STILL don't have a barcode, force add it.
+        bool hasBarcode = false;
+        for (const auto& b : cfg.blocks) if (b.type == "barcode") { hasBarcode = true; break; }
+        if (!hasBarcode) {
+            qDebug() << "[PrintHelper] ⚠️ Barcode block missing from config, forcing add.";
+            cfg.blocks.append({"barcode", "maBanSao", "middle", 0, false, "center"});
         }
 
         // ═══ THẺ HỌC VIÊN ═══
@@ -1593,5 +1582,83 @@ bool PrintHelper::showPrintPreview(QTextDocument* doc, const QString& title, QWi
         qDebug() << "User cancelled";
         return false;
     }
+}
+
+bool PrintHelper::xuatLichSuMuonTraToPDF(PTRDG docGia, QWidget* parent) {
+    if (!docGia) return false;
+
+    // 1. Build Reader Info HTML
+    QString infoHtml = QString(
+        "<h2>Thông tin Học viên</h2>"
+        "<p><b>Mã số:</b> %1</p>"
+        "<p><b>Họ tên:</b> %2 %3</p>"
+        "<p><b>Lớp:</b> %4</p>"
+    ).arg(docGia->data.MaThe)
+     .arg(QString::fromStdString(docGia->data.Ho))
+     .arg(QString::fromStdString(docGia->data.Ten))
+     .arg(QString::fromStdString(docGia->data.Lop));
+
+    // 2. Build History Table HTML
+    QString tableHtml = 
+        "<br><h2>Lịch sử Mượn Trả</h2>"
+        "<table border='1' cellspacing='0' cellpadding='5' width='100%' style='border-collapse: collapse;'>"
+        "<tr style='background-color: #f2f2f2;'>"
+        "<th>Mã Sách</th><th>Ngày Mượn</th><th>Ngày Trả</th><th>Trạng Thái</th><th>Ghi Chú</th>"
+        "</tr>";
+
+    MUONTRA p = docGia->data.dsmt;
+    while (p) {
+        QString statusStr = "";
+        int st = p->data.TrangThai;
+        if (st == 0) statusStr = "Dang muon";
+        else if (st == 1) statusStr = "Da tra";
+        else if (st == 2) statusStr = "Mat";
+
+        // Calculate overdue on the fly
+        QDate hanTra = QDate::fromString(QString::fromStdString(p->data.NgayTra), "dd/MM/yyyy");
+        int soNgayQH = 0;
+        if (st == 0) {
+            QDate today = QDate::currentDate();
+            if (today > hanTra) {
+                soNgayQH = hanTra.daysTo(today);
+            }
+        }
+
+        QString note = "";
+        if (soNgayQH > 0) note = QString("Qua han %1 ngay").arg(soNgayQH);
+        if (p->data.tienPhat > 0) {
+            if (!note.isEmpty()) note += " ";
+            note += QString("(Phat: %1)").arg(p->data.tienPhat);
+        }
+
+        tableHtml += QString(
+            "<tr>"
+            "<td>%1</td><td>%2</td><td>%3</td><td>%4</td><td>%5</td>"
+            "</tr>"
+        ).arg(p->data.banSaoSach ? QString::fromStdString(p->data.banSaoSach->maSach) : (p->data.maSachCached.empty() ? "???" : QString::fromStdString(p->data.maSachCached)))
+         .arg(QString::fromStdString(p->data.NgayMuon))
+         .arg(QString::fromStdString(p->data.NgayTra))
+         .arg(statusStr)
+         .arg(note);
+
+        p = p->next;
+    }
+    tableHtml += "</table>";
+
+    // 3. Combine
+    QString finalHtml = QString(
+        "<html><head><style>body { font-family: 'Times New Roman'; }</style></head><body>"
+        "<h1 style='text-align: center;'>BAO CAO LICH SU MUON TRA</h1>"
+        "%1"
+        "<hr>"
+        "%2"
+        "</body></html>"
+    ).arg(infoHtml).arg(tableHtml);
+
+    QTextDocument doc;
+    doc.setHtml(finalHtml);
+
+    QString fileName = QString("LichSu_%1_%2").arg(QString::fromStdString(docGia->data.Ho)).arg(docGia->data.MaThe);
+    return showPrintPreview(&doc, "Xuất Lịch Sử PDF", parent, fileName);
 }
 

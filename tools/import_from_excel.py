@@ -89,8 +89,8 @@ def generate_sample(path):
 
     bs = wb.create_sheet("BanSao")
     bs.append(["isbn", "ma_sach", "status", "vi_tri", "date_added"])
-    bs.append(["9780306406157", "9780306406157-001", "CHO_MUON_DUOC", "Ke A1", "2025-12-06"])
-    bs.append(["9780306406157", "9780306406157-002", "DANG_MUON", "Ke A1", "2025-12-07"])
+    bs.append(["9780306406157", "9780306406157-1", "CHO_MUON_DUOC", "Ke A1", "2025-12-06"])
+    bs.append(["9780306406157", "9780306406157-2", "DANG_MUON", "Ke A1", "2025-12-07"])
 
     wb.save(path)
     # Also add DocGia sheet
@@ -186,7 +186,7 @@ def preview_and_prepare(dauSachRows, banSaoRows, out_dir, docGiaRows=None, muonT
             ok = False; reasons.append('ISBN length invalid')
         if not copy_id or str(copy_id).strip() == "":
             # generate copy id from isbn
-            copy_id = f"{isbn}-AUTO-{i:03d}"
+            copy_id = f"{isbn}-AUTO-{i}"
         if not status:
             status = 'CHO_MUON_DUOC'
 

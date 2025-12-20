@@ -12,6 +12,7 @@
 #include <QGroupBox>
 #include <QDateTime>
 #include <QShortcut>
+#include "utils/ToastNotification.h"
 
 extern PTRDG rootDocGia;
 
@@ -312,17 +313,18 @@ void ManHinhThemDocGia::khiNhanLuu() {
     int genderValue = chonGioiTinh->currentData().toInt();
 
     // Validate họ đệm
+    // Validate họ đệm
     if (lastName.isEmpty()) {
-        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"),
-            LanguageManager::instance().getText("MSG_MISSING_LASTNAME"));
+        nhapHo->setStyleSheet("QLineEdit { border: 2px solid #e74c3c; background-color: #ffe5e5; }");
+        ToastNotification::show(LanguageManager::instance().getText("MSG_MISSING_LASTNAME"), ToastNotification::WARNING);
         nhapHo->setFocus();
         return;
     }
     
     std::string loiHo = KiemTraTenNguoi(lastName.toStdString(), "Họ đệm");
     if (!loiHo.empty()) {
-        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_ERROR_NAME"),
-            QString::fromStdString(loiHo) + LanguageManager::instance().getText("MSG_ERROR_NAME_FORMAT_HINT"));
+        nhapHo->setStyleSheet("QLineEdit { border: 2px solid #e74c3c; background-color: #ffe5e5; }");
+        ToastNotification::show(QString::fromStdString(loiHo), ToastNotification::WARNING);
         nhapHo->setFocus();
         return;
     }
@@ -330,16 +332,16 @@ void ManHinhThemDocGia::khiNhanLuu() {
     // Validate tên
     // Validate tên
     if (firstName.isEmpty()) {
-        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"),
-            LanguageManager::instance().getText("MSG_MISSING_FIRSTNAME"));
+        nhapTen->setStyleSheet("QLineEdit { border: 2px solid #e74c3c; background-color: #ffe5e5; }");
+        ToastNotification::show(LanguageManager::instance().getText("MSG_MISSING_FIRSTNAME"), ToastNotification::WARNING);
         nhapTen->setFocus();
         return;
     }
     
     std::string loiTen = KiemTraTenNguoi(firstName.toStdString(), "Tên");
     if (!loiTen.empty()) {
-        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_ERROR_FIRSTNAME"),
-            QString::fromStdString(loiTen) + LanguageManager::instance().getText("MSG_ERROR_FIRSTNAME_FORMAT_HINT"));
+        nhapTen->setStyleSheet("QLineEdit { border: 2px solid #e74c3c; background-color: #ffe5e5; }");
+        ToastNotification::show(QString::fromStdString(loiTen), ToastNotification::WARNING);
         nhapTen->setFocus();
         return;
     }
@@ -363,33 +365,21 @@ void ManHinhThemDocGia::khiNhanLuu() {
             
             QString genderStr = genderValue == 0 ? LanguageManager::instance().getText("GENDER_MALE") : LanguageManager::instance().getText("GENDER_FEMALE");
             QString maTheStr = (newReader != nullptr) ? QString::number(newReader->data.MaThe) : maDuocTao;
-            QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"),
-                QString("✅ %1\n\n"
-                       "🎫 %2: %3\n"
-                       "👤 %4: %5 %6\n"
-                       "⚧ %7: %8")
-                    .arg(LanguageManager::instance().getText("MSG_SUCCESS_ADD"))
-                    .arg(LanguageManager::instance().getText("LBL_READER_CODE"))
-                    .arg(maTheStr)
-                    .arg(LanguageManager::instance().getText("LBL_LASTNAME") + " " + LanguageManager::instance().getText("LBL_FIRSTNAME")) // Or just "Name"
-                    .arg(lastName)
-                    .arg(firstName)
-                    .arg(LanguageManager::instance().getText("LBL_GENDER"))
-                    .arg(genderStr));
+            
+            // Show non-blocking success toast
+            ToastNotification::show(
+                LanguageManager::instance().getText("MSG_SUCCESS_ADD") + ": " + lastName + " " + firstName,
+                ToastNotification::SUCCESS
+            );
             
             accept();
         } else {
-            QMessageBox::critical(this, LanguageManager::instance().getText("TITLE_ERROR"),
-                LanguageManager::instance().getText("MSG_ERROR_ADD") + "\n" +
-                LanguageManager::instance().getText("MSG_TRY_AGAIN")); // Forgot MSG_TRY_AGAIN? Or simplify.
-
+             ToastNotification::show(LanguageManager::instance().getText("MSG_ERROR_ADD"), ToastNotification::ERROR);
         }
     } catch (const std::exception& e) {
-        QMessageBox::critical(this, LanguageManager::instance().getText("TITLE_ERROR_SYSTEM"),
-            LanguageManager::instance().getText("MSG_ERROR_ADD_FAILED").arg(e.what()));
+        ToastNotification::show(LanguageManager::instance().getText("MSG_ERROR_ADD_FAILED").arg(e.what()), ToastNotification::ERROR);
     } catch (...) {
-        QMessageBox::critical(this, LanguageManager::instance().getText("TITLE_ERROR_UNKNOWN"),
-            LanguageManager::instance().getText("MSG_ERROR_UNKNOWN_ACTION"));
+        ToastNotification::show(LanguageManager::instance().getText("MSG_ERROR_UNKNOWN_ACTION"), ToastNotification::ERROR);
     }
 }
 
@@ -420,20 +410,14 @@ void ManHinhThemDocGia::setupTabOrder() {
 }
 
 void ManHinhThemDocGia::clearAllFields() {
-    // Confirm before clearing
-    QMessageBox::StandardButton reply = QMessageBox::question(this,
-        LanguageManager::instance().getText("BTN_CLEAR_FORM"), // Title "Clear Form" or "Confirm Clear"
-        LanguageManager::instance().getText("MSG_CONFIRM_CLEAR"), // Need key?
-        QMessageBox::Yes | QMessageBox::No);
+    // Clear without annoying confirmation
+    nhapHo->clear();
+    nhapTen->clear();
+    chonGioiTinh->setCurrentIndex(0);
+    taoMaDocGia(); // Generate new ID
+    nhapHo->setFocus();
     
-    if (reply == QMessageBox::Yes) {
-        nhapHo->clear();
-        nhapTen->clear();
-        chonGioiTinh->setCurrentIndex(0);
-        taoMaDocGia(); // Generate new ID
-        nhapHo->setFocus();
-        
-        // Visual feedback
-        AnimationHelper::fadeIn(nhanMaThe, 300);
-    }
+    // Visual feedback
+    AnimationHelper::fadeIn(nhanMaThe, 300);
+    ToastNotification::show(LanguageManager::instance().getText("MSG_FORM_CLEARED"), ToastNotification::INFO);
 }

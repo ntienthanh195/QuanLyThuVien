@@ -1,169 +1,85 @@
-# Hệ Thống Quản Lý Thư Viện
-**Phiên bản:** 2.1 (Release Candidate 2)  
-**Ngày cập nhật:** 14/12/2025
+# 📚 Hệ Thống Quản Lý Thư Viện (V2.2)
 
-Phần mềm quản lý thư viện chuyên nghiệp dành cho trường học và học viện, hỗ trợ đa ngôn ngữ (Tiếng Việt, Tiếng Khmer, English).
-
----
-
-## Tính Năng Chính
-
-### Quản Lý
-- **Sách:** Quản lý đầu sách và bản sao, tìm kiếm nâng cao, import từ Excel/CSV
-- **Học Viên:** Quản lý thông tin, trạng thái thẻ, lịch sử mượn trả
-- **Nhân Sự:** Phân quyền Admin/Thủ thư với audit logging
-- **Mượn/Trả:** Quy trình 1 chạm với barcode scanner, tự động tính phạt quá hạn
-
-### In Ấn
-- In thẻ thư viện với mã QR
-- In mã vạch Code128 cho sách
-- In phiếu mượn/trả tự động
-- Hỗ trợ máy in nhiệt K80 và A4
-
-### Báo Cáo & Thống Kê
-- Dashboard thời gian thực
-- Top 10 sách/học viên
-- Báo cáo quá hạn với tính năng filter
-- Export Excel/PDF
-
-### Hệ Thống
-- **Đa ngôn ngữ:** Chuyển đổi tức thì giữa Việt-Khmer-English
-- **Sao lưu:** Backup tự động và thủ công
-- **Database:** SQLite với EventBus realtime sync
+**Phiên bản:** 2.2 
+**Cập nhật cuối:** 20/12/2025  
+**Trạng thái:** Hoàn thiện - Sẵn sàng triển khai (Zero-Configuration)
 
 ---
 
-## Yêu Cầu Hệ Thống
+## 🚀 Tính Năng Nổi Bật: "Cắm là Chạy" (Zero-Configuration)
 
-- **OS:** Windows 10/11 (64-bit)
-- **Qt:** 6.10.1 với MinGW 64-bit
-- **RAM:** Tối thiểu 2GB (khuyến nghị 4GB)
-- **Màn hình:** Độ phân giải tối thiểu 1366x768
+## 🚀 Giải Pháp "Cắm là Chạy" (Zero-Configuration Portability)
+
+Dự án được thiết kế với triết lý **"Phần mềm phục vụ con người"**, đặc biệt là những người dùng không am hiểu sâu về kỹ thuật. Chúng tôi đã triển khai một hệ sinh thái tự động hóa toàn diện:
+
+### 1. Hệ Thống Tự Khởi Tạo & Di Trú (Auto-Migration & Seeding)
+- **Tự động hóa sơ đồ (Schema):** Khi khởi chạy lần đầu trên máy mới, ứng dụng tự quét và tạo toàn bộ cấu trúc bảng SQLite. Nếu database cũ thiếu cột (do cập nhật phiên bản), hệ thống tự động `ALTER TABLE` để bổ sung mà không làm mất dữ liệu.
+- **Dữ liệu mồi (Data Seeding):** Tự động thiết lập tài khoản Admin mặc định, phân quyền Thủ thư và các cấu hình hệ thống (giới hạn mượn, tiền phạt) ngay khi database được tạo mới.
+- **Chuẩn hóa dữ liệu cũ:** Cơ chế thông minh tự động tìm kiếm và "sửa lỗi" các mã sách có hậu tố không chuẩn (như `-001` thành `-1`), đảm bảo tính nhất quán của dữ liệu trên mọi môi trường.
+
+### 2. Môi Trường Python Tự Phục Hồi (Self-Healing Runtime)
+- **Vượt rào quản lý hệ thống:** Đối với các máy tính bị khóa quyền cài đặt thư viện (lỗi *externally-managed-environment* thường gặp trên MSYS2/MinGW), ứng dụng sẽ tự động cô lập một môi trường ảo riêng biệt (`.venv`) ngay trong thư mục dự án.
+- **Quản lý Dependencies thông minh:** Ứng dụng tự động kiểm tra và cài đặt thư viện `openpyxl`. Nếu môi trường hệ thống không khả dụng, nó sẽ tự "chữa lành" bằng cách xây dựng lại runtime cục bộ, hỗ trợ cả cấu trúc thư mục Windows (`Scripts`) và Unix-style (`bin`).
+
+### 3. Trải Nghiệm Đa Ngôn Ngữ Nhất Quán
+- **Chuyển vùng dữ liệu:** Không chỉ là dịch văn bản, hệ thống hỗ trợ font chữ đặc thù (Khmer OS Siemreap) được nhúng sẵn vào gói cài đặt, đảm bảo hiển thị hoàn hảo ngay cả trên máy tính chưa cài font.
+- **Real-time Sync:** Mọi thay đổi về ngôn ngữ được áp dụng tức thì trên toàn bộ giao diện mà không cần khởi động lại app.
 
 ---
 
-## Hướng Dẫn Build
+## 🛠 Tính Năng Chuyên Sâu (Functional Deep-Dive)
 
-### 1. Chuẩn Bị Môi Trường
+### 📖 Quản Lý Sách & Kho Số Hóa
+- **Quản lý phân cấp:** Phân tách rõ ràng giữa "Đầu sách" (Metadata) và "Bản sao" (Physical copies).
+- **ISBN & Metadata:** Tự động chuẩn hóa mã ISBN, hỗ trợ lưu trữ thông tin nhà xuất bản, tác giả, năm xuất bản và giá tiền.
+- **Số hóa quy trình nhập liệu:** Nhập hàng nghìn bản ghi từ Excel chỉ trong vài giây với hệ thống kiểm lỗi logic (validation) cực kỳ chặt chẽ.
+- **In ấn mã vạch:** Tích hợp bộ tạo mã vạch Code128, cho phép in tem dán cho từng cuốn sách trực tiếp từ phần mềm.
 
+### 🎓 Hệ Thống Học Viên & Quản Lý Mượn Trả
+- **Thẻ thư viện thông minh:** Tự động tạo mã QR định danh cho từng học viên, hỗ trợ in thẻ nhựa hoặc thẻ giấy chuyên nghiệp.
+- **Quy trình mượn trả "Một chạm":** Sử dụng máy quét mã vạch để tối giản hóa thao tác, giảm thiểu sai sót con người.
+- **Quản lý nghiệp vụ chặt chẽ:** Tự động tính toán hạn trả, tiền phạt quá hạn dựa trên cấu hình linh hoạt (số sách tối đa, số ngày mượn, đơn giá phạt).
+- **Lịch sử toàn diện:** Truy xuất chi tiết lịch sử mượn trả của từng học viên và từng đầu sách.
+
+### 📊 Phân Tích Dữ Liệu & Quản Trị Hệ Thống
+- **Dashboard thời gian thực:** Cung cấp biểu đồ thống kê trực quan về tình hình mượn trả, top sách được yêu thích và tình trạng kho.
+- **Audit Logging (Nhật ký hệ thống):** Ghi lại mọi thao tác quan trọng (thêm/sửa/xóa/đăng nhập) để đảm bảo tính minh bạch và bảo mật.
+- **Quản lý phân quyền:** Hệ thống phân quyền chi tiết giữa Quản trị viên (Toàn quyền) và Thủ thư (Chỉ quản lý nghiệp vụ).
+- **Cấu hình động:** Cho phép thay đổi các quy định về mượn trả và giao diện mà không cần can thiệp vào mã nguồn.
+- **Backup dữ liệu tự động định kỳ.**
+
+---
+
+## 💻 Yêu Cầu Hệ Thống & Build
+
+- **OS:** Windows 10/11 (64-bit).
+- **Runtime:** Ứng dụng đi kèm mọi thư viện cần thiết (DLLs).
+- **Python (Tùy chọn):** Nếu cần Import Excel, chỉ cần có Python cài sẵn, ứng dụng sẽ tự lo phần còn lại.
+
+### Hướng Dẫn Build (Dành cho Lập trình viên)
 ```powershell
-# Clone repository
-git clone <repository-url>
-cd QuanLyThuVien
-```
+# 1. Build Release
+qmake.exe QuanLyThuVien_V2.pro -spec win32-g++ "CONFIG+=release"
+mingw32-make.exe release
 
-### 2. Build Release
-
-```powershell
-# Chạy qmake
-C:/Qt/6.10.1/mingw_64/bin/qmake.exe QuanLyThuVien_V2.pro -spec win32-g++ "CONFIG+=release"
-
-# Compile
-C:/Qt/Tools/mingw1310_64/bin/mingw32-make.exe release
-```
-
-### 3. Đóng Gói (Deploy)
-
-```powershell
-# Tự động đóng gói với script
+# 2. Đóng gói Portable
 ./deploy.ps1
-
-# Kết quả: QuanLyThuVien_Portable/
 ```
-
-**Chi tiết:** Xem `HUONG_DAN_DONG_GOI.md`
-
----
-
-## Cấu Trúc Dự Án
-
-```
-QuanLyThuVien/
-├── nguon/                  # UI Code (Vietnamese naming - legacy)
-│   ├── giao_dien/         # Main widgets
-│   └── main_v2.cpp        # Entry point
-├── src/                    # Modern code (English naming)
-│   ├── models/            # Business logic
-│   ├── utils/             # Utilities (LanguageManager, PrintHelper...)
-│   └── views/             # Dialogs and widgets
-├── include/               # Header files
-├── resources/             # Icons, fonts, QSS themes
-├── data/                  # Database and sample data
-├── tools/                 # Helper scripts
-└── docs/archive/          # Legacy documentation
-
-Artifacts (Reports):
-└── .gemini/antigravity/brain/.../
-    ├── BAO_CAO_UX_TONG_HOP.md        # Comprehensive UX audit
-    ├── BAO_CAO_TONG_KET_HIEU_CHINH.md # Implementation summary
-    └── HUONG_DAN_SU_DUNG_NHANH.md     # Quick user guide
-```
+*Kết quả nằm trong thư mục `QuanLyThuVien_Portable/`.*
 
 ---
 
-## Công Nghệ
-
-- **Framework:** Qt 6.10.1 (C++ Widgets)
-- **Database:** SQLite + Custom binary files
-- **Architecture:** MVC with EventBus pattern
-- **Barcode:** Code128 generator (custom)
-- **PDF:** QPrinter with custom templates
-- **Build:** qmake + MinG
----
-
-## Khắc Phục Sự Cố
-
-### Lỗi: "Qt6Core.dll is missing"
-```powershell
-cd QuanLyThuVien_Portable
-C:/Qt/6.10.1/mingw_64/bin/windeployqt.exe QuanLyThuVien.exe --release
-```
-
-### Lỗi: Thiếu MinGW DLLs
-```powershell
-copy C:\Qt\Tools\mingw1310_64\bin\libgcc_s_seh-1.dll QuanLyThuVien_Portable\
-copy C:\Qt\Tools\mingw1310_64\bin\libstdc++-6.dll QuanLyThuVien_Portable\
-copy C:\Qt\Tools\mingw1310_64\bin\libwinpthread-1.dll QuanLyThuVien_Portable\
-```
-
-### Lỗi: Font chữ Khmer bị ô vuông
-- Cài đặt font **Khmer OS Siemreap** (có sẵn trong `resources/fonts/`)
-- Copy `Siemreap-Regular.ttf` vào `C:\Windows\Fonts\`
+## 📁 Cấu Trúc Dự Án
+- `src/`: Mã nguồn C++ hiện đại (MVC Pattern).
+- `include/`: Các file header định nghĩa hệ thống.
+- `tools/`: Các script Python hỗ trợ (Quan trọng cho tính năng Excel).
+- `resources/`: Icons, Fonts (Khmer OS Siemreap) và QSS Styles.
+- `data/`: Cơ sở dữ liệu SQLite và file cấu hình.
 
 ---
 
-## Roadmap (Phase 3)
-
-### Đang Thực Hiện
-- [ ] Cleanup emoji trong UI (70+ vị trí)
-- [ ] Chuẩn hóa icon set (SVG only)
-- [ ] Fix accessibility (contrast ratio, keyboard navigation)
-- [ ] Thay thế QMessageBox bằng Toast notifications
-
-### Kế Hoạch
-- [ ] Bulk operations (xóa nhiều, export nhiều)
-- [ ] Dashboard animations
-- [ ] Module kiểm kê kho
-- [ ] Web portal cho học viên
-
-**Chi tiết:** Xem `BAO_CAO_UX_TONG_HOP.md`
-
----
-
-## Đóng Góp
-
-Dự án hiện đang trong giai đoạn **Release Candidate**. Nếu phát hiện lỗi hoặc có đề xuất, vui lòng:
-
-1. Kiểm tra `BAO_CAO_UX_TONG_HOP.md` xem vấn đề đã được ghi nhận chưa
-2. Tạo issue mô tả chi tiết (steps to reproduce, expected vs actual)
-3. Attach screenshots nếu là UI bug
-
----
-
-## License
-
-Proprietary - For Internal Use Only
-
-**Phát triển cho:** Học viện Phật giáo Nam Tông Khemr 
-**Team:** Chăm Rốch Thi  
-**Năm:** 2025
+## 📋 Thông Tin Bản Quyền
+- **Dự án:** Library Management System
+- **Phát triển cho:** Học viện Phật giáo Nam Tông Khmer
+- **Tác giả:** Chăm Rốch Thi & Team
+- **Giấy phép:** Nội bộ (Proprietary)

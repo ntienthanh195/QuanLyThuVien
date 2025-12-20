@@ -58,18 +58,25 @@ private:
     // Helper struct moved to public
     std::vector<ThongTinMuon> danhSachMuonVec;
 
-    QPushButton *nutThanhLy;
-    QPushButton *nutSua; // New button
+    QPushButton *nutSua; 
     QPushButton *nutThuHoi;
     QPushButton *nutBaoMat;
-    QPushButton *nutThanhToan; // NEW
-    QPushButton *nutXoaBanSao;
+    QPushButton *nutThanhToan; 
     QPushButton *nutLamMoi;
     QPushButton *nutInThe;
+    QPushButton *nutXuatPDF; 
     QPushButton *nutDong;
     
-    QLabel *nhanTongQuat;
     QLabel *nhanTrangThai;
+    QLabel *lblMaThe;
+    QLabel *lblHoTen;
+    QLabel *lblLoaiDocGia;
+    QLabel *lblLop;
+    QLabel *lblGioiTinh;
+    QLabel *lblTrangThai;
+    QLabel *lblNgaySinh;
+    QLabel *lblSDT;
+    QLabel *lblEmail;
     
     int dongSachDuocChon;
     

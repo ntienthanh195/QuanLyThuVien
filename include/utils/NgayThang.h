@@ -14,5 +14,7 @@ time_t ChuyenNgaySangTimeT(const std::string& sNgay, std::ostream& out = std::co
 bool kiemTraQuaHan(std::string ngayMuon, std::ostream& out = std::cout); // Chua dinh nghia trong file .cpp ?
 std::string layNgayHienTai(std::ostream& out = std::cout);
 int tinhSoNgayQuaHan(std::string ngayMuon, std::ostream& out = std::cout);
+int LayNamPhatLich(); // Nam hien tai + 543
+std::string ChuyenSangPhatLich(const std::string& ngayCE); // "2025" -> "2025 (PL 2568)"
 
 #endif // NGAYTHANG_H

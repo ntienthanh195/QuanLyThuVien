@@ -51,8 +51,15 @@ private:
     QPushButton *nutInTem; // Nút in tem
     QPushButton *nutChonTatCa; // Nút chọn tất cả
     QPushButton *nutDong;
-    QLabel *nhanTongQuat;
     QLabel *nhanTrangThai;
+    QLabel *lblTenSach;
+    QLabel *lblTacGia;
+    QLabel *lblISBN;
+    QLabel *lblTheLoai;
+    QLabel *lblNXB;
+    QLabel *lblNamXB;
+    QLabel *lblSoTrang;
+    QLabel *lblGiaTien;
     
     int dongBanSaoDuocChon;
     std::string maBanSaoDuocChon;
