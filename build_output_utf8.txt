@@ -1,0 +1,84 @@
+﻿C:/msys64/mingw64/bin/mingw32-make.exe -f Makefile.Release
+mingw32-make[1]: Entering directory 'E:/Qt/QuanLyThuVien'
+g++ -c -fno-keep-inline-dllexport -O2 -std=gnu++1z -Wall -Wextra -Wextra -fexceptions -mthreads -DUNICODE -D_UNICODE -DWIN32 -DMINGW_HAS_SECURE_API=1 -DAPP_SOURCE_DIR=\"E:/Qt/QuanLyThuVien\" -DQT_DISABLE_DEPRECATED_BEFORE=0x060000 -DQT_DEPRECATED_WARNINGS -DQT_NO_DEBUG -DQT_PRINTSUPPORT_LIB -DQT_CHARTS_LIB -DQT_OPENGLWIDGETS_LIB -DQT_WIDGETS_LIB -DQT_OPENGL_LIB -DQT_SVG_LIB -DQT_GUI_LIB -DQT_SQL_LIB -DQT_CONCURRENT_LIB -DQT_CORE_LIB -DQT_NEEDS_QMAIN -I. -Ibao_gom -Ibao_gom/giao_dien -Ibao_gom/giao_dien/hop_thoai -Ibao_gom/tien_ich -Iinclude -Iinclude/models -Iinclude/views -Iinclude/utils -Iinclude/qrcode -I3rdparty/QXlsx/QXlsx -I3rdparty/QXlsx -I3rdparty/QXlsx/QXlsx/header -IE:/Qt/QuanLyThuVien/3rdparty/QXlsx/QXlsx/../QXlsx/header/win32-gcc -IC:/Qt/6.10.1/mingw_64/include -IC:/Qt/6.10.1/mingw_64/include/QtPrintSupport -IC:/Qt/6.10.1/mingw_64/include/QtCharts -IC:/Qt/6.10.1/mingw_64/include/QtOpenGLWidgets -IC:/Qt/6.10.1/mingw_64/include/QtWidgets -IC:/Qt/6.10.1/mingw_64/include/QtOpenGL -IC:/Qt/6.10.1/mingw_64/include/QtSvg -IC:/Qt/6.10.1/mingw_64/include/QtGui/6.10.1 -IC:/Qt/6.10.1/mingw_64/include/QtGui/6.10.1/QtGui -IC:/Qt/6.10.1/mingw_64/include/QtGui -IC:/Qt/6.10.1/mingw_64/include/QtSql -IC:/Qt/6.10.1/mingw_64/include/QtConcurrent -IC:/Qt/6.10.1/mingw_64/include/QtCore/6.10.1 -IC:/Qt/6.10.1/mingw_64/include/QtCore/6.10.1/QtCore -IC:/Qt/6.10.1/mingw_64/include/QtCore -Irelease_v2/moc -I/include -IC:/Qt/6.10.1/mingw_64/mkspecs/win32-g++  -o release_v2\obj\ImportManager.o src\utils\ImportManager.cpp
+mingw32-make : src\ut
+ils\ImportManager.cpp
+: In member function 
+'bool ImportManager::
+runApply(const 
+QString&, const 
+QString&, QWidget*)':
+At line:1 char:1
++ mingw32-make -j8 > 
+build_output.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: (src\uti   
+ ls\Impor...g&, Q    
+Widget*)'::Strin    
+g) [], RemoteExc    
+eption
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+src\utils\ImportManag
+er.cpp:297:33: 
+error: qualified-id 
+in declaration 
+before '(' token
+  297 | bool ImportMa
+nager::runApplyData(c
+onst 
+QList<QStringList> 
+&data, const QString 
+&type, const QString 
+&mode, QWidget 
+*parent) {
+      |              
+                   ^
+src\utils\ImportManag
+er.cpp:363:2: error: 
+expected '}' at end 
+of input
+  363 | }
+      |  ^
+src\utils\ImportManag
+er.cpp:212:94: note: 
+to match this '{'
+  212 | bool ImportMa
+nager::runApply(const
+ QString &excelFile, 
+const QString &mode, 
+QWidget *parent) {
+      |              
+                     
+                     
+                     
+                 ^
+src\utils\ImportManag
+er.cpp:212:86: 
+warning: unused 
+parameter 'parent' 
+[-Wunused-parameter]
+  212 | bool ImportMa
+nager::runApply(const
+ QString &excelFile, 
+const QString &mode, 
+QWidget *parent) {
+      |              
+                     
+                     
+                     
+~~~~~~~~~^~~~~~
+mingw32-make[1]: *** 
+[Makefile.Release:221
+51: release_v2/obj/Im
+portManager.o] Error 
+1
+mingw32-make[1]: Leaving directory 'E:/Qt/QuanLyThuVien'
+mingw32-make: *** 
+[Makefile:45: 
+release] Error 2

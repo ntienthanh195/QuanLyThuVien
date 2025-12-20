@@ -1816,9 +1816,7 @@ void BangDieuKhien::xuLyNhapDuLieuTongHop() {
     ImportManager& mgr = ImportManager::instance();
     
     // Check and install dependencies (IMPORTANT for other machines)
-    if (!mgr.ensureDependencies(this)) {
-        return; // Error message shown inside ensureDependencies
-    }
+
     
     // Show loading? (Simple enough for now)
     ImportManager::PreviewResult res = mgr.runPreview(fileName);

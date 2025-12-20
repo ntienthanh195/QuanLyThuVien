@@ -808,7 +808,7 @@ void WidgetQuanLyDocGia::xuLyNhapDuLieuTu() {
     if (file.isEmpty()) return;
 
     ImportManager importer(this);
-    if (!importer.ensureDependencies(this)) return;
+
 
     QProgressDialog progress(LanguageManager::instance().getText("MSG_PROCESSING_EXCEL"), QString(), 0, 0, this);
     progress.setWindowModality(Qt::WindowModal);

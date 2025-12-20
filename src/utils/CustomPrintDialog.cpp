@@ -1,6 +1,10 @@
 #include "utils/CustomPrintDialog.h"
 #include "utils/PrintHelper.h"
 #include "utils/FilePathManager.h"
+#include <QScrollBar>
+#include <QMouseEvent>
+#include <QWheelEvent>
+#include <QAbstractScrollArea>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGridLayout>
@@ -192,6 +196,14 @@ void CustomPrintDialog::setupUI() {
     m_previewWidget = new QPrintPreviewWidget(m_printer);
     m_previewWidget->setStyleSheet("background-color: #2b2b40; border: 1px solid #3E3E42; border-radius: 4px;");
     
+    // Install Event Filter for Zoom/Pan
+    m_previewWidget->installEventFilter(this);
+    for (auto child : m_previewWidget->findChildren<QWidget*>()) {
+        child->installEventFilter(this);
+        // Important: Set tracking to get mouse move events while dragging
+        child->setMouseTracking(true); 
+    }
+
     rightLayout->addWidget(m_previewWidget);
     
     // Assemble panels
@@ -317,4 +329,57 @@ void CustomPrintDialog::onZoomChanged(int value) {
 
 QString CustomPrintDialog::selectedPrinterName() const {
     return m_printerCombo->currentText();
+}
+
+bool CustomPrintDialog::eventFilter(QObject *obj, QEvent *event) {
+    // Helper to find scroll area
+    auto getScrollArea = [&]() -> QAbstractScrollArea* {
+        return m_previewWidget->findChild<QAbstractScrollArea*>();
+    };
+
+    if (event->type() == QEvent::Wheel) {
+        QWheelEvent *wheelEvent = static_cast<QWheelEvent*>(event);
+        // Fix for Trackpad: 
+        // - Standard Wheel (2 fingers) -> Scroll (Pan) [Pass through]
+        // - Ctrl + Wheel (Pinch) -> Zoom [Consume]
+        if (wheelEvent->modifiers() & Qt::ControlModifier) { 
+            int delta = wheelEvent->angleDelta().y();
+            if (delta != 0) {
+                int currentVal = m_zoomSlider->value();
+                // Slower zoom step for smoother trackpad pinch
+                int step = (delta > 0) ? 5 : -5; 
+                m_zoomSlider->setValue(currentVal + step);
+                return true;
+            }
+        }
+    } else if (event->type() == QEvent::MouseButtonPress) {
+        QMouseEvent *mouseEvent = static_cast<QMouseEvent*>(event);
+        if (mouseEvent->button() == Qt::LeftButton) {
+            m_isDragging = true;
+            m_lastMousePos = mouseEvent->globalPosition().toPoint();
+            m_previewWidget->setCursor(Qt::ClosedHandCursor);
+            return true;
+        }
+    } else if (event->type() == QEvent::MouseMove) {
+        if (m_isDragging) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent*>(event);
+            QPoint delta = mouseEvent->globalPosition().toPoint() - m_lastMousePos;
+            m_lastMousePos = mouseEvent->globalPosition().toPoint();
+
+            QAbstractScrollArea* scroll = getScrollArea();
+            if (scroll) {
+                scroll->horizontalScrollBar()->setValue(scroll->horizontalScrollBar()->value() - delta.x());
+                scroll->verticalScrollBar()->setValue(scroll->verticalScrollBar()->value() - delta.y());
+            }
+            return true;
+        }
+    } else if (event->type() == QEvent::MouseButtonRelease) {
+        if (m_isDragging) {
+            m_isDragging = false;
+            m_previewWidget->setCursor(Qt::ArrowCursor);
+            return true;
+        }
+    }
+    
+    return QDialog::eventFilter(obj, event);
 }

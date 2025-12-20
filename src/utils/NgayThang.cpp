@@ -95,8 +95,20 @@ bool phanTichNgay(const std::string &ngay, int &d, int &m, int &y){
         return false;                                        // loi chuyen doi
     }
     
-    if (d < 1 || d > 31 || m < 1 || m > 12 || y < NAM_XUAT_BAN_MIN)  // kiem tra gia tri hop le
+    // Kiem tra gia tri co ban
+    if (d < 1 || d > 31 || m < 1 || m > 12 || y < NAM_XUAT_BAN_MIN)
         return false;
+        
+    // Validate days in month
+    int daysInMonth = 31;
+    if (m == 4 || m == 6 || m == 9 || m == 11) {
+        daysInMonth = 30;
+    } else if (m == 2) {
+        bool isLeap = (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0);
+        daysInMonth = isLeap ? 29 : 28;
+    }
     
-    return true;                                             // hop le
+    if (d > daysInMonth) return false;
+    
+    return true;
 }

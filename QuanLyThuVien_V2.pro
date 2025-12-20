@@ -232,3 +232,8 @@ HEADERS += include/views/dialogs/ManHinhPreviewImport.h
 HEADERS += include/utils/ImportManager.h
 SOURCES += src/qrcode/Code128.cpp
 HEADERS += include/qrcode/Code128.h
+
+# ============================================
+# QXlsx Library (Native Excel Support) - Added for Task #ImportExcel
+# ============================================
+include(3rdparty/QXlsx/QXlsx/QXlsx.pri)

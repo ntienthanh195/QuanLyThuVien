@@ -53,12 +53,39 @@ public:
         }
         return QVariant();
     }
+    Qt::ItemFlags flags(const QModelIndex &index) const override {
+        if (!index.isValid()) return Qt::NoItemFlags;
+        // Allow editing for all cells except the Valid column itself (optional)
+        return Qt::ItemIsSelectable | Qt::ItemIsEditable | Qt::ItemIsEnabled;
+    }
+
+    bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole) override {
+        if (index.isValid() && role == Qt::EditRole) {
+            QString newValue = value.toString();
+            // Update data
+            if (index.row() < m_data.size() && index.column() < m_data[index.row()].size()) {
+                m_data[index.row()][index.column()] = newValue;
+                // Re-validate row? For now, we only update the value.
+                // ideally we should re-run validation logic here, but that's complex without the ImportManager logic.
+                // User can visually correct it.
+                // Or we can simple-check: Is Empty?
+                emit dataChanged(index, index, {role});
+                return true;
+            }
+        }
+        return false;
+    }
+
     QVariant headerData(int section, Qt::Orientation orientation, int role) const override {
         if (role == Qt::DisplayRole && orientation == Qt::Horizontal) {
-            if (section < m_headers.size()) return m_headers[section];
+             if (section < m_headers.size()) return m_headers[section];
         }
         return QVariant();
     }
+    
+    // Helper to get data back
+    QList<QStringList> getData() const { return m_data; }
+    int getValidColIdx() const { return m_validColIdx; }
 
 private:
     QStringList m_headers;
@@ -223,6 +250,35 @@ void ManHinhPreviewImport::onBtnCancelClicked() {
 }
 
 void ManHinhPreviewImport::onBtnApplyClicked() {
+    // Check if there are invalid rows
+    // Iterate all tabs? Or just active one? 
+    // Ideally we should check ALL tabs or just the one we are importing.
+    // Current flow: Import Everything.
+    
+    // Simple check: Loop through all tabs, get model, check for Invalid rows
+    for (int i = 0; i < m_tabWidget->count(); ++i) {
+        QTableView *tv = qobject_cast<QTableView*>(m_tabWidget->widget(i));
+        if (tv) {
+            CsvTableModel *model = static_cast<CsvTableModel*>(tv->model());
+            if (model) {
+                int validIdx = model->getValidColIdx();
+                if (validIdx >= 0) {
+                     QList<QStringList> data = model->getData();
+                     for (const QStringList &row : data) {
+                         if (validIdx < row.size()) {
+                             if (row[validIdx].toUpper() == "FALSE" || row[validIdx] == "0") {
+                                 QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"), 
+                                     "Dữ liệu còn dòng không hợp lệ (màu đỏ). Vui lòng sửa hoặc xóa trước khi nhập.");
+                                 m_tabWidget->setCurrentIndex(i);
+                                 return; // Block
+                             }
+                         }
+                     }
+                }
+            }
+        }
+    }
+
     // Ask for mode
     QStringList modes; 
     modes << LanguageManager::instance().getText("OPTION_MERGE") 
@@ -237,7 +293,31 @@ void ManHinhPreviewImport::onBtnApplyClicked() {
         if (item.contains("Replace")) mode = "replace";
         if (item.contains("Skip")) mode = "skip";
 
-        if (m_importer->runApply(m_excelPath, mode, this)) {
+        // Determine Data to Apply (From Current Tab)
+        QWidget *current = m_tabWidget->currentWidget();
+        QTableView *tv = qobject_cast<QTableView*>(current);
+        bool success = false;
+        
+        if (tv) {
+            CsvTableModel *model = static_cast<CsvTableModel*>(tv->model());
+            if (model) {
+                QList<QStringList> data = model->getData();
+                // Detect Type
+                QString type = "SACH"; // Default
+                QVariant head = model->headerData(0, Qt::Horizontal, Qt::DisplayRole);
+                QString headStr = head.toString();
+                if (headStr.contains("HoDem", Qt::CaseInsensitive)) {
+                    type = "DOCGIA";
+                }
+                
+                success = m_importer->runApplyData(data, type, mode, this);
+            }
+        } else {
+            // Fallback to original file-based apply if somehow no table (shouldn't happen)
+            success = m_importer->runApply(m_excelPath, mode, this);
+        }
+
+        if (success) {
             QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), LanguageManager::instance().getText("MSG_IMPORT_SUCCESS"));
             accept();
         }

@@ -310,8 +310,8 @@ void CuaSoChinh::thieLapMenuBen() {
     widgetTieuDe->setFixedHeight(headerHeight);
     widgetTieuDe->setStyleSheet(
         "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-        "stop:0 rgba(244, 164, 96, 0.1), stop:1 #1E1E2D); "
-        "border-bottom: 2px solid #FFD700;" // Gold accent border
+        "stop:0 rgba(74, 144, 226, 0.1), stop:1 #1E1E2D); "
+        "border-bottom: 2px solid #4A90E2;" // Blue accent border
     );
     
     int headerMargin = ResponsiveHelper::getScaledMargin(15, screenSize);
@@ -324,19 +324,19 @@ void CuaSoChinh::thieLapMenuBen() {
     nutToggleSidebar->setFixedSize(40, 40);
     nutToggleSidebar->setStyleSheet(
         "QPushButton {"
-        "    background-color: rgba(244, 164, 96, 0.15);" // Saffron alpha
-        "    color: #F4A460;" // Saffron
-        "    border: 1px solid rgba(244, 164, 96, 0.3);"
+        "    background-color: rgba(74, 144, 226, 0.15);" // Blue alpha
+        "    color: #4A90E2;" // Blue
+        "    border: 1px solid rgba(74, 144, 226, 0.3);"
         "    border-radius: 8px;"
         "    font-size: 20px;"
         "    font-weight: bold;"
         "}"
         "QPushButton:hover {"
-        "    background-color: rgba(244, 164, 96, 0.25);"
-        "    border: 1px solid #F4A460;"
+        "    background-color: rgba(74, 144, 226, 0.25);"
+        "    border: 1px solid #4A90E2;"
         "}"
         "QPushButton:pressed {"
-        "    background-color: rgba(244, 164, 96, 0.35);"
+        "    background-color: rgba(74, 144, 226, 0.35);"
         "}"
     );
     connect(nutToggleSidebar, &QPushButton::clicked, this, &CuaSoChinh::toggleSidebar);
@@ -374,26 +374,26 @@ void CuaSoChinh::thieLapMenuBen() {
     boTriToggle->addWidget(btnLang);
     boTriTieuDe->addLayout(boTriToggle);
     
-    // Logo - Đơn giản hơn, icon đơn sắc - CHUYỂN SANG MÀU CAM NGHỆ (Saffron)
+    // Logo - Đơn giản hơn, icon đơn sắc - REVERTED to Blue/White
     int logoFontSize = ResponsiveHelper::getScaledFontSize(28, screenSize);
     QLabel *nhanLogo = new QLabel("☸"); // Dharmachakra Symbol
     nhanLogo->setObjectName("LogoLabel");
     nhanLogo->setStyleSheet(QString(
         "font-size: %1px;"
-        "color: #F4A460;" // Saffron
+        "color: #4A90E2;" // Blue
         "background: transparent;"
         "font-weight: 300;"
     ).arg(logoFontSize));
     nhanLogo->setAlignment(Qt::AlignCenter);
     
-    // Tên hệ thống - Segoe UI, simple - THÊM TÊN HỌC VIỆN SONG NGỮ
+    // Tên hệ thống - Segoe UI, simple - REVERTED to Standard
     int titleFontSize = ResponsiveHelper::getScaledFontSize(11, screenSize);
     nhanTieuDe = new QLabel(LanguageManager::instance().getText("HEADER_SYSTEM_NAME"));
     nhanTieuDe->setObjectName("TitleLabel");
     nhanTieuDe->setStyleSheet(QString(
         "font-size: %1px;"
         "font-weight: 700;"
-        "color: #FFD700;" // Gold
+        "color: #FFFFFF;" // White
         "text-align: center;"
         "letter-spacing: 0.5px;"
         "background: transparent;"
@@ -419,7 +419,7 @@ void CuaSoChinh::thieLapMenuBen() {
         "    background: #1E1E2D;"
         "    border: none;"
         "    outline: none;"
-        "    border-right: 1px solid rgba(244, 164, 96, 0.1);"
+        "    border-right: 1px solid rgba(255, 255, 255, 0.05);"
         "}"
         "QListWidget#MenuList::item {"
         "    padding: %1px 15px;"
@@ -436,12 +436,12 @@ void CuaSoChinh::thieLapMenuBen() {
         "    border-radius: 8px;"
         "}"
         "QListWidget#MenuList::item:hover {"
-        "    background-color: rgba(244, 164, 96, 0.08);"
-        "    color: #F4A460;"
+        "    background-color: rgba(74, 144, 226, 0.1);"
+        "    color: #4A90E2;"
         "}"
         "QListWidget#MenuList::item:selected {"
-        "    background-color: rgba(244, 164, 96, 0.18);"
-        "    color: #FFD700;"
+        "    background-color: rgba(74, 144, 226, 0.2);"
+        "    color: #FFFFFF;"
         "    font-weight: 700;"
         "}"
     ).arg(menuPadding).arg(menuFontSize));

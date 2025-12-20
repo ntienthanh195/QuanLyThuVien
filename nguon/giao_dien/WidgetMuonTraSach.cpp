@@ -45,6 +45,10 @@
 #include <QApplication>
 #include <QLineEdit>
 #include <QTextEdit>
+#include <QListWidget>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QPair>
 
 // Prefer DBBatcher snapshot API when available to avoid buffer overruns
 
@@ -557,7 +561,6 @@ void WidgetMuonTraSach::thieLapTabMuonSach() {
     // Connect signals
     connect(nutLamMoiDocGia, &QPushButton::clicked, this, &WidgetMuonTraSach::xuLyLamMoiDanhSach);
     connect(bangDocGia, &QTableView::clicked, this, [this](const QModelIndex &idx){ this->xuLyChonDocGia(idx.row(), idx.column()); });
-    connect(bangDocGia, &QTableView::clicked, this, [this](const QModelIndex &idx){ this->xuLyChonDocGia(idx.row(), idx.column()); });
     
     // Auto-enable borrow button when ISBN changes
     connect(oNhapISBN, &QLineEdit::textChanged, this, [this](const QString &text) {
@@ -624,23 +627,20 @@ void WidgetMuonTraSach::thieLapBangDocGia() {
 }
 
 void WidgetMuonTraSach::hienThiDanhSachDocGia() {
-    // Lấy toàn bộ học viên từ cây nhị phân (Live Memory)
-    // Avoid DBBatcher snapshot to ensure we see realtime changes in 'dsmt' (linked list transactions)
-    // which are maintained in the memory tree 'rootDocGia'.
-    // extern removed
-    std::vector<PTRDG> danhSach;
-    int tongSo = 0;
+    // ⚡ OPTIMIZED: Fetch reader IDs from SQL (highly efficient sorting/paging)
+    // and load corresponding objects from memory tree (log N). 
+    // This avoids O(N) full tree dump for large databases.
+    QSqlQuery q;
+    q.prepare("SELECT ma_the FROM doc_gia ORDER BY ten ASC");
     
-    DuyetCayRaVector(rootDocGia, danhSach);
-    tongSo = (int)danhSach.size();
-    
-    // Lưu danh sách đầy đủ
     danhSachDocGia.clear();
-    for (int i = 0; i < tongSo; i++) {
-        danhSachDocGia.push_back(danhSach[i]);
+    if (q.exec()) {
+        while (q.next()) {
+            PTRDG dg = timDocGia(rootDocGia, q.value(0).toInt());
+            if (dg) danhSachDocGia.push_back(dg);
+        }
     }
     
-    // Hiển thị trang hiện tại
     hienThiTrang();
 }
 
@@ -685,18 +685,21 @@ void WidgetMuonTraSach::xuLyTimKiem() {
     danhSachDocGia.clear();
     
     if (laMaThe) {
-        // Tìm theo mã thẻ
         int ma = tuKhoa.toInt();
         PTRDG docGia = timDocGia(rootDocGia, ma);
-        if (docGia) {
-            danhSachDocGia.push_back(docGia);
-        }
+        if (docGia) danhSachDocGia.push_back(docGia);
     } else {
-        // Tìm theo tên
-        std::vector<PTRDG> ketQua(1000);
-        int soKetQua = TimDocGiaTheoHoTen(rootDocGia, tuKhoa.toStdString(), ketQua.data(), (int)ketQua.size());
-        for (int i = 0; i < soKetQua; i++) {
-            danhSachDocGia.push_back(ketQua[i]);
+        // ⚡ OPTIMIZED: Use SQL for fuzzy name search (O(log N) indexed)
+        // vs O(N) memory tree scan.
+        QSqlQuery q;
+        q.prepare("SELECT ma_the FROM doc_gia WHERE (ho || ' ' || ten) LIKE :search OR ten LIKE :search ORDER BY ten ASC");
+        q.bindValue(":search", "%" + tuKhoa + "%");
+        
+        if (q.exec()) {
+            while (q.next()) {
+                PTRDG dg = timDocGia(rootDocGia, q.value(0).toInt());
+                if (dg) danhSachDocGia.push_back(dg);
+            }
         }
     }
     
@@ -1016,86 +1019,61 @@ static std::string TachISBNTuMaSach(const std::string& maSach) {
     return maSach; // If no dash, return as is (fallback)
 }
 
-PTRDG WidgetMuonTraSach::TimDocGiaDangMuonSach(const QString &input, QString &resolvedMaSach) {
-    if (input.isEmpty()) return nullptr;
+QList<QPair<PTRDG, QString>> WidgetMuonTraSach::TimDocGiaDangMuonSach(const QString &input) {
+    QList<QPair<PTRDG, QString>> matches;
+    if (input.isEmpty()) return matches;
+    
+    QSqlQuery q;
+    q.prepare("SELECT m.ma_the, b.ma_sach FROM muon_tra m JOIN ban_sao b ON m.ban_sao_id = b.id WHERE (b.ma_sach = :ma OR b.ma_sach LIKE :isbn) AND (m.trang_thai = 0 OR m.trang_thai = 2)");
+    q.bindValue(":ma", input.trimmed());
+    q.bindValue(":isbn", input.trimmed() + "-%");
     extern PTRDG rootDocGia;
-    extern PTRDG rootDocGia;
-    // extern int soLuongDauSach; // Unused
-    
-    std::string sInput = input.toStdString();
-    resolvedMaSach = ""; // Reset
-    
-    // ---------------------------------------------------------
-    // STRATEGY 1: EXACT MATCH (Mã Sách Cụ Thể) - Priority #1
-    // ---------------------------------------------------------
-    PTRDG found = nullptr;
-    
-    // Helper to scan tree
-    std::function<void(PTRDG)> findExact = [&](PTRDG p) {
-        if (!p || found) return;
-        MUONTRA mt = p->data.dsmt;
-        while (mt) {
-            if (mt->data.TrangThai == DANG_MUON) {
-                // Check ma sach
-                std::string currentCode = (mt->data.banSaoSach) ? mt->data.banSaoSach->maSach : mt->data.maSachCached;
-                if (currentCode == sInput) {
-                    found = p;
-                    resolvedMaSach = QString::fromStdString(currentCode);
-                    return;
-                }
-            }
-            mt = mt->next;
+    if (q.exec()) {
+        while (q.next()) {
+            PTRDG reader = timDocGia(rootDocGia, q.value(0).toInt());
+            if (reader) matches.append({reader, q.value(1).toString()});
         }
-        findExact(p->left);
-        findExact(p->right);
-    };
-    findExact(rootDocGia);
-    
-    if (found) return found;
+    }
+    return matches;
+}
 
-    // ---------------------------------------------------------
-    // STRATEGY 2: ISBN MATCH (Smart Find) - Priority #2
-    // ---------------------------------------------------------
-    // Input might be an ISBN. We check if ANY reader is borrowing a book with this ISBN.
-    // Constraint: Valid ONLY if there is EXACTLY ONE such instance in the entire system.
-    // (To avoid returning the wrong person's book if 2 people borrowed copies of same ISBN).
-    
-    PTRDG candidateReader = nullptr;
-    std::string candidateCode = "";
-    int matchCount = 0;
 
-    std::function<void(PTRDG)> findISBN = [&](PTRDG p) {
-        if (!p) return;
-        MUONTRA mt = p->data.dsmt;
-        while (mt) {
-            if (mt->data.TrangThai == DANG_MUON) {
-                std::string currentCode = (mt->data.banSaoSach) ? mt->data.banSaoSach->maSach : mt->data.maSachCached;
-                // Attempt to extract ISBN from the borrowed book's code
-                // Code format: ISBN-Sequence (e.g. 978-123-1)
-                // We check if currentCode STARTS WITH input (simple check) OR strict parsing.
-                // Strict parsing: Check if TachISBN(currentCode) == input
-                
-                std::string isbnOfBook = TachISBNTuMaSach(currentCode);
-                if (!isbnOfBook.empty() && isbnOfBook == sInput) {
-                    matchCount++;
-                    candidateReader = p;
-                    candidateCode = currentCode;
-                }
-            }
-            mt = mt->next;
+// Minimal Selection Dialog for ISBN Ambiguity
+static QPair<PTRDG, QString> ShowAmbiguityResolver(QWidget* parent, const QList<QPair<PTRDG, QString>>& matches) {
+    QDialog dialog(parent);
+    dialog.setWindowTitle("Chọn học viên trả sách");
+    dialog.setMinimumWidth(400);
+    
+    QVBoxLayout layout(&dialog);
+    layout.addWidget(new QLabel("Phát hiện nhiều học viên đang mượn đầu sách này.\nVui lòng chọn người cần trả:"));
+    
+    QListWidget listWidget;
+    for (const auto& match : matches) {
+        QString info = QString("[%1] %2 %3 - Cuốn: %4")
+            .arg(match.first->data.MaThe)
+            .arg(QString::fromStdString(match.first->data.Ho))
+            .arg(QString::fromStdString(match.first->data.Ten))
+            .arg(match.second);
+        QListWidgetItem* item = new QListWidgetItem(info, &listWidget);
+        item->setData(Qt::UserRole, QVariant::fromValue((void*)match.first));
+        item->setData(Qt::UserRole + 1, match.second);
+    }
+    listWidget.setCurrentRow(0);
+    layout.addWidget(&listWidget);
+    
+    QDialogButtonBox buttonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    layout.addWidget(&buttonBox);
+    
+    QObject::connect(&buttonBox, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    QObject::connect(&buttonBox, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    
+    if (dialog.exec() == QDialog::Accepted) {
+        QListWidgetItem* item = listWidget.currentItem();
+        if (item) {
+            return {(PTRDG)item->data(Qt::UserRole).value<void*>(), item->data(Qt::UserRole+1).toString()};
         }
-        findISBN(p->left);
-        findISBN(p->right);
-    };
-    findISBN(rootDocGia);
-    
-    if (matchCount == 1) {
-        resolvedMaSach = QString::fromStdString(candidateCode);
-        return candidateReader;
-    } 
-    // If matchCount > 1: Ambiguous. We do not support auto-return to avoid errors.
-    
-    return nullptr;
+    }
+    return {nullptr, ""};
 }
 
 
@@ -1191,21 +1169,30 @@ void WidgetMuonTraSach::xoaThongTinHienThi() {
     docGiaHienTai = nullptr;
     sachDangChonMuon = nullptr;
     banSaoDangChon = nullptr;
+    danhSachSachDangMuon.clear();
+    if (modelSachDangMuon) { if (auto m = dynamic_cast<SachDangMuonModel*>(modelSachDangMuon)) m->refresh(); }
+    SafeGui::safeSetText(nhanThongTinDocGia, "<i>" + LanguageManager::instance().getText("MSG_SELECT_READER_FIRST") + "</i>");
 }
 
-// Helper: Check if current reader has borrowed this book
+// Helper: Check if current reader has borrowed this book (Supports ISBN or Exact MaSach)
 bool WidgetMuonTraSach::laSachDocGiaHienTaiDangMuon(const QString& maSach) {
     if (!docGiaHienTai) return false;
     
-    // Convert once for efficiency
-    std::string targetMaSach = maSach.toStdString();
+    QString qma = maSach.trimmed();
+    if (qma.isEmpty()) return false;
     
-    // Search in borrowed books list
+    // Search in borrowed books list (in-memory DTOs for current reader)
     for (const auto& sach : danhSachSachDangMuon) {
-        if (sach.maSach == targetMaSach && sach.trangThai == 0) {
-            // trangThai == 0 means currently borrowed
-            return true;
-        }
+        // Only check active loans
+        if (sach.trangThai != 0) continue;
+        
+        QString itemMa = QString::fromStdString(sach.maSach);
+        
+        // Match Scenario 1: Exact Code (e.g. Scanned "ISBN-1" matches Borrowed "ISBN-1")
+        if (itemMa == qma) return true;
+        
+        // Match Scenario 2: ISBN Prefix (e.g. Scanned "ISBN" matches Borrowed "ISBN-1")
+        if (itemMa.startsWith(qma + "-")) return true;
     }
     return false;
 }
@@ -1981,59 +1968,97 @@ void WidgetMuonTraSach::xuLyQuetMaDocGia(const QString& maThe) {
         m_pendingBookCode.clear();
         
         qDebug() << "[SCAN] Đang ở trạng thái chờ -> Tự động mượn sách:" << bookToBorrow;
+        ToastNotification::show(QString("Đã chọn học viên: %1. Tiếp tục mượn sách...").arg(QString::fromStdString(dg->data.Ten)), ToastNotification::SUCCESS);
         xuLyTuDongMuon(bookToBorrow);
     } else {
-        // Chỉ load thông tin nếu đang IDLE
         ToastNotification::show(QString("Đã chọn học viên: %1").arg(QString::fromStdString(dg->data.Ten)), ToastNotification::SUCCESS);
+        hienThiTrang(); // Sync table focus if possible
     }
     
     QApplication::beep();
 }
 
 void WidgetMuonTraSach::xuLyQuetMaSach(const QString& maSach) {
-    qDebug() << "[SCAN] Mã sách:" << maSach;
-    
-    // ═══════════════════════════════════════════════════
-    // KIỂM TRA TRẠNG THÁI SÁCH (Sử dụng SQL Sync)
-    // ═══════════════════════════════════════════════════
     TrangThaiSach trangThai = kiemTraTrangThaiSach(maSach);
+    qDebug() << "[SCAN] Mã sách:" << maSach << "| Trạng thái:" << trangThai;
     
     switch (trangThai) {
         case SACH_RANH:
+            qDebug() << " -> Sách rảnh. Kiểm tra mượn sách.";
             // Nếu chưa chọn học viên -> Chuyển trạng thái chờ
             if (!docGiaHienTai) {
+                qDebug() << " -> Sách RẢNH nhưng chưa chọn học viên. Chờ quét thẻ...";
                 m_currentState = STATE_WAITING_FOR_READER;
                 m_pendingBookCode = maSach;
-                ToastNotification::show("Chưa chọn học viên. Vui lòng quét thẻ!", ToastNotification::INFO);
-                return;
+                ToastNotification::show("Sách sẵn sàng. Vui lòng quét thẻ học viên để mượn!", ToastNotification::INFO);
+            } else {
+                qDebug() << " -> Sách RẢNH. Thực hiện mượn cho học viên hiện tại.";
+                ToastNotification::show("Phát hiện sách trên kệ. Đang thực hiện mượn...", ToastNotification::INFO);
+                xuLyTuDongMuon(maSach);
             }
-            // ✅ TỰ ĐỘNG MƯỢN
-            xuLyTuDongMuon(maSach);
             break;
             
         case SACH_DOC_GIA_HIEN_TAI_DANG_MUON:
-            // ✅ TỰ ĐỘNG TRẢ (Đã chọn đúng học viên)
+            qDebug() << " -> Sách đã được học viên này mượn. Thực hiện trả.";
+            ToastNotification::show("Sách học viên đang mượn. Đang thực hiện trả...", ToastNotification::INFO);
             xuLyTuDongTra(maSach);
             break;
             
-        case SACH_NGUOI_KHAC_DANG_MUON: {
-            // ✅ TỰ ĐỘNG TRẢ (Chưa chọn học viên hoặc chọn sai người)
-            // Tìm xem ai đang mượn cuốn này
+        case SACH_NGUOI_KHAC_DANG_MUON:
+        case SACH_DANG_BAO_MAT: {
+            // ✅ TỰ ĐỘNG CHUYỂN NGƯỜI & TRẢ (Yêu cầu của bạn: Chuyển sang người đang mượn dù đang chọn ai đi nữa)
+            qDebug() << " -> Sách đang được mượn/báo mất bởi NGƯỜI KHÁC. Đang tìm kiếm học viên...";
+            
+            auto matches = TimDocGiaDangMuonSach(maSach);
+            if (matches.isEmpty()) {
+                 qDebug() << " -> Không thể xác định học viên đang mượn cụ thể.";
+                 QMessageBox::warning(this, "Lỗi", "Sách đang được mượn nhưng không tìm thấy dữ liệu học viên duy nhất!");
+                 break;
+            }
+
+            PTRDG reader = nullptr;
             QString resolvedMaSach = "";
-            PTRDG reader = TimDocGiaDangMuonSach(maSach, resolvedMaSach);
+
+            if (matches.size() == 1) {
+                reader = matches[0].first;
+                resolvedMaSach = matches[0].second;
+            } else {
+                // ✅ Resolve ambiguity (multiple readers have copies of same ISBN)
+                qDebug() << " -> Ambiguity detected! Found" << matches.size() << "matches. Opening resolver...";
+                auto chosen = ShowAmbiguityResolver(this, matches);
+                reader = chosen.first;
+                resolvedMaSach = chosen.second;
+                
+                if (!reader) {
+                    qDebug() << " -> Resolver cancelled by user.";
+                    return; // Abort if user cancelled
+                }
+            }
+            
             if (reader) {
+                qDebug() << " -> Tìm thấy học viên:" << QString::fromStdString(reader->data.Ten) << "MaThe:" << reader->data.MaThe;
+                
                 docGiaHienTai = reader;
                 capNhatThongTinDocGia();
                 capNhatBangSachDangMuon();
-                // Select and return
-                xuLyTuDongTra(resolvedMaSach.isEmpty() ? maSach : resolvedMaSach);
-            } else {
-                 QMessageBox::warning(this, "Lỗi", "Sách đang được mượn nhưng không tìm thấy dữ liệu học viên!");
+                hienThiTrang(); // Sync page
+                
+                QString msg = (trangThai == SACH_DANG_BAO_MAT) ? 
+                    QString("Tìm thấy sách báo mất của %1. Tự động chuyển...").arg(QString::fromStdString(reader->data.Ten)) :
+                    QString("Phát hiện học viên %1 đang mượn. Tự động chuyển...").arg(QString::fromStdString(reader->data.Ten));
+                
+                ToastNotification::show(msg, ToastNotification::INFO);
+                
+                // REDUCED DELAY: 150ms for snappier experience
+                QTimer::singleShot(150, this, [this, resolvedMaSach, maSach]() {
+                    xuLyTuDongTra(resolvedMaSach.isEmpty() ? maSach : resolvedMaSach);
+                });
             }
             break;
         }
             
         case SACH_KHONG_TON_TAI:
+            qDebug() << " -> Sách không tồn tại hoặc đã thanh lý.";
             QMessageBox::warning(this, "Lỗi", QString("Không tìm thấy sách hoặc sách đã thanh lý: %1").arg(maSach));
             break;
     }
@@ -2054,7 +2079,7 @@ WidgetMuonTraSach::TrangThaiSach WidgetMuonTraSach::kiemTraTrangThaiSach(const Q
         int status = q.value(0).toInt();
         if (status == CHO_MUON_DUOC) return SACH_RANH;
         if (status == DANG_MUON) return SACH_NGUOI_KHAC_DANG_MUON;
-        // Trạng thái khác (Thanh lý, Mất...) coi như không tồn tại để mượn
+        if (status == 2) return SACH_DANG_BAO_MAT; // 2: Lost/Mất
         return SACH_KHONG_TON_TAI;
     }
 
@@ -2213,7 +2238,10 @@ void WidgetMuonTraSach::xuLyTuDongTra(const QString& maSach) {
     }
     
     // Select the row
-    bangSachDangMuon->selectRow(dongChon);
+    // Select the row and update Current Index (Critical for xuLyNutXacNhanTra)
+    QModelIndex idx = modelSachDangMuon->index(dongChon, 0);
+    bangSachDangMuon->setCurrentIndex(idx);
+    bangSachDangMuon->selectionModel()->select(idx, QItemSelectionModel::Select | QItemSelectionModel::Rows);
     
     // Trigger Return
     QTimer::singleShot(100, this, [this]() {

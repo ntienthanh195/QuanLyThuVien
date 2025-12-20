@@ -807,7 +807,7 @@ void WidgetQuanLySach::xuLyNhapDuLieuTu() {
     if (file.isEmpty()) return;
 
     ImportManager importer(this);
-    if (!importer.ensureDependencies(this)) return;
+
 
     // Show loading
     QProgressDialog progress(LanguageManager::instance().getText("MSG_PROCESSING_EXCEL"), QString(), 0, 0, this);

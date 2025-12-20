@@ -67,6 +67,7 @@ public:
         SACH_RANH,
         SACH_DOC_GIA_HIEN_TAI_DANG_MUON,
         SACH_NGUOI_KHAC_DANG_MUON,
+        SACH_DANG_BAO_MAT, // NEW: Found a book that was previously reported as lost
         SACH_KHONG_TON_TAI
     };
 
@@ -164,7 +165,7 @@ private:
     int tinhTienPhat(int soNgayQuaHan);
     
     // Auto-Return Helpers
-    PTRDG TimDocGiaDangMuonSach(const QString &input, QString &resolvedMaSach);
+    QList<QPair<PTRDG, QString>> TimDocGiaDangMuonSach(const QString &input);
     
     // Layout chính
     QVBoxLayout *boTriChinh;

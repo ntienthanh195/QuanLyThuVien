@@ -622,29 +622,28 @@ bool PrintHelper::inDanhSachDocGia(PTRDG root, QWidget* parent) {
     }
     
     // 3. Build HTML Content
-    QString contentHTML;
+    QString noiDungBang = "";
     
-    // Summary Box (Improved Aesthetics with Borders - No Colors)
-    contentHTML += QString(
-        "<div style='margin-bottom: 25px;'>"
-        "  <div style='font-size: 13pt; font-weight: bold; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 12px; color: #000;'>TỔNG QUAN ĐỘC GIẢ</div>"
-        "  <table border='1' cellspacing='0' cellpadding='10' width='100%' style='font-size: 10.5pt;'>"
-        "    <tr>"
-        "      <td width='33%'><b>Tổng số:</b> %1</td>"
-        "      <td width='33%'><b>Đang hoạt động:</b> %2</td>"
-        "      <td width='34%'><b>Bị khóa:</b> %3</td>"
-        "    </tr>"
-        "    <tr>"
-        "      <td><b>Đang mượn sách:</b> %4</td>"
-        "      <td><b>Nam:</b> %5</td>"
-        "      <td><b>Nữ:</b> %6</td>"
-        "    </tr>"
-        "  </table>"
+    // Summary Section (Clean Table Style)
+    noiDungBang += QString(
+        "<div style='margin-bottom: 20px; font-size: 11pt;'>"
+        "<table width='100%' border='0' cellspacing='0' cellpadding='4'>"
+        "<tr>"
+        "  <td><b>Tổng số:</b> %1</td>"
+        "  <td><b>Nam:</b> %2</td>"
+        "  <td><b>Nữ:</b> %3</td>"
+        "</tr>"
+        "<tr>"
+        "  <td><b>Hoạt động:</b> %4</td>"
+        "  <td><b>Bị khóa:</b> %5</td>"
+        "  <td><b>Đang mượn:</b> %6</td>"
+        "</tr>"
+        "</table>"
         "</div>"
-    ).arg(list.size()).arg(totalActive).arg(totalInactive).arg(totalWithBooks).arg(totalMale).arg(totalFemale);
-    
-    // Data Table (Explicit borders - Center Alignment for IDs/Numbers)
-    contentHTML += "<table border='1' cellspacing='0' cellpadding='8' width='100%'>"
+    ).arg(list.size()).arg(totalMale).arg(totalFemale).arg(totalActive).arg(totalInactive).arg(totalWithBooks);
+
+    // Data Table (Match Book Report Style)
+    noiDungBang += "<table border='1' cellspacing='0' cellpadding='8' width='100%'>"
                    "<thead>"
                    "<tr>"
                    "<th>STT</th>"
@@ -663,25 +662,25 @@ bool PrintHelper::inDanhSachDocGia(PTRDG root, QWidget* parent) {
         QString phai = p->data.Phai ? "Nữ" : "Nam";
         QString trangThai = (p->data.TrangThai == 1) ? "Hoạt động" : "Bị khóa";
         
-        contentHTML += QString("<tr>"
+        noiDungBang += QString("<tr>"
                                "<td class='text-center'>%1</td>"
                                "<td class='text-center nowrap'><b>%2</b></td>"
                                "<td>%3</td>"
                                "<td class='text-center'>%4</td>"
                                "<td class='text-center'>%5</td>"
-                               "<td class='text-center'><b>%6</b> cuốn</td>"
+                               "<td class='text-center'>%6</td>"
                                "</tr>")
             .arg(i + 1)
             .arg(p->data.MaThe)
             .arg(hoTen)
             .arg(phai)
             .arg(trangThai)
-            .arg(p->data.soSachDangMuon);
+            .arg(p->data.soSachDangMuon > 0 ? QString::number(p->data.soSachDangMuon) + " cuốn" : "-");
     }
-    contentHTML += "</tbody></table>";
+    noiDungBang += "</tbody></table>";
     
     // 4. Wrap with Standard Master Template
-    QString html = taoHTMLDanhSach("DANH SÁCH HỌC VIÊN", contentHTML);
+    QString html = taoHTMLDanhSach("DANH SÁCH HỌC VIÊN", noiDungBang);
     
     // 5. Build Document and Execute Print
     QTextDocument doc;

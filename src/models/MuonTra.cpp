@@ -338,7 +338,8 @@ std::string TraSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[], 
         }
         // Prefer cached maSach if present (safer than dereferencing possibly-dangling PTRDMS)
         std::string currMaSach = !curr->data.maSachCached.empty() ? curr->data.maSachCached : (curr->data.banSaoSach ? curr->data.banSaoSach->maSach : std::string());
-        if (!currMaSach.empty() && currMaSach == maSach && curr->data.TrangThai == 0) {
+        // Match exact MaSach AND (Active Loan (0) OR Lost Book (2))
+        if (!currMaSach.empty() && currMaSach == maSach && (curr->data.TrangThai == 0 || curr->data.TrangThai == 2)) {
             found = curr;
             break;
         }
@@ -376,8 +377,8 @@ std::string TraSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[], 
     
     // DB Update muon_tra
     QSqlQuery q(db);
-    // Updated Query to include tien_phat
-    q.prepare("UPDATE muon_tra SET ngay_tra=?, trang_thai=?, tien_phat=? WHERE ma_the=? AND ban_sao_id=(SELECT id FROM ban_sao WHERE ma_sach=?) AND trang_thai=0");
+    // Updated Query to include both active loans (0) and lost books (2)
+    q.prepare("UPDATE muon_tra SET ngay_tra=?, trang_thai=?, tien_phat=? WHERE ma_the=? AND ban_sao_id=(SELECT id FROM ban_sao WHERE ma_sach=?) AND (trang_thai=0 OR trang_thai=2)");
     q.addBindValue(QString::fromStdString(ngayTra));
     q.addBindValue(1); // Da tra
     q.addBindValue((qint64)tienPhat); // Save Fine

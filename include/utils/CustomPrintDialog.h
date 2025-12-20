@@ -65,6 +65,13 @@ private:
     QString m_defaultPrinter;
     QString m_exportPath;
     QPrinter* m_printer;
+
+protected:
+    bool eventFilter(QObject *obj, QEvent *event) override;
+
+private:
+    QPoint m_lastMousePos;
+    bool m_isDragging = false;
 };
 
 #endif // CUSTOMPRINTDIALOG_H

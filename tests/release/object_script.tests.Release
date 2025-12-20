@@ -1,0 +1,14 @@
+release/NgayThang.o
+release/XuLyChuoi.o
+release/ThongBao.o
+release/DocGia.o
+release/MuonTra.o
+release/mock_DauSach.o
+release/mock_SettingsManager.o
+release/mock_DatabaseManager.o
+release/mock_AuditLogger.o
+release/mock_EventBus.o
+release/mock_FileSystem.o
+release/mock_NhapLieu.o
+release/main.o
+release/moc_tst_NgayThang.o

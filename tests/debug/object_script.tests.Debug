@@ -1,0 +1,14 @@
+debug/NgayThang.o
+debug/XuLyChuoi.o
+debug/ThongBao.o
+debug/DocGia.o
+debug/MuonTra.o
+debug/mock_DauSach.o
+debug/mock_SettingsManager.o
+debug/mock_DatabaseManager.o
+debug/mock_AuditLogger.o
+debug/mock_EventBus.o
+debug/mock_FileSystem.o
+debug/mock_NhapLieu.o
+debug/main.o
+debug/moc_tst_NgayThang.o

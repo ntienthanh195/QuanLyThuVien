@@ -1,16 +1,27 @@
 #include "utils/ImportManager.h"
 #include "utils/FilePathManager.h"
+#include "models/QuanLySach.h"
+#include "models/DocGia.h"
+#include "models/ThaoTacFile.h"
+#include "models/NhapLieu.h" 
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
-#include <QProcess>
-#include <QMessageBox>
-#include <QProgressDialog>
+#include <QTextStream>
 #include <QDebug>
+#include <QDateTime>
+
+// QXlsx Include
+#include "xlsxdocument.h"
+#include "xlsxchartsheet.h"
+#include "xlsxcellrange.h"
+#include "xlsxchart.h"
+#include "xlsxrichstring.h"
+#include "xlsxworkbook.h"
+#include "xlsxcell.h"
+using namespace QXlsx;
 
 ImportManager::ImportManager(QObject *parent) : QObject(parent) {
-    m_pythonExe = getPythonExecutable();
-    m_scriptPath = getScriptPath();
 }
 
 ImportManager& ImportManager::instance() {
@@ -18,252 +29,334 @@ ImportManager& ImportManager::instance() {
     return _instance;
 }
 
-QString ImportManager::getPythonExecutable() {
-    QString repoRoot = FilePathManager::getRootPath();
-    
-    // 1. Check Portable Runtime (Bundled with App) - Deployment Priority
-    QString appDir = QCoreApplication::applicationDirPath();
-    QStringList portablePaths;
-    portablePaths << QDir(appDir).filePath("python_runtime/python.exe");
-    portablePaths << QDir(appDir).filePath("python/python.exe");
-    portablePaths << QDir(appDir).filePath("runtime/python.exe");
-    
-    // Developer Convenience: Check Source Root (Repo Root)
-    portablePaths << QDir(repoRoot).filePath("python_runtime/python.exe");
-    
-    for (const QString &path : portablePaths) {
-        if (QFile::exists(path)) return path;
-    }
+#include "utils/XuLyChuoi.h"
+#include <QMap>
 
-    // 2. Check Dev Venv (Repo Root or App Root)
-    QString venvPython = QDir(repoRoot).filePath(".venv/Scripts/python.exe");
-    if (QFile::exists(venvPython)) return venvPython;
-    
-    QString appVenv = QDir(appDir).filePath(".venv/Scripts/python.exe");
-    if (QFile::exists(appVenv)) return appVenv;
-
-    // 3. Fallback to System Python
-    return "python"; 
+// ⚡ SMART HELPERS: Normalize headers for matching
+static QString normalizeHeader(const QString &header) {
+    return QString::fromStdString(BoDauVaThuong(header.toStdString())).trimmed();
 }
 
-QString ImportManager::getScriptPath() {
-    QString repoRoot = FilePathManager::getRootPath();
-    QStringList candidates;
-    candidates << QDir(repoRoot).filePath("tools/import_from_excel.py");
-    candidates << QDir(QCoreApplication::applicationDirPath()).filePath("tools/import_from_excel.py");
-    candidates << QDir(QCoreApplication::applicationDirPath()).filePath("../tools/import_from_excel.py");
-    candidates << QDir(QDir::currentPath()).filePath("tools/import_from_excel.py");
-    candidates << QDir(repoRoot).filePath("../tools/import_from_excel.py");
-
-    for (const QString &cand : candidates) {
-        if (QFile::exists(cand)) return cand;
+static QString detectTypeFromHeaders(const QStringList &headers) {
+    int sachScore = 0;
+    int docGiaScore = 0;
+    
+    QStringList sachKeywords = {"isbn", "tensach", "dausach", "tacgia", "nhaxuatban", "nxb", "namxb", "theloai", "giatien", "soluong", "vitri"};
+    QStringList docGiaKeywords = {"hodem", "ten", "phai", "ngaysinh", "lop", "sdt", "email", "nguoimuon", "hocvien", "thedocgia"};
+    
+    for (const QString &h : headers) {
+        QString n = normalizeHeader(h);
+        if (n.isEmpty()) continue;
+        for (const QString &kw : sachKeywords) if (n.contains(kw)) sachScore++;
+        for (const QString &kw : docGiaKeywords) if (n.contains(kw)) docGiaScore++;
     }
-    return QString();
+    if (sachScore > docGiaScore && sachScore > 0) return "SACH";
+    if (docGiaScore > sachScore && docGiaScore > 0) return "DOCGIA";
+    return "";
 }
 
-bool ImportManager::ensureDependencies(QWidget *parent) {
-    if (m_pythonExe.isEmpty()) return false;
+static QMap<QString, int> buildColumnMap(const QStringList &headers, const QString &type) {
+    QMap<QString, int> mapping;
+    QMap<QString, QStringList> schema;
     
-    // Quick check if we can run a simple import
-    QProcess proc;
-    setupProcessEnv(proc);
-    proc.start(m_pythonExe, QStringList() << "-c" << "import openpyxl");
-    proc.waitForFinished(5000);
-    if (proc.exitCode() == 0) return true;
-
-    // Install if missing
-    QProgressDialog progress("Đang kiểm tra và cài đặt thư viện...", QString(), 0, 0, parent);
-    progress.setWindowModality(Qt::WindowModal);
-    progress.setMinimumDuration(0);
-    progress.show();
-    QCoreApplication::processEvents();
-
-    // 1. Check if pip exists
-    QProcess pipCheck;
-    setupProcessEnv(pipCheck);
-    pipCheck.start(m_pythonExe, QStringList() << "-m" << "pip" << "--version");
-    pipCheck.waitForFinished(3000);
-    
-    if (pipCheck.exitCode() != 0) {
-        // Pip missing, try to bootstrap
-        QProcess bootstrapProc;
-        setupProcessEnv(bootstrapProc);
-        progress.setLabelText("Đang khôi phục Pip (PackageManager)...");
-        bootstrapProc.start(m_pythonExe, QStringList() << "-m" << "ensurepip" << "--default-pip");
-        if (!bootstrapProc.waitForFinished(60000) || bootstrapProc.exitCode() != 0) {
-             progress.close();
-             QString err = QString::fromUtf8(bootstrapProc.readAllStandardError());
-             QString msg = "Không tìm thấy Pip (trình quản lý gói) và không thể tự cài đặt.\n";
-             if (err.contains("externally-managed-environment")) {
-                 msg += "\nMôi trường Python của bạn đang được quản lý bởi hệ thống (thường gặp trên MSYS2/MinGW).\n"
-                        "Vui lòng mở terminal và chạy lệnh sau để khắc phục:\n"
-                        "pacman -S mingw-w64-x86_64-python-pip mingw-w64-x86_64-python-openpyxl";
-             } else {
-                 msg += "Chi tiết lỗi: " + err;
-             }
-             QMessageBox::warning(parent, "Cảnh báo Pip", msg);
-             progress.show();
-        }
+    if (type == "SACH") {
+        schema["ISBN"] = {"isbn"};
+        schema["TEN"] = {"tensach", "dausach", "tieude", "ten", "title"};
+        schema["TACGIA"] = {"tacgia", "author"};
+        schema["NAM"] = {"namxb", "namxuatban", "nam", "year"};
+        schema["THELOAI"] = {"theloai", "category", "genre"};
+        schema["GIA"] = {"giatien", "gia", "price", "dongia"};
+        schema["SOLUONG"] = {"soluong", "sl", "quantity", "stock", "amount"};
+        schema["NXB"] = {"nhaxuatban", "nxb", "publisher"};
+        schema["VITRI"] = {"vitri", "location", "shelf", "ke"};
+    } else {
+        schema["HO"] = {"ho", "hodem", "last", "surname", "family"};
+        schema["TEN"] = {"ten", "first", "given", "name"};
+        schema["PHAI"] = {"phai", "gioitinh", "sex", "gender"};
+        schema["NGAYSINH"] = {"ngaysinh", "dob", "birthday"};
+        schema["LOP"] = {"lop", "class", "grade"};
+        schema["SDT"] = {"sdt", "phone", "tel", "dienthoai"};
+        schema["EMAIL"] = {"email", "thu"};
     }
 
-    progress.setLabelText("Đang cài đặt thư viện 'openpyxl'...");
-    QCoreApplication::processEvents();
-
-    QProcess installProc;
-    setupProcessEnv(installProc);
-    installProc.start(m_pythonExe, QStringList() << "-m" << "pip" << "install" << "openpyxl" << "--user" << "--prefer-binary" << "--break-system-packages");
-    // Timeout after 3 minutes (180s) to avoid hanging forever
-    if (!installProc.waitForFinished(180000)) {
-        installProc.kill();
-        progress.close();
-        QMessageBox::critical(parent, "Lỗi Quá Giờ", "Quá trình tải thư viện mất quá nhiều thời gian.\nVui lòng kiểm tra kết nối mạng và thử lại.");
-        return false;
-    }
-    
-    // Close progress before showing error
-    progress.close();
-
-    if (installProc.exitCode() != 0) {
-        QString stdOut = QString::fromUtf8(installProc.readAllStandardOutput());
-        QString stdErr = QString::fromUtf8(installProc.readAllStandardError());
-        
-        // Try self-healing if it's an externally managed environment
-        if (stdErr.contains("externally-managed-environment")) {
-            progress.setLabelText("Phát hiện môi trường hệ thống bị khóa. Đang tạo môi trường ảo riêng biệt...");
-            QCoreApplication::processEvents();
-            
-            QString repoRoot = FilePathManager::getRootPath();
-            QString venvPath = QDir(repoRoot).filePath(".venv");
-            
-            QProcess venvProc;
-            setupProcessEnv(venvProc);
-            venvProc.start(m_pythonExe, QStringList() << "-m" << "venv" << venvPath);
-            
-            if (venvProc.waitForFinished(120000) && venvProc.exitCode() == 0) {
-                // Determine venv python path (handle both Windows/Unix styles)
-                QString venvPython = QDir(venvPath).filePath("Scripts/python.exe");
-                if (!QFile::exists(venvPython)) {
-                    venvPython = QDir(venvPath).filePath("bin/python.exe");
-                }
-                
-                if (QFile::exists(venvPython)) {
-                    m_pythonExe = venvPython;
-                    progress.setLabelText("Đang cài đặt thư viện vào môi trường ảo mới...");
-                    QCoreApplication::processEvents();
-                    
-                    QProcess venvInstall;
-                    setupProcessEnv(venvInstall);
-                    venvInstall.start(m_pythonExe, QStringList() << "-m" << "pip" << "install" << "openpyxl" << "--prefer-binary");
-                    
-                    if (venvInstall.waitForFinished(180000) && venvInstall.exitCode() == 0) {
-                        progress.close();
-                        return true;
-                    }
+    for (int i = 0; i < headers.size(); ++i) {
+        QString n = normalizeHeader(headers[i]);
+        if (n.isEmpty()) continue;
+        for (auto it = schema.begin(); it != schema.end(); ++it) {
+            for (const QString &kw : it.value()) {
+                if (n.contains(kw) && !mapping.contains(it.key())) {
+                    mapping[it.key()] = i + 1;
+                    break;
                 }
             }
         }
-
-        progress.close();
-        QMessageBox msgBox(parent);
-        msgBox.setIcon(QMessageBox::Critical);
-        msgBox.setWindowTitle("Lỗi Cài Đặt Thư Viện");
-        
-        if (stdErr.contains("externally-managed-environment")) {
-            msgBox.setText("Môi trường Python hiện tại không cho phép cài đặt thư viện trực tiếp và quá trình tự sửa lỗi thất bại.");
-            msgBox.setInformativeText("CÁCH KHẮC PHỤC THỦ CÔNG:\n"
-                                     "1. Mở terminal (MSYS2/MinGW).\n"
-                                     "2. Chạy lệnh: pacman -S mingw-w64-x86_64-python-openpyxl\n"
-                                     "3. Khởi động lại ứng dụng.");
-        } else {
-            msgBox.setText("Không thể tự động cài đặt thư viện 'openpyxl'.");
-            msgBox.setInformativeText("Vui lòng chụp lại thông báo lỗi này và gửi cho kỹ thuật viên.");
-            msgBox.setDetailedText("Output:\n" + stdOut + "\nError:\n" + stdErr);
-        }
-        msgBox.exec();
-        return false;
     }
-    return true;
+    return mapping;
 }
 
 ImportManager::PreviewResult ImportManager::runPreview(const QString &excelFile) {
     PreviewResult result;
     result.success = false;
 
-    if (m_scriptPath.isEmpty()) {
-        result.message = "Không tìm thấy file script import_from_excel.py";
+    Document doc(excelFile);
+    if (!doc.load()) {
+        result.message = "Không thể mở file Excel. Vui lòng kiểm tra lại đường dẫn.";
         return result;
     }
 
-    QProcess proc;
-    // Output directly to 'tools' folder for simplicity via script default, 
-    // or explicit output arg. Let's use explicit output temp dir logic later if needed
-    // For now script defaults to 'tools' or explicit '--out'
-    
-    // Use a temp folder logic or just use tools
-    QString outDir = QDir(FilePathManager::getRootPath()).filePath("tools");
-    
-    QStringList args;
-    args << m_scriptPath << "--file" << excelFile << "--preview" << "--out" << outDir;
-    
-    setupProcessEnv(proc);
-    proc.start(m_pythonExe, args);
-    if (!proc.waitForStarted(10000)) {
-        result.message = "Không thể khởi chạy Python process.";
-        return result;
+    if (!doc.selectSheet("Sheet1")) {
+         QStringList sheets = doc.sheetNames();
+         if (!sheets.isEmpty()) doc.selectSheet(sheets.first());
     }
-    proc.waitForFinished(-1);
 
-    QString stdoutStr = QString::fromUtf8(proc.readAllStandardOutput());
-    QString stderrStr = QString::fromUtf8(proc.readAllStandardError());
+    // 1. READ HEADERS for Smart Detection
+    QStringList headers;
+    for (int col = 1; col <= 20; ++col) {
+        auto cell = doc.cellAt(1, col);
+        if (!cell) break;
+        headers << cell->value().toString().trimmed();
+    }
     
-    // Check if script output contains preview CSV paths
-    // The script prints "Preview CSVs: \n - path"
-    // We can just construct paths based on outDir since the script uses fixed names inside outDir
-    result.dauSachCsv = QDir(outDir).filePath("preview_dausach.csv");
-    result.banSaoCsv = QDir(outDir).filePath("preview_bansao.csv");
-    result.docGiaCsv = QDir(outDir).filePath("preview_docgia.csv");
-    result.muonTraCsv = QDir(outDir).filePath("preview_muontra.csv");
-
-    if (proc.exitCode() == 0) {
-        result.success = true;
-        result.message = stdoutStr;
+    result.detectedType = detectTypeFromHeaders(headers);
+    
+    // Choose schema for mapping preview (Default to SACH if unknown for generic view)
+    QString mapMode = result.detectedType.isEmpty() ? "SACH" : result.detectedType;
+    QMap<QString, int> colMap = buildColumnMap(headers, mapMode);
+    
+    // Define target columns for alignment
+    QStringList targetKeys;
+    if (mapMode == "SACH") {
+        targetKeys << "ISBN" << "TEN" << "TACGIA" << "NAM" << "THELOAI" << "GIA" << "SOLUONG" << "NXB" << "VITRI";
     } else {
-        result.success = false;
-        result.message = stderrStr + "\n" + stdoutStr;
+        targetKeys << "HO" << "TEN" << "PHAI" << "NGAYSINH" << "LOP" << "SDT" << "EMAIL";
     }
+
+    // 2. READ DATA WITH ALIGNMENT
+    QList<QStringList> previewData;
+    int row = 2;
+    int maxRow = doc.dimension().lastRow();
+    
+    while (row <= maxRow) {
+        auto cellA = doc.cellAt(row, 1);
+        if (!cellA || cellA->value().toString().trimmed().isEmpty()) { row++; continue; }
+
+        QStringList rowData;
+        for (const QString &key : targetKeys) {
+            int colIndex = colMap.value(key, -1);
+            QString val = "";
+            if (colIndex != -1) {
+                auto cell = doc.cellAt(row, colIndex);
+                val = cell ? cell->value().toString().trimmed() : "";
+            }
+            val.replace("\"", "\"\"");
+            rowData << val;
+        }
+        
+        rowData << "TRUE"; // Mark as valid for preview
+        previewData.append(rowData);
+        row++;
+        if (previewData.size() >= 100) break;
+    }
+
+    QString outDir = QDir(FilePathManager::getRootPath()).filePath("tools");
+    QDir().mkpath(outDir);
+
+    result.dauSachCsv = createTempCsv(QDir(outDir).filePath("preview_dausach.csv"), previewData, "SACH");
+    result.docGiaCsv = createTempCsv(QDir(outDir).filePath("preview_docgia.csv"), previewData, "DOCGIA"); 
+    
+    result.success = true;
+    result.message = QString("Đọc xong. Phát hiện kiểu: %1").arg(result.detectedType.isEmpty() ? "Không rõ" : result.detectedType);
     return result;
 }
 
-bool ImportManager::runApply(const QString &excelFile, const QString &mode, QWidget *parent) {
-    if (m_scriptPath.isEmpty()) return false;
+QString ImportManager::createTempCsv(const QString &path, const QList<QStringList> &data, const QString &type) {
+    QFile file(path);
+    if (file.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
+        QTextStream out(&file);
+        #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+            out.setEncoding(QStringConverter::Utf8);
+        #else
+            out.setCodec("UTF-8");
+        #endif
+        // Add specific headers expected by UI?
+        // ManHinhPreviewImport likely expects specific headers.
+        // Let's look at the old Python script logic or UI.
+        // Or simpler: Just write raw data. The UI likely maps data by index 0,1,2...
+        
+        // We add a generic header if list is not empty, or assume row 1 was header?
+        // We skipped row 1 in loop. Let's add standard headers to make UI happy.
+        // Book: ISBN, TenSach, TacGia, Nam, TheLoai, Gia, SoLuong, NXB, ViTri
+        // Write Headers based on Type
+        if (type == "DOCGIA") {
+             // Reader: Ho, Ten, Gioi Tinh, Ngay Sinh, Lop, SDT, Email
+             out << "HoDem,Ten,GioiTinh,NgaySinh,Lop,SDT,Email,Valid\n";
+        } else {
+             // Book: ISBN, TenSach, ...
+             out << "ISBN,TenSach,TacGia,NamXB,TheLoai,GiaTien,SoLuong,NhaXuatBan,ViTri,Valid\n";
+        }
 
-    QProgressDialog progress("Đang cập nhật cơ sở dữ liệu...", QString(), 0, 0, parent);
-    progress.setWindowModality(Qt::WindowModal);
-    progress.setMinimumDuration(0);
-    progress.show();
-    QCoreApplication::processEvents();
-
-    QProcess proc;
-    QStringList args;
-    args << m_scriptPath << "--file" << excelFile << "--to-db" << "--mode" << mode;
-    
-    setupProcessEnv(proc);
-    proc.start(m_pythonExe, args);
-    proc.waitForFinished(-1);
-    
-    if (proc.exitCode() != 0) {
-        QString err = QString::fromUtf8(proc.readAllStandardError());
-        QMessageBox::critical(parent, "Lỗi Import", "Có lỗi xảy ra:\n" + err);
-        return false;
+        for (const QStringList &row : data) {
+            // Join with quotes
+            QStringList quotedRow;
+            for (const QString &field : row) {
+                quotedRow << "\"" + field + "\"";
+            }
+            out << quotedRow.join(",") << "\n";
+        }
+        file.close();
+        return path;
     }
-    
+    return "";
+}
+
+bool ImportManager::runApply(const QString &excelFile, const QString &mode, QWidget *parent) {
+    Document doc(excelFile);
+    if (!doc.load()) return false;
+
+    if (!doc.selectSheet("Sheet1")) {
+         QStringList sheets = doc.sheetNames();
+         if (!sheets.isEmpty()) doc.selectSheet(sheets.first());
+    }
+
+    // 1. Scan Headers to build map
+    QStringList headers;
+    for (int col = 1; col <= 30; ++col) {
+        auto cell = doc.cellAt(1, col);
+        if (!cell) break;
+        headers << cell->value().toString().trimmed();
+    }
+    QMap<QString, int> colMap = buildColumnMap(headers, mode);
+    qDebug() << "[IMPORT] Apply Mapping:" << colMap;
+
+    int row = 2;
+    int maxRow = doc.dimension().lastRow();
+
+    if (mode == "SACH") {
+        int iISBN = colMap.value("ISBN", 1);
+        int iTEN = colMap.value("TEN", 2);
+        int iTACGIA = colMap.value("TACGIA", 3);
+        int iNAM = colMap.value("NAM", 4);
+        int iTHELOAI = colMap.value("THELOAI", 5);
+        int iGIA = colMap.value("GIA", 6);
+        int iSOLUONG = colMap.value("SOLUONG", 7);
+        int iNXB = colMap.value("NXB", 8);
+        int iVITRI = colMap.value("VITRI", 9);
+
+        while (row <= maxRow) {
+            QString isbn = doc.read(row, iISBN).toString().trimmed();
+            QString ten = doc.read(row, iTEN).toString().trimmed();
+            if (ten.isEmpty()) { row++; continue; }
+
+            QString tg = doc.read(row, iTACGIA).toString().trimmed();
+            int nam = doc.read(row, iNAM).toInt();
+            QString tl = doc.read(row, iTHELOAI).toString().trimmed();
+            long long gia = doc.read(row, iGIA).toLongLong();
+            int sl = doc.read(row, iSOLUONG).toInt();
+            QString nxb = doc.read(row, iNXB).toString().trimmed();
+            QString vt = doc.read(row, iVITRI).toString().trimmed();
+
+            ThemDauSachMoi(isbn.toStdString(), ten.toStdString(), 100, tg.toStdString(), nam, tl.toStdString(), sl, vt.toStdString(), gia, nxb.toStdString());
+            row++;
+        }
+    } 
+    else if (mode == "DOCGIA") {
+        int iHO = colMap.value("HO", 1);
+        int iTEN = colMap.value("TEN", 2);
+        int iPHAI = colMap.value("PHAI", 3);
+        int iNGAYSINH = colMap.value("NGAYSINH", 4);
+        int iLOP = colMap.value("LOP", 5);
+        int iSDT = colMap.value("SDT", 6);
+        int iEMAIL = colMap.value("EMAIL", 7);
+
+        while (row <= maxRow) {
+            QString ho = doc.read(row, iHO).toString().trimmed();
+            QString ten = doc.read(row, iTEN).toString().trimmed();
+            if (ten.isEmpty()) { row++; continue; }
+
+            QString phaiStr = doc.read(row, iPHAI).toString().toLower();
+            bool phai = (phaiStr == "nu" || phaiStr == "female" || phaiStr == "1" || phaiStr.contains("nữ"));
+            QString ngaySinh = doc.read(row, iNGAYSINH).toString().trimmed();
+            QString lop = doc.read(row, iLOP).toString().trimmed();
+            QString sdt = doc.read(row, iSDT).toString().trimmed();
+            QString email = doc.read(row, iEMAIL).toString().trimmed();
+            
+            PTRDG node = taoDocGia(ho.toStdString(), ten.toStdString(), phai, 1, rootDocGia);
+            node->data.NgaySinh = ngaySinh.toStdString();
+            node->data.Lop = lop.toStdString();
+            node->data.SDT = sdt.toStdString();
+            node->data.Email = email.toStdString();
+            InsertDocGia(rootDocGia, node);
+            row++;
+        }
+    }
+    DanhDauDuLieuThayDoi();
     return true;
 }
 
-void ImportManager::setupProcessEnv(QProcess &proc) {
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    // CRITICAL: Unset PYTHONHOME/PYTHONPATH to prevent conflicts with system/toolchain Python
-    env.remove("PYTHONHOME");
-    env.remove("PYTHONPATH");
-    proc.setProcessEnvironment(env);
+bool ImportManager::runApplyData(const QList<QStringList> &data, const QString &type, const QString &mode, QWidget *parent) {
+    if (data.isEmpty()) return false;
+    
+    int countSuccess = 0;
+    
+    // Iterate rows
+    for (const QStringList &row : data) {
+        if (row.isEmpty()) continue;
+        
+        // CHECK VALIDITY (Last Column)
+        if (row.last().toUpper() == "FALSE" || row.last() == "0") {
+            continue; // Skip invalid
+        }
+        
+        if (type == "SACH") {
+             // 0:ISBN, 1:Ten, 2:TacGia, 3:Nam, 4:TheLoai, 5:Gia, 6:Qty, 7:NXB, 8:ViTri
+             if (row.size() < 9) continue;
+             QString isbn = row[0];
+             QString ten = row[1];
+             QString tg = row[2];
+             int nam = row[3].toInt();
+             QString tl = row[4];
+             long long gia = row[5].toLongLong();
+             int sl = row[6].toInt();
+             QString nxb = row[7];
+             QString vt = row[8];
+             
+             if (ten.isEmpty()) continue;
+
+             ThemDauSachMoi(isbn.toStdString(), ten.toStdString(), 100, 
+                            tg.toStdString(), nam, tl.toStdString(), 
+                            sl, vt.toStdString(), gia, nxb.toStdString());
+             countSuccess++;
+        }
+        else if (type == "DOCGIA") {
+             // 0:Ho, 1:Ten, 2:GT, 3:DOB, 4:Lop, 5:SDT, 6:Email
+             if (row.size() < 7) continue;
+             QString ho = row[0];
+             QString ten = row[1];
+             QString phaiStr = row[2].toLower();
+             bool phai = (phaiStr.contains("nu") || phaiStr.contains("female") || phaiStr == "1");
+             QString ngaySinh = row[3];
+             QString lop = row[4];
+             QString sdt = row[5];
+             QString email = row[6];
+             
+             if (ten.isEmpty()) continue;
+             
+             PTRDG node = taoDocGia(ho.toStdString(), ten.toStdString(), phai, 1, rootDocGia);
+             node->data.NgaySinh = ngaySinh.toStdString();
+             node->data.Lop = lop.toStdString();
+             node->data.SDT = sdt.toStdString();
+             node->data.Email = email.toStdString();
+             
+             InsertDocGia(rootDocGia, node);
+             countSuccess++;
+        }
+    }
+    
+    if (type == "SACH") {
+        DanhDauDuLieuThayDoi();
+    } else if (type == "DOCGIA") {
+        saveDocGia(rootDocGia);
+    }
+    
+    return true;
 }
