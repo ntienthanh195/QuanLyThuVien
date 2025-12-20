@@ -50,7 +50,7 @@
 
 
 WidgetMuonTraSach::WidgetMuonTraSach(QWidget *cha) 
-    : QWidget(cha), docGiaHienTai(nullptr), sachDangChonMuon(nullptr), banSaoDangChon(nullptr) {
+    : QWidget(cha), docGiaHienTai(nullptr), sachDangChonMuon(nullptr), banSaoDangChon(nullptr), m_batchPrintTimer(nullptr) {
     thieLapGiaoDien();
     // thieLapTabTraSach(); // REMOVED: Now merged into Borrow logic
 
@@ -1361,7 +1361,7 @@ void WidgetMuonTraSach::xuLyNutXacNhanMuon(bool skipConfirm) {
         m_lastOperationWasBorrow = true; // Set operation type
         m_batchPrintQueueMa.append(maSach);
         m_batchPrintQueueTen.append(tenSach);
-        m_batchPrintTimer->start(5000); // 5000ms = 5 giây
+        // m_batchPrintTimer->start(5000); // 5000ms = 5 giây - DISABLED: Auto-print disabled per user request.
         
         /* 
         // OLD LOGIC: Print immediately
