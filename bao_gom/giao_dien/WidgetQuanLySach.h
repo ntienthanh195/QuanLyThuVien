@@ -75,6 +75,7 @@ private slots:
     void xuLyLocTrangThai(int chiSo);
     void xuLyChonDong(int dong, int cot);
     void xuLyNhapDuLieuTu();
+    void xuLyNutKiemKe();
     void onWatchedFileChanged(const QString &path);
 
     // Multilingual Support
@@ -126,6 +127,7 @@ private:
     QPushButton *nutXemChiTiet;
     QPushButton *nutNhapFile;
     QPushButton *nutXuatFile;
+    QPushButton *nutKiemKe;
     
     // Dữ liệu hiện tại
     PTRDS dauSachDangChon;

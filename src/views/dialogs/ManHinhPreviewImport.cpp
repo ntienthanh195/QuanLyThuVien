@@ -125,14 +125,20 @@ void ManHinhPreviewImport::setupUI() {
     lblSub->setStyleSheet("font-style: italic; color: #AAAAAA; margin-bottom: 5px;");
     mainLayout->addWidget(lblSub);
 
-    // Tabs
     m_tabWidget = new QTabWidget(this);
     mainLayout->addWidget(m_tabWidget);
+    
+    QLabel *lblChoose = new QLabel(LanguageManager::instance().getText("LBL_CHOOSE_IMPORT_TYPE"), this);
+    lblChoose->setStyleSheet("color: #00BCF2; font-weight: bold; margin-top: 5px;");
+    mainLayout->addWidget(lblChoose);
+
+    int bookTabIdx = -1;
+    int readerTabIdx = -1;
 
     if (!m_result.dauSachCsv.isEmpty() && QFile::exists(m_result.dauSachCsv)) {
         QTableView *tv = new QTableView();
         loadCsv(m_result.dauSachCsv, tv);
-        m_tabWidget->addTab(tv, LanguageManager::instance().getText("TAB_BOOKS")); 
+        bookTabIdx = m_tabWidget->addTab(tv, LanguageManager::instance().getText("TAB_BOOKS")); 
     }
     if (!m_result.banSaoCsv.isEmpty() && QFile::exists(m_result.banSaoCsv)) {
         QTableView *tv = new QTableView();
@@ -141,13 +147,20 @@ void ManHinhPreviewImport::setupUI() {
     }
     if (!m_result.docGiaCsv.isEmpty() && QFile::exists(m_result.docGiaCsv)) {
         QTableView *tv = new QTableView();
-        loadCsv(m_result.docGiaCsv, tv); // Leaving hardcoded for safety
-        m_tabWidget->addTab(tv, LanguageManager::instance().getText("TAB_READERS"));
+        loadCsv(m_result.docGiaCsv, tv); 
+        readerTabIdx = m_tabWidget->addTab(tv, LanguageManager::instance().getText("TAB_READERS"));
     }
     if (!m_result.muonTraCsv.isEmpty() && QFile::exists(m_result.muonTraCsv)) {
         QTableView *tv = new QTableView();
         loadCsv(m_result.muonTraCsv, tv);
         m_tabWidget->addTab(tv, LanguageManager::instance().getText("TAB_LOANS"));
+    }
+
+    // Smart auto-select tab
+    if (m_result.detectedType == "SACH" && bookTabIdx != -1) {
+        m_tabWidget->setCurrentIndex(bookTabIdx);
+    } else if (m_result.detectedType == "DOCGIA" && readerTabIdx != -1) {
+        m_tabWidget->setCurrentIndex(readerTabIdx);
     }
 
     // Buttons

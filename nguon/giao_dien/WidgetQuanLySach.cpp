@@ -37,7 +37,8 @@
 #include "utils/PrintHelper.h" // Added include
 #include "views/dialogs/ManHinhPreviewImport.h"
 #include "utils/ImportManager.h"
-#include "giao_dien/hop_thoai/ManHinhQuanLyIn.h" // Moved to top
+#include "giao_dien/hop_thoai/ManHinhQuanLyIn.h" 
+#include "giao_dien/hop_thoai/ManHinhKiemKe.h"
 #include <QHeaderView>
 #include <QMessageBox>
 #include <QDebug>
@@ -249,7 +250,12 @@ void WidgetQuanLySach::thieLapHeaderBar() {
     nutXuatFile->setIcon(QIcon(":/icons/print.svg"));
     nutXuatFile->setStyleSheet(nutNhapFile->styleSheet());
     
+    nutKiemKe = new QPushButton(" " + LanguageManager::instance().getText("BTN_INVENTORY"));
+    nutKiemKe->setIcon(QIcon(":/icons/search.svg"));
+    nutKiemKe->setStyleSheet(nutNhapFile->styleSheet());
+    
     layoutActions->addWidget(nutXuatFile);
+    layoutActions->addWidget(nutKiemKe);
 
     // Group 3: SELECTION (Chi Tiết, Sửa, Xóa) - Initially Disabled
     QWidget *groupSelection = new QWidget();
@@ -303,6 +309,7 @@ void WidgetQuanLySach::thieLapHeaderBar() {
     connect(nutXemChiTiet, &QPushButton::clicked, this, &WidgetQuanLySach::xuLyNutXemChiTiet);
     connect(nutSuaSach, &QPushButton::clicked, this, &WidgetQuanLySach::xuLyNutSuaSach);
     connect(nutXoaSach, &QPushButton::clicked, this, &WidgetQuanLySach::xuLyNutXoaSach);
+    connect(nutKiemKe, &QPushButton::clicked, this, &WidgetQuanLySach::xuLyNutKiemKe);
     
     // Header: In -> Unified Print Dialog
     connect(nutXuatFile, &QPushButton::clicked, this, [this]() {
@@ -913,4 +920,8 @@ QColor WidgetQuanLySach::layMauTrangThai(TrangThaiSach trangThai) const {
         case THANH_LY: return QColor("#F64E60");
         default: return QColor("#6C6C80");
     }
+}
+void WidgetQuanLySach::xuLyNutKiemKe() {
+    ManHinhKiemKe dialog(this);
+    dialog.exec();
 }

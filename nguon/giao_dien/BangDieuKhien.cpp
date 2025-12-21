@@ -1384,7 +1384,15 @@ QWidget* BangDieuKhien::taoPanelCanhBao() {
         // Icon với màu pastel
         QLabel *iconLabel = new QLabel();
         iconLabel->setFixedSize(40, 40);
-        iconLabel->setText(icon);
+        if (icon.startsWith(":/")) {
+            QPixmap pix(icon);
+            if (!pix.isNull()) {
+                iconLabel->setPixmap(pix.scaled(20, 20, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+            }
+        } else {
+            iconLabel->setText(icon);
+            iconLabel->setStyleSheet(QString("font-size: 18px; color: %1;").arg(mau));
+        }
         iconLabel->setAlignment(Qt::AlignCenter);
         iconLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
         
@@ -1395,9 +1403,9 @@ QWidget* BangDieuKhien::taoPanelCanhBao() {
             .arg(mauGoc.green())
             .arg(mauGoc.blue());
         
-        iconLabel->setStyleSheet(QString(
-            "background-color: %1; border-radius: 8px; font-size: 18px; color: %2; border: none;"
-        ).arg(mauMo).arg(mau));
+        iconLabel->setStyleSheet(iconLabel->styleSheet() + QString(
+            "background-color: %1; border-radius: 8px; border: none;"
+        ).arg(mauMo));
         
         // Text
         QVBoxLayout *textLayout = new QVBoxLayout();
@@ -1454,15 +1462,15 @@ QWidget* BangDieuKhien::taoPanelCanhBao() {
     // Các mục cảnh báo & tác vụ với chức năng click
     
     // 1. In Ấn (Top Priority)
-    noiDungLayout->addWidget(taoMucCanhBao("🖨️", LanguageManager::instance().getText("DASH_TASK_PRINT"), "#a855f7", LanguageManager::instance().getText("DASH_DESC_PRINT"),
+    noiDungLayout->addWidget(taoMucCanhBao(":/icons/print.svg", LanguageManager::instance().getText("DASH_TASK_PRINT"), "#a855f7", LanguageManager::instance().getText("DASH_DESC_PRINT"),
         [this]() { xuLyMoDialogInAn(); }));
         
     // 2. Nhập Dữ Liệu (Replaced Quét Mã)
-    noiDungLayout->addWidget(taoMucCanhBao("📥", LanguageManager::instance().getText("DASH_TASK_IMPORT"), "#38bdf8", LanguageManager::instance().getText("DASH_DESC_IMPORT"),
+    noiDungLayout->addWidget(taoMucCanhBao(":/icons/import.svg", LanguageManager::instance().getText("DASH_TASK_IMPORT"), "#38bdf8", LanguageManager::instance().getText("DASH_DESC_IMPORT"),
         [this]() { xuLyNhapDuLieuTongHop(); }));
     
     // 3. Sao Lưu (New)
-    noiDungLayout->addWidget(taoMucCanhBao("", LanguageManager::instance().getText("DASH_TASK_BACKUP"), "#34d399", LanguageManager::instance().getText("DASH_DESC_BACKUP"),
+    noiDungLayout->addWidget(taoMucCanhBao(":/icons/copy.svg", LanguageManager::instance().getText("DASH_TASK_BACKUP"), "#34d399", LanguageManager::instance().getText("DASH_DESC_BACKUP"),
         [this]() { 
             // Call generic backup function
             QString file = QString::fromStdString(TaoBackup());
@@ -1479,16 +1487,42 @@ QWidget* BangDieuKhien::taoPanelCanhBao() {
     QString expiryText = QString("%1 %2 | %3 %4")
         .arg(tkDocGia.docGiaHetHan).arg(LanguageManager::instance().getText("DASH_ALERT_EXPIRED"))
         .arg(tkDocGia.docGiaSapHetHan).arg(LanguageManager::instance().getText("DASH_ALERT_NEAR_EXPIRY"));
-    noiDungLayout->addWidget(taoMucCanhBao("", LanguageManager::instance().getText("DASH_ALERT_CARDS"), (totalExpiry > 0 ? "#f87171" : "#fbbf24"), expiryText,
+    noiDungLayout->addWidget(taoMucCanhBao(":/icons/user.svg", LanguageManager::instance().getText("DASH_ALERT_CARDS"), (totalExpiry > 0 ? "#f87171" : "#fbbf24"), expiryText,
         [this]() { emit yeuCauChuyenDenQuanLyDocGia(); }));
 
     // 5. Sách Quá Hạn
-    noiDungLayout->addWidget(taoMucCanhBao("▲", QString("%1 %2").arg(tkDocGia.docGiaCoSachQuaHan).arg(LanguageManager::instance().getText("DASH_ALERT_OVERDUE")), "#fb923c", "", 
+    noiDungLayout->addWidget(taoMucCanhBao(":/icons/exchange.svg", QString("%1 %2").arg(tkDocGia.docGiaCoSachQuaHan).arg(LanguageManager::instance().getText("DASH_ALERT_OVERDUE")), "#fb923c", "", 
         [this]() { emit yeuCauChuyenDenMuonTraSach(); }));
     
     // 6. Sách Sắp Hết (New)
-    noiDungLayout->addWidget(taoMucCanhBao("", QString("%1 %2").arg(sachSapHet).arg(LanguageManager::instance().getText("DASH_ALERT_LOW_STOCK")), "#f472b6", LanguageManager::instance().getText("DASH_DESC_LOW_STOCK"),
+    noiDungLayout->addWidget(taoMucCanhBao(":/icons/book.svg", QString("%1 %2").arg(sachSapHet).arg(LanguageManager::instance().getText("DASH_ALERT_LOW_STOCK")), "#f472b6", LanguageManager::instance().getText("DASH_DESC_LOW_STOCK"),
         [this]() { emit yeuCauChuyenDenQuanLySach(); }));
+
+    // 7. Thống kê Tài Chính (Admin Only)
+    if (UserManager::instance().hasPermission("ADMIN")) {
+        long long monthlyRevenue = 0;
+        long long totalDebt = 0;
+        QSqlQuery q;
+        QString monthYear = QDate::currentDate().toString("MM/yyyy");
+        q.prepare("SELECT SUM(tien_phat) FROM muon_tra WHERE da_thanh_toan = 1 AND (ngay_tra LIKE :p1 OR ngay_muon LIKE :p2)");
+        q.bindValue(":p1", "%" + monthYear);
+        q.bindValue(":p2", "%" + monthYear);
+        if (q.exec() && q.next()) monthlyRevenue = q.value(0).toLongLong();
+        
+        q.prepare("SELECT SUM(tien_phat) FROM muon_tra WHERE da_thanh_toan = 0 AND (trang_thai = 1 OR trang_thai = 2)");
+        if (q.exec() && q.next()) totalDebt = q.value(0).toLongLong();
+
+        if (monthlyRevenue > 0) {
+            noiDungLayout->addWidget(taoMucCanhBao(":/icons/stats.svg", LanguageManager::instance().getText("DASH_FINANCE_MONTHLY"), "#4CAF50", 
+                QString("+%1 VND").arg(QLocale(QLocale::Vietnamese).toString(monthlyRevenue)),
+                [this]() { emit yeuCauChuyenDenMuonTraSach(); }));
+        }
+        if (totalDebt > 0) {
+            noiDungLayout->addWidget(taoMucCanhBao(":/icons/info.svg", LanguageManager::instance().getText("DASH_FINANCE_DEBT"), "#f43f5e", 
+                QString("%1 VND").arg(QLocale(QLocale::Vietnamese).toString(totalDebt)),
+                [this]() { emit yeuCauChuyenDenMuonTraSach(); }));
+        }
+    }
     
     noiDungLayout->addStretch();
     

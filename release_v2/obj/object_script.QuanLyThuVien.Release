@@ -34,6 +34,7 @@ release_v2/obj/BangDieuKhien.o
 release_v2/obj/WidgetQuanLySach.o
 release_v2/obj/WidgetQuanLyDocGia.o
 release_v2/obj/WidgetMuonTraSach.o
+release_v2/obj/WidgetLichSuMuonTra.o
 release_v2/obj/HopThoaiThemSach.o
 release_v2/obj/HopThoaiThemDocGia.o
 release_v2/obj/HopThoaiSuaSach.o
@@ -47,6 +48,7 @@ release_v2/obj/HopThoaiCauHinhIn.o
 release_v2/obj/ManHinhChiTietSach.o
 release_v2/obj/ManHinhChiTietDocGia.o
 release_v2/obj/HopThoaiThanhToan.o
+release_v2/obj/ManHinhKiemKe.o
 release_v2/obj/ResponsiveHelper.o
 release_v2/obj/AnimationHelper.o
 release_v2/obj/ConfirmationDialog.o
@@ -109,6 +111,7 @@ release_v2/obj/moc_BangDieuKhien.o
 release_v2/obj/moc_WidgetQuanLySach.o
 release_v2/obj/moc_WidgetQuanLyDocGia.o
 release_v2/obj/moc_WidgetMuonTraSach.o
+release_v2/obj/moc_WidgetLichSuMuonTra.o
 release_v2/obj/moc_HopThoaiThemSach.o
 release_v2/obj/moc_HopThoaiThemDocGia.o
 release_v2/obj/moc_HopThoaiSuaSach.o
@@ -122,6 +125,7 @@ release_v2/obj/moc_HopThoaiCauHinhIn.o
 release_v2/obj/moc_ManHinhChiTietSach.o
 release_v2/obj/moc_ManHinhChiTietDocGia.o
 release_v2/obj/moc_HopThoaiThanhToan.o
+release_v2/obj/moc_ManHinhKiemKe.o
 release_v2/obj/moc_WidgetQuanLyNguoiDung.o
 release_v2/obj/moc_HopThoaiCaiDat.o
 release_v2/obj/moc_ResponsiveHelper.o

@@ -40,6 +40,9 @@ public:
     // Automatic normalization for book copy codes
     void normalizeBookCodes();
 
+    // Archiving & Cleanup
+    bool archiveOldRecords(int monthsThreshold = 6);
+
     // Last error
     QSqlError lastError() const;
 

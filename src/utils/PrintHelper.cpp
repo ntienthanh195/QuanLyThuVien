@@ -18,6 +18,13 @@
 #include <QPrintDialog>
 #include <QPageSize>
 #include <QPageLayout>
+#include <QDateTime>
+#include <QMap>
+#include <QAbstractItemModel>
+#include <QSqlQuery>
+#include <QSqlError>
+#include <QApplication>
+#include "models/UserManager.h"
 #include <QMarginsF>
 #include <QInputDialog> // Missing
 #include <QTextDocument>
@@ -1661,3 +1668,133 @@ bool PrintHelper::xuatLichSuMuonTraToPDF(PTRDG docGia, QWidget* parent) {
     return showPrintPreview(&doc, "Xuất Lịch Sử PDF", parent, fileName);
 }
 
+bool PrintHelper::inBaoCaoTaiChinh(const QString& start, const QString& end, const QString& tieuDe, QAbstractItemModel* model, QWidget* parent) {
+    if (!model) return false;
+
+    QString html = "<html><head><style>"
+                   "table { border-collapse: collapse; width: 100%; font-size: 11px; }"
+                   "th, td { border: 1px solid #333; padding: 6px; text-align: left; }"
+                   "th { background-color: #f2f2f2; font-weight: bold; }"
+                   "h1 { text-align: center; color: #1a1a1a; }"
+                   ".header-info { margin-bottom: 20px; font-size: 12px; }"
+                   ".footer { margin-top: 30px; text-align: right; font-style: italic; }"
+                   "</style></head><body>";
+
+    html += QString("<h1>%1</h1>").arg(tieuDe);
+    html += QString("<div class='header-info'>"
+                    "<b>Thời gian:</b> Từ %1 đến %2<br>"
+                    "<b>Ngày lập:</b> %3"
+                    "</div>")
+            .arg(start).arg(end).arg(QDateTime::currentDateTime().toString("dd/MM/yyyy HH:mm"));
+
+    html += "<table><tr>";
+    for (int i = 0; i < model->columnCount(); ++i) {
+        html += QString("<th>%1</th>").arg(model->headerData(i, Qt::Horizontal).toString());
+    }
+    html += "</tr>";
+
+    long long total = 0;
+    for (int r = 0; r < model->rowCount(); ++r) {
+        html += "<tr>";
+        for (int c = 0; c < model->columnCount(); ++c) {
+            QString val = model->data(model->index(r, c)).toString();
+            html += QString("<td>%1</td>").arg(val);
+            if (c == 4) { // Assuming Fine column
+                total += model->data(model->index(r, c)).toLongLong();
+            }
+        }
+        html += "</tr>";
+    }
+    html += "</table>";
+
+    html += QString("<div class='footer'><b>Tổng cộng: %1 VND</b></div>").arg(QLocale(QLocale::Vietnamese).toString(total));
+    html += "</body></html>";
+
+    QTextDocument doc;
+    doc.setHtml(html);
+    return showPrintPreview(&doc, tieuDe, parent, "BaoCo_TaiChinh_" + QDate::currentDate().toString("yyyyMMdd"));
+}
+
+bool PrintHelper::inBaoCaoKiemKe(const QStringList& missing, const QStringList& unknown, const QStringList& borrowedAnomalies,
+                               const QStringList& borrowed, const QMap<QString, int>& stats, QWidget* parent) {
+
+    QString html = "<html><head><style>"
+                   "h1 { text-align: center; color: #1a1a1a; margin-top: 0; }"
+                   "h2 { color: #d32f2f; border-bottom: 2px solid #ccc; padding-bottom: 5px; font-size: 16px; margin-top: 25px; }"
+                   ".audit-info { margin-bottom: 25px; font-size: 13px; line-height: 1.6; }"
+                   "table { border-collapse: collapse; width: 100%; margin-bottom: 20px; font-size: 11px; }"
+                   "th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }"
+                   "th { background-color: #f5f6fa; font-weight: bold; color: #333; }"
+                   ".summary-table { width: auto; min-width: 350px; border: 2px solid #333; margin-bottom: 30px; }"
+                   ".summary-table th { background-color: #333; color: white; }"
+                   ".summary-table td { font-weight: bold; font-size: 14px; text-align: center; }"
+                   "</style></head><body>";
+
+    html += "<h1>BÁO CÁO KIỂM KÊ KHO SÁCH TỔNG QUÁT</h1>";
+    
+    html += "<div class='audit-info'>";
+    html += QString("• <b>Ngày kiểm kê:</b> %1<br>").arg(QDateTime::currentDateTime().toString("dd/MM/yyyy HH:mm:ss"));
+    html += QString("• <b>Người kiểm kê:</b> %1<br>").arg(UserManager::instance().currentUser().fullName.isEmpty() ? 
+                                                       UserManager::instance().currentUser().username : 
+                                                       UserManager::instance().currentUser().fullName);
+    html += "</div>";
+
+    // --- SUMMARY SECTION ---
+    html += "<h2>1. TÓM TẮT CHỈ SỐ HỆ THỐNG</h2>";
+    html += "<table class='summary-table'>";
+    html += "<tr><th>Chỉ số</th><th>Số lượng</th></tr>";
+    html += QString("<tr><td>Tổng số đầu sách</td><td>%1</td></tr>").arg(stats.value("titles", 0));
+    html += QString("<tr><td>Tổng số cuốn (Bản sao)</td><td>%1</td></tr>").arg(stats.value("copies", 0));
+    html += QString("<tr><td>Sách đang cho mượn (Theo hợp đồng)</td><td>%1</td></tr>").arg(stats.value("borrowed", 0));
+    html += QString("<tr><td>Sách thực tế phải có trên kệ</td><td>%1</td></tr>").arg(stats.value("stock", 0));
+    html += "</table>";
+
+    // --- COMPARISON SECTION ---
+    html += "<h2>2. KẾT QUẢ ĐỐI SOÁT THỰC TẾ</h2>";
+    
+    // Missing (In System but not on shelf)
+    if (!missing.isEmpty()) {
+        html += QString("<p style='color: #d32f2f; font-weight: bold;'>⚠️ DANH SÁCH SÁCH THẤT LẠC - THIẾU (%1 CUỐN)</p>").arg(missing.size());
+        html += "<table><tr><th>STT</th><th>Mã cá biệt</th><th>Vị trí (Lý thuyết)</th><th>Ghi chú</th></tr>";
+        for (int i = 0; i < missing.size(); ++i) {
+            html += QString("<tr><td>%1</td><td>%2</td><td>-</td><td>Có trong DB nhưng không tìm thấy</td></tr>").arg(i+1).arg(missing[i]);
+        }
+        html += "</table>";
+    }
+
+    // Surplus (Scanned but not in System)
+    if (!unknown.isEmpty()) {
+        html += QString("<p style='color: #f39c12; font-weight: bold;'>❔ DANH SÁCH MÃ LẠ - DƯ (%1 CUỐN)</p>").arg(unknown.size());
+        html += "<table><tr><th>STT</th><th>Mã quét được</th><th>Ghi chú</th></tr>";
+        for (int i = 0; i < unknown.size(); ++i) {
+            html += QString("<tr><td>%1</td><td>%2</td><td>Dữ liệu không tồn tại</td></tr>").arg(i+1).arg(unknown[i]);
+        }
+        html += "</table>";
+    }
+
+    // Anomalies (Scanned but DB says Borrowed)
+    if (!borrowedAnomalies.isEmpty()) {
+        html += QString("<p style='color: #a78bfa; font-weight: bold;'>⚡ DANH SÁCH SAI TRẠNG THÁI (%1 CUỐN)</p>").arg(borrowedAnomalies.size());
+        html += "<table><tr><th>STT</th><th>Mã cá biệt</th><th>Trạng thái DB</th><th>Ghi chú</th></tr>";
+        for (int i = 0; i < borrowedAnomalies.size(); ++i) {
+            html += QString("<tr><td>%1</td><td>%2</td><td>Đang mượn</td><td>Có trên kệ nhưng chưa trả trên máy</td></tr>").arg(i+1).arg(borrowedAnomalies[i]);
+        }
+        html += "</table>";
+    }
+
+    if (missing.isEmpty() && unknown.isEmpty() && borrowedAnomalies.isEmpty()) {
+        html += "<p style='text-align: center; font-size: 18px; color: #27ae60; padding: 20px; border: 2px dashed #27ae60;'><b>✓ TẤT CẢ DỮ LIỆU KHỚP TUYỆT ĐỐI!</b></p>";
+    }
+
+    html += "<div style='margin-top: 50px; text-align: right;'>"
+            "<p>......, Ngày .... tháng .... năm ........</p>"
+            "<p style='margin-right: 50px;'><b>Người lập biểu</b></p>"
+            "<br><br><br>"
+            "</div>";
+
+    html += "</body></html>";
+
+    QTextDocument doc;
+    doc.setHtml(html);
+    return showPrintPreview(&doc, "Báo cáo kiểm kê tổng quát", parent, "KiemKe_Audit_" + QDate::currentDate().toString("yyyyMMdd"));
+}

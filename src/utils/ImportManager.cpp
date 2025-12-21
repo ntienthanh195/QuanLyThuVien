@@ -41,15 +41,22 @@ static QString detectTypeFromHeaders(const QStringList &headers) {
     int sachScore = 0;
     int docGiaScore = 0;
     
-    QStringList sachKeywords = {"isbn", "tensach", "dausach", "tacgia", "nhaxuatban", "nxb", "namxb", "theloai", "giatien", "soluong", "vitri"};
-    QStringList docGiaKeywords = {"hodem", "ten", "phai", "ngaysinh", "lop", "sdt", "email", "nguoimuon", "hocvien", "thedocgia"};
+    // Strong indicators get more points
+    QMap<QString, int> sachKeywords = {
+        {"isbn", 5}, {"tensach", 3}, {"dausach", 3}, {"tacgia", 2}, {"nxb", 2}, {"giatien", 2}, {"soluong", 2}
+    };
+    QMap<QString, int> docGiaKeywords = {
+        {"hodem", 3}, {"ngaysinh", 3}, {"msv", 5}, {"mssv", 5}, {"lop", 2}, {"sdt", 4}, {"email", 4}, {"hocvien", 5}
+    };
     
     for (const QString &h : headers) {
         QString n = normalizeHeader(h);
         if (n.isEmpty()) continue;
-        for (const QString &kw : sachKeywords) if (n.contains(kw)) sachScore++;
-        for (const QString &kw : docGiaKeywords) if (n.contains(kw)) docGiaScore++;
+        for (auto it = sachKeywords.begin(); it != sachKeywords.end(); ++it) if (n.contains(it.key())) sachScore += it.value();
+        for (auto it = docGiaKeywords.begin(); it != docGiaKeywords.end(); ++it) if (n.contains(it.key())) docGiaScore += it.value();
     }
+    
+    qDebug() << "[IMPORT] Type Detection Scores - Sach:" << sachScore << "DocGia:" << docGiaScore;
     if (sachScore > docGiaScore && sachScore > 0) return "SACH";
     if (docGiaScore > sachScore && docGiaScore > 0) return "DOCGIA";
     return "";
@@ -109,9 +116,9 @@ ImportManager::PreviewResult ImportManager::runPreview(const QString &excelFile)
          if (!sheets.isEmpty()) doc.selectSheet(sheets.first());
     }
 
-    // 1. READ HEADERS for Smart Detection
+    // 1. READ HEADERS
     QStringList headers;
-    for (int col = 1; col <= 20; ++col) {
+    for (int col = 1; col <= 30; ++col) {
         auto cell = doc.cellAt(1, col);
         if (!cell) break;
         headers << cell->value().toString().trimmed();
@@ -119,53 +126,57 @@ ImportManager::PreviewResult ImportManager::runPreview(const QString &excelFile)
     
     result.detectedType = detectTypeFromHeaders(headers);
     
-    // Choose schema for mapping preview (Default to SACH if unknown for generic view)
-    QString mapMode = result.detectedType.isEmpty() ? "SACH" : result.detectedType;
-    QMap<QString, int> colMap = buildColumnMap(headers, mapMode);
+    // 2. BUILD MAPPINGS FOR BOTH
+    QMap<QString, int> colMapSach = buildColumnMap(headers, "SACH");
+    QMap<QString, int> colMapDocGia = buildColumnMap(headers, "DOCGIA");
     
-    // Define target columns for alignment
-    QStringList targetKeys;
-    if (mapMode == "SACH") {
-        targetKeys << "ISBN" << "TEN" << "TACGIA" << "NAM" << "THELOAI" << "GIA" << "SOLUONG" << "NXB" << "VITRI";
-    } else {
-        targetKeys << "HO" << "TEN" << "PHAI" << "NGAYSINH" << "LOP" << "SDT" << "EMAIL";
-    }
+    QStringList keysSach = {"ISBN", "TEN", "TACGIA", "NAM", "THELOAI", "GIA", "SOLUONG", "NXB", "VITRI"};
+    QStringList keysDocGia = {"HO", "TEN", "PHAI", "NGAYSINH", "LOP", "SDT", "EMAIL"};
 
-    // 2. READ DATA WITH ALIGNMENT
-    QList<QStringList> previewData;
+    // 3. READ DATA FOR BOTH PATHS
+    QList<QStringList> previewDataSach;
+    QList<QStringList> previewDataDocGia;
     int row = 2;
     int maxRow = doc.dimension().lastRow();
     
     while (row <= maxRow) {
         auto cellA = doc.cellAt(row, 1);
-        if (!cellA || cellA->value().toString().trimmed().isEmpty()) { row++; continue; }
-
-        QStringList rowData;
-        for (const QString &key : targetKeys) {
-            int colIndex = colMap.value(key, -1);
-            QString val = "";
-            if (colIndex != -1) {
-                auto cell = doc.cellAt(row, colIndex);
-                val = cell ? cell->value().toString().trimmed() : "";
-            }
-            val.replace("\"", "\"\"");
-            rowData << val;
+        auto cellB = doc.cellAt(row, 2);
+        if ((!cellA || cellA->value().toString().trimmed().isEmpty()) && 
+            (!cellB || cellB->value().toString().trimmed().isEmpty())) { 
+            row++; continue; 
         }
-        
-        rowData << "TRUE"; // Mark as valid for preview
-        previewData.append(rowData);
+
+        // Align for Sach
+        QStringList rowSach;
+        for (const QString &key : keysSach) {
+            int colIdx = colMapSach.value(key, -1);
+            QString val = (colIdx != -1) ? doc.read(row, colIdx).toString().trimmed() : "";
+            val.replace("\"", "\"\""); rowSach << val;
+        }
+        rowSach << "TRUE"; previewDataSach.append(rowSach);
+
+        // Align for DocGia
+        QStringList rowDocGia;
+        for (const QString &key : keysDocGia) {
+            int colIdx = colMapDocGia.value(key, -1);
+            QString val = (colIdx != -1) ? doc.read(row, colIdx).toString().trimmed() : "";
+            val.replace("\"", "\"\""); rowDocGia << val;
+        }
+        rowDocGia << "TRUE"; previewDataDocGia.append(rowDocGia);
+
         row++;
-        if (previewData.size() >= 100) break;
+        if (previewDataSach.size() >= 100) break;
     }
 
     QString outDir = QDir(FilePathManager::getRootPath()).filePath("tools");
     QDir().mkpath(outDir);
 
-    result.dauSachCsv = createTempCsv(QDir(outDir).filePath("preview_dausach.csv"), previewData, "SACH");
-    result.docGiaCsv = createTempCsv(QDir(outDir).filePath("preview_docgia.csv"), previewData, "DOCGIA"); 
+    result.dauSachCsv = createTempCsv(QDir(outDir).filePath("preview_dausach.csv"), previewDataSach, "SACH");
+    result.docGiaCsv = createTempCsv(QDir(outDir).filePath("preview_docgia.csv"), previewDataDocGia, "DOCGIA"); 
     
     result.success = true;
-    result.message = QString("Đọc xong. Phát hiện kiểu: %1").arg(result.detectedType.isEmpty() ? "Không rõ" : result.detectedType);
+    result.message = QString("Đọc xong. Gợi ý: %1").arg(result.detectedType == "SACH" ? "Sách" : (result.detectedType == "DOCGIA" ? "Độc giả" : "Chưa rõ"));
     return result;
 }
 

@@ -14,11 +14,15 @@
 #include <QPair>
 #include <QDesktopServices>
 #include <QUrl>
+#include <QMap>
+#include <QAbstractItemModel>
 #include "models/DocGia.h"
 #include "models/QuanLySach.h"
 
 class QPrinter;
 class QTextDocument;
+class QAbstractItemModel;
+template <typename K, typename V> class QMap;
 
 /**
  * @brief PrintHelper - Utility class cho in ấn thẻ thư viện, tem mã vạch, báo cáo
@@ -121,7 +125,10 @@ public:
     static bool inPhieuTraTuDong(PTRDG docGia, const QString& maSach, const QString& tenSach,
                                   const QString& ngayTra, QWidget* parent = nullptr, bool forcePreview = false);
     static bool inBienLaiPhat(PTRDG docGia, const QString& lyDo, long long soTien, QWidget* parent = nullptr);
-    static bool xuatLichSuMuonTraToPDF(PTRDG docGia, QWidget* parent = nullptr); // NEW
+    static bool xuatLichSuMuonTraToPDF(PTRDG docGia, QWidget* parent = nullptr); 
+    static bool inBaoCaoTaiChinh(const QString& start, const QString& end, const QString& tieuDe, QAbstractItemModel* model, QWidget* parent = nullptr);
+    static bool inBaoCaoKiemKe(const QStringList& missing, const QStringList& unknown, const QStringList& borrowedAnomalies,
+                               const QStringList& borrowed, const QMap<QString, int>& stats, QWidget* parent = nullptr);
 
     // ===== HELPER FUNCTIONS =====
     static QString taoMaVachHTML(const QString& maSo, int fontSize = 48);

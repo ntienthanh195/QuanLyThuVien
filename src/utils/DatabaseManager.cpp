@@ -206,6 +206,27 @@ bool DatabaseManager::createTables() {
         ");"
     );
 
+    // muon_tra_archive (Mirror for historical data)
+    ok &= q.exec(
+        "CREATE TABLE IF NOT EXISTS muon_tra_archive ("
+        "id INTEGER PRIMARY KEY,"
+        "ma_the INTEGER,"
+        "ban_sao_id INTEGER,"
+        "ngay_muon TEXT,"
+        "ngay_tra TEXT,"
+        "trang_thai INTEGER,"
+        "tien_phat INTEGER,"
+        "so_lan_gia_han INTEGER,"
+        "da_thanh_toan INTEGER"
+        ");"
+    );
+
+    // Optimized indices for history and reporting
+    q.exec("CREATE INDEX IF NOT EXISTS idx_muon_tra_card ON muon_tra(ma_the)");
+    q.exec("CREATE INDEX IF NOT EXISTS idx_muon_tra_date ON muon_tra(ngay_muon)");
+    q.exec("CREATE INDEX IF NOT EXISTS idx_muon_tra_status ON muon_tra(trang_thai)");
+    q.exec("CREATE INDEX IF NOT EXISTS idx_doc_gia_name ON doc_gia(ho, ten)");
+
     // MIGRATION FOR FEATURE 4 (Existing DBs)
     // Add columns if they don't exist
     // so_lan_gia_han
@@ -447,6 +468,73 @@ void DatabaseManager::normalizeBookCodes() {
     if (count > 0) {
         qDebug() << "[DatabaseManager] Automatically normalized" << count << "book code(s).";
     }
+}
+
+bool DatabaseManager::archiveOldRecords(int monthsThreshold) {
+    if (!m_db.isOpen()) return false;
+
+    qDebug() << "[DatabaseManager] Starting archiving process (threshold:" << monthsThreshold << "months)...";
+
+    if (!beginTransaction()) return false;
+
+    // 1. Move old finished records to archive
+    // Converting dd/MM/yyyy to YYYY-MM-DD for comparison
+    QString dateIso = "SUBSTR(ngay_muon, 7, 4) || '-' || SUBSTR(ngay_muon, 4, 2) || '-' || SUBSTR(ngay_muon, 1, 2)";
+    QString thresholdDate = QDate::currentDate().addMonths(-monthsThreshold).toString("yyyy-MM-dd");
+
+    QSqlQuery q(m_db);
+    q.prepare(QString("INSERT INTO muon_tra_archive "
+                      "SELECT * FROM muon_tra "
+                      "WHERE (%1 < :date) "
+                      "AND (trang_thai = 1 OR trang_thai = 2) " // Only Returned (1) or Lost (2)
+                      "AND (ngay_tra IS NOT NULL AND ngay_tra != '')").arg(dateIso));
+    q.bindValue(":date", thresholdDate);
+
+    if (!q.exec()) {
+        qWarning() << "[DatabaseManager] Archiving failed (Phase 1):" << q.lastError().text();
+        rollback();
+        return false;
+    }
+
+    int movedCount = q.numRowsAffected();
+    if (movedCount > 0) {
+        // 2. Delete moved records from primary table
+        QSqlQuery qDel(m_db);
+        qDel.prepare(QString("DELETE FROM muon_tra "
+                             "WHERE id IN (SELECT id FROM muon_tra_archive) "
+                             "AND id IN (SELECT id FROM muon_tra WHERE (%1 < :date))").arg(dateIso));
+        qDel.bindValue(":date", thresholdDate);
+
+        if (!qDel.exec()) {
+             qWarning() << "[DatabaseManager] Archiving failed (Phase 2):" << qDel.lastError().text();
+             rollback();
+             return false;
+        }
+    }
+
+    if (!commit()) return false;
+
+    // 3. Optional: Shrink DB file
+    if (movedCount > 0) {
+        qDebug() << "[DatabaseManager] Archived" << movedCount << "records. Running VACUUM...";
+        m_db.close(); // Vacuum requires no transactions or sometimes even closed connections depending on driver, 
+                      // but mostly it just needs no active statements.
+        {
+            QSqlDatabase db2 = QSqlDatabase::addDatabase("QSQLITE", "vacuum_conn");
+            db2.setDatabaseName(m_path);
+            if (db2.open()) {
+                QSqlQuery qVac(db2);
+                qVac.exec("VACUUM");
+                db2.close();
+            }
+        }
+        QSqlDatabase::removeDatabase("vacuum_conn");
+        connect(m_path); // Reconnect main
+    } else {
+        qDebug() << "[DatabaseManager] No records met the archiving criteria.";
+    }
+
+    return true;
 }
 
 DatabaseManager::~DatabaseManager() {

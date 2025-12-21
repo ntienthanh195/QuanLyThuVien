@@ -30,6 +30,7 @@
 
 class QAbstractItemModel;
 class DocGiaTableModel;
+class WidgetLichSuMuonTra;
 
 // Include backend models
 #include "models/DocGia.h"
@@ -211,7 +212,7 @@ private:
     
     // === TAB LỊCH SỬ ===
     QWidget *widgetLichSu;
-    QLabel *nhanLichSuPlaceholder; // New: History Placeholder
+    WidgetLichSuMuonTra *widgetLichSuFull;
     
     // Dữ liệu hiện tại
     PTRDG docGiaHienTai;

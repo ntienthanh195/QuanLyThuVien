@@ -1,0 +1,153 @@
+﻿
+  C:/msys64/mingw64/b
+in/mingw32-make.exe 
+-f Makefile.Release
+  mingw32-make[1]: 
+Entering directory 
+'E:/Qt/QuanLyThuVien'
+  g++ -c -fno-keep-in
+line-dllexport -O2 
+-std=gnu++1z -Wall 
+-Wextra -Wextra 
+-fexceptions 
+-mthreads -DUNICODE 
+-D_UNICODE -DWIN32 -D
+MINGW_HAS_SECURE_API=
+1 -DAPP_SOURCE_DIR=\"
+E:/Qt/QuanLyThuVien\"
+ -DQT_DISABLE_DEPRECA
+TED_BEFORE=0x060000 -
+DQT_DEPRECATED_WARNIN
+GS -DQT_NO_DEBUG -DQT
+_PRINTSUPPORT_LIB 
+-DQT_CHARTS_LIB -DQT_
+OPENGLWIDGETS_LIB 
+-DQT_WIDGETS_LIB 
+-DQT_OPENGL_LIB 
+-DQT_SVG_LIB 
+-DQT_GUI_LIB 
+-DQT_SQL_LIB 
+-DQT_CONCURRENT_LIB 
+-DQT_CORE_LIB 
+-DQT_NEEDS_QMAIN -I. 
+-Ibao_gom 
+-Ibao_gom/giao_dien -
+Ibao_gom/giao_dien/ho
+p_thoai 
+-Ibao_gom/tien_ich 
+-Iinclude 
+-Iinclude/models 
+-Iinclude/views 
+-Iinclude/utils 
+-Iinclude/qrcode -I3r
+dparty/QXlsx/QXlsx 
+-I3rdparty/QXlsx -I3r
+dparty/QXlsx/QXlsx/he
+ader -IE:/Qt/QuanLyTh
+uVien/3rdparty/QXlsx/
+QXlsx/../QXlsx/header
+/win32-gcc -IC:/Qt/6.
+10.1/mingw_64/include
+ -IC:/Qt/6.10.1/mingw
+_64/include/QtPrintSu
+pport -IC:/Qt/6.10.1/
+mingw_64/include/QtCh
+arts -IC:/Qt/6.10.1/m
+ingw_64/include/QtOpe
+nGLWidgets -IC:/Qt/6.
+10.1/mingw_64/include
+/QtWidgets -IC:/Qt/6.
+10.1/mingw_64/include
+/QtOpenGL -IC:/Qt/6.1
+0.1/mingw_64/include/
+QtSvg -IC:/Qt/6.10.1/
+mingw_64/include/QtGu
+i/6.10.1 -IC:/Qt/6.10
+.1/mingw_64/include/Q
+tGui/6.10.1/QtGui -IC
+:/Qt/6.10.1/mingw_64/
+include/QtGui -IC:/Qt
+/6.10.1/mingw_64/incl
+ude/QtSql -IC:/Qt/6.1
+0.1/mingw_64/include/
+QtConcurrent -IC:/Qt/
+6.10.1/mingw_64/inclu
+de/QtCore/6.10.1 -IC:
+/Qt/6.10.1/mingw_64/i
+nclude/QtCore/6.10.1/
+QtCore -IC:/Qt/6.10.1
+/mingw_64/include/QtC
+ore -Irelease_v2/moc 
+-I/include -IC:/Qt/6.
+10.1/mingw_64/mkspecs
+/win32-g++  -o releas
+e_v2\obj\PrintHelper.
+o src\utils\PrintHelp
+er.cpp
+  In file included 
+from src\utils\PrintH
+elper.cpp:8:
+> include/utils/Print
+Helper.h:125:99: 
+error: 
+'QAbstractItemModel' 
+has not been declared
+    125 |     static 
+bool inBaoCaoTaiChinh
+(const QString& 
+start, const 
+QString& end, const 
+QString& tieuDe, 
+QAbstractItemModel* 
+model, QWidget* 
+parent = nullptr);
+        |            
+                     
+                     
+                     
+                     
+   ^~~~~~~~~~~~~~~~~~
+> src\utils\PrintHelp
+er.cpp:1671:6: 
+error: no 
+declaration matches 
+'bool PrintHelper::in
+BaoCaoTaiChinh(const 
+QString&, const 
+QString&, const 
+QString&, 
+QAbstractItemModel*, 
+QWidget*)'
+   1671 | bool PrintH
+elper::inBaoCaoTaiChi
+nh(const QString& 
+start, const 
+QString& end, const 
+QString& tieuDe, 
+QAbstractItemModel* 
+model, QWidget* 
+parent) {
+        |      
+^~~~~~~~~~~
+  include/utils/Print
+Helper.h:125:17: 
+note: candidate is: 
+'static bool PrintHel
+per::inBaoCaoTaiChinh
+(const QString&, 
+const QString&, 
+const QString&, 
+int*, QWidget*)'
+    125 |     static 
+bool inBaoCaoTaiChinh
+(const QString& 
+start, const 
+QString& end, const 
+QString& tieuDe, 
+QAbstractItemModel* 
+model, QWidget* 
+parent = nullptr);
+        |            
+     ^~~~~~~~~~~~~~~~
+
+

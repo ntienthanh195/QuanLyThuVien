@@ -115,14 +115,16 @@ SOURCES += \
     nguon/giao_dien/BangDieuKhien.cpp \
     nguon/giao_dien/WidgetQuanLySach.cpp \
     nguon/giao_dien/WidgetQuanLyDocGia.cpp \
-    nguon/giao_dien/WidgetMuonTraSach.cpp
+    nguon/giao_dien/WidgetMuonTraSach.cpp \
+    nguon/giao_dien/WidgetLichSuMuonTra.cpp
 
 HEADERS += \
     bao_gom/giao_dien/CuaSoChinh.h \
     bao_gom/giao_dien/BangDieuKhien.h \
     bao_gom/giao_dien/WidgetQuanLySach.h \
     bao_gom/giao_dien/WidgetQuanLyDocGia.h \
-    bao_gom/giao_dien/WidgetMuonTraSach.h
+    bao_gom/giao_dien/WidgetMuonTraSach.h \
+    bao_gom/giao_dien/WidgetLichSuMuonTra.h
 
 # Dialog phụ
 SOURCES += \
@@ -138,7 +140,8 @@ SOURCES += \
     nguon/giao_dien/hop_thoai/HopThoaiCauHinhIn.cpp \
     src/views/dialogs/ManHinhChiTietSach.cpp \
     src/views/dialogs/ManHinhChiTietDocGia.cpp \
-    nguon/giao_dien/hop_thoai/HopThoaiThanhToan.cpp
+    nguon/giao_dien/hop_thoai/HopThoaiThanhToan.cpp \
+    nguon/giao_dien/hop_thoai/ManHinhKiemKe.cpp
 
 HEADERS += \
     bao_gom/giao_dien/hop_thoai/HopThoaiThemSach.h \
@@ -154,6 +157,7 @@ HEADERS += \
     include/views/dialogs/ManHinhChiTietSach.h \
     include/views/dialogs/ManHinhChiTietDocGia.h \
     bao_gom/giao_dien/hop_thoai/HopThoaiThanhToan.h \
+    bao_gom/giao_dien/hop_thoai/ManHinhKiemKe.h \
     bao_gom/giao_dien/WidgetQuanLyNguoiDung.h \
     bao_gom/giao_dien/hop_thoai/HopThoaiCaiDat.h
 

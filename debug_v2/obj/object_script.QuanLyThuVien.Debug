@@ -34,6 +34,7 @@ debug_v2/obj/BangDieuKhien.o
 debug_v2/obj/WidgetQuanLySach.o
 debug_v2/obj/WidgetQuanLyDocGia.o
 debug_v2/obj/WidgetMuonTraSach.o
+debug_v2/obj/WidgetLichSuMuonTra.o
 debug_v2/obj/HopThoaiThemSach.o
 debug_v2/obj/HopThoaiThemDocGia.o
 debug_v2/obj/HopThoaiSuaSach.o
@@ -47,6 +48,7 @@ debug_v2/obj/HopThoaiCauHinhIn.o
 debug_v2/obj/ManHinhChiTietSach.o
 debug_v2/obj/ManHinhChiTietDocGia.o
 debug_v2/obj/HopThoaiThanhToan.o
+debug_v2/obj/ManHinhKiemKe.o
 debug_v2/obj/ResponsiveHelper.o
 debug_v2/obj/AnimationHelper.o
 debug_v2/obj/ConfirmationDialog.o
@@ -109,6 +111,7 @@ debug_v2/obj/moc_BangDieuKhien.o
 debug_v2/obj/moc_WidgetQuanLySach.o
 debug_v2/obj/moc_WidgetQuanLyDocGia.o
 debug_v2/obj/moc_WidgetMuonTraSach.o
+debug_v2/obj/moc_WidgetLichSuMuonTra.o
 debug_v2/obj/moc_HopThoaiThemSach.o
 debug_v2/obj/moc_HopThoaiThemDocGia.o
 debug_v2/obj/moc_HopThoaiSuaSach.o
@@ -122,6 +125,7 @@ debug_v2/obj/moc_HopThoaiCauHinhIn.o
 debug_v2/obj/moc_ManHinhChiTietSach.o
 debug_v2/obj/moc_ManHinhChiTietDocGia.o
 debug_v2/obj/moc_HopThoaiThanhToan.o
+debug_v2/obj/moc_ManHinhKiemKe.o
 debug_v2/obj/moc_WidgetQuanLyNguoiDung.o
 debug_v2/obj/moc_HopThoaiCaiDat.o
 debug_v2/obj/moc_ResponsiveHelper.o

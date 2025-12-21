@@ -45,6 +45,7 @@
 #include <QApplication>
 #include <QLineEdit>
 #include <QTextEdit>
+#include "giao_dien/WidgetLichSuMuonTra.h"
 #include <QListWidget>
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -1082,13 +1083,8 @@ void WidgetMuonTraSach::thieLapTabLichSu() {
     QVBoxLayout *boTri = new QVBoxLayout(widgetLichSu);
     boTri->setContentsMargins(20, 20, 20, 20);
     
-    nhanLichSuPlaceholder = new QLabel(LanguageManager::instance().getText("MSG_TAB_HISTORY_PLACEHOLDER"));
-    nhanLichSuPlaceholder->setStyleSheet(
-        "background-color: #252534; color: #B5B5C3; padding: 40px; "
-        "border-radius: 8px; font-size: 13px; line-height: 1.8;"
-    );
-    nhanLichSuPlaceholder->setAlignment(Qt::AlignCenter);
-    boTri->addWidget(nhanLichSuPlaceholder);
+    widgetLichSuFull = new WidgetLichSuMuonTra(widgetLichSu);
+    boTri->addWidget(widgetLichSuFull);
     
     hopTab->addTab(widgetLichSu, LanguageManager::instance().getText("TAB_HISTORY"));
 }
@@ -1099,6 +1095,9 @@ void WidgetMuonTraSach::lamMoi() {
     if (docGiaHienTai) {
         currentID = docGiaHienTai->data.MaThe;
     }
+
+    // Refresh History Tab if exists
+    if (widgetLichSuFull) widgetLichSuFull->lamMoi();
 
     // 1. Refresh Reader List (updates Model & Vector)
     hienThiDanhSachDocGia();
@@ -2261,7 +2260,7 @@ void WidgetMuonTraSach::capNhatNgonNgu() {
     
     // 2. Main Labels
     if(nhanTieuDeChinh) nhanTieuDeChinh->setText(LanguageManager::instance().getText("HEADER_MAIN_TITLE"));
-    if(nhanLichSuPlaceholder) nhanLichSuPlaceholder->setText(LanguageManager::instance().getText("MSG_TAB_HISTORY_PLACEHOLDER"));
+    // if(nhanLichSuPlaceholder) deleted
     
     if(oNhapTimDocGia) oNhapTimDocGia->setPlaceholderText(LanguageManager::instance().getText("PLACEHOLDER_SEARCH_READER"));
     if(oNhapISBN) oNhapISBN->setPlaceholderText(LanguageManager::instance().getText("PLACEHOLDER_SCAN_BORROW"));
