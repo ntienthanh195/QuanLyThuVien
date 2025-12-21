@@ -86,3 +86,15 @@ files/*.csv
 *.jpg
 *.jpeg
 *.tmp
+# B? sung: Các file log build và l?i
+build_*.txt
+compile_error*.txt
+make_dump.txt
+
+# B? sung: Database và file backup rác
+*.db
+*.sqlite
+_rac_backup/
+
+# B? sung: File th?c thi rác
+diag_code128.exe
