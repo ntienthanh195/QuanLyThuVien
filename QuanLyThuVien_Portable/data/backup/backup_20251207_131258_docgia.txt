@@ -1,8 +1,0 @@
-DG|1001|Nguyen|An|0|1
-END_DG
-DG|0|13382|Na|0|1
-END_DG
-DG|1002|Tran|Binh|0|1
-END_DG
-DG|12395|Chăm Rốch|Thi|0|1
-END_DG

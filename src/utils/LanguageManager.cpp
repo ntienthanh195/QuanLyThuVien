@@ -96,6 +96,77 @@ void LanguageManager::loadDictionary()
         {Language::Khmer, "ចំនួនសិស្សសរុប"},
         {Language::English, "Total Students"}
     };
+
+    // LOG ACTIONS
+    m_dictionary["LOG_ACTION_ADD"] = {
+        {Language::Vietnamese, "Thêm mới"},
+        {Language::Khmer, "បន្ថែមថ្មី"},
+        {Language::English, "Added"}
+    };
+    m_dictionary["LOG_ACTION_EDIT"] = {
+        {Language::Vietnamese, "Cập nhật"},
+        {Language::Khmer, "ធ្វើ bច្ចុប្បន្នភាព"},
+        {Language::English, "Updated"}
+    };
+    m_dictionary["LOG_ACTION_DELETE"] = {
+        {Language::Vietnamese, "Xóa bỏ"},
+        {Language::Khmer, "លុបចោល"},
+        {Language::English, "Deleted"}
+    };
+    m_dictionary["LOG_ACTION_BORROW"] = {
+        {Language::Vietnamese, "Mượn sách"},
+        {Language::Khmer, "ខ្ចីសៀវភៅ"},
+        {Language::English, "Borrowed"}
+    };
+    m_dictionary["LOG_ACTION_RETURN"] = {
+        {Language::Vietnamese, "Trả sách"},
+        {Language::Khmer, "សងសៀវភៅ"},
+        {Language::English, "Returned"}
+    };
+    m_dictionary["LOG_ACTION_LOST"] = {
+        {Language::Vietnamese, "Báo mất"},
+        {Language::Khmer, "បាត់សៀវភៅ"},
+        {Language::English, "Reported Lost"}
+    };
+    m_dictionary["LOG_ACTION_INVENTORY"] = {
+        {Language::Vietnamese, "Kiểm kê"},
+        {Language::Khmer, "សារពើភ័ណ្ឌ"},
+        {Language::English, "Inventory Audit"}
+    };
+
+    // ENTITIES
+    m_dictionary["ENTITY_STOCKS"] = {
+        {Language::Vietnamese, "Kho sách"},
+        {Language::Khmer, "ឃ្លាំងសៀវភៅ"},
+        {Language::English, "Book Stocks"}
+    };
+    m_dictionary["ENTITY_SYSTEM"] = {
+        {Language::Vietnamese, "Hệ thống"},
+        {Language::Khmer, "ប្រព័ន្ធ"},
+        {Language::English, "System"}
+    };
+
+    // ENTITIES
+    m_dictionary["ENTITY_READER"] = {
+        {Language::Vietnamese, "Học viên"},
+        {Language::Khmer, "អ្នកអាន"},
+        {Language::English, "Student"}
+    };
+    m_dictionary["ENTITY_BOOK"] = {
+        {Language::Vietnamese, "Sách"},
+        {Language::Khmer, "សៀវភៅ"},
+        {Language::English, "Book Title"}
+    };
+    m_dictionary["ENTITY_COPY"] = {
+        {Language::Vietnamese, "Bản sao"},
+        {Language::Khmer, "ច្បាប់ចម្លង"},
+        {Language::English, "Copy"}
+    };
+    m_dictionary["ENTITY_LOAN"] = {
+        {Language::Vietnamese, "Giao dịch"},
+        {Language::Khmer, "ប្រតិបត្តិការ"},
+        {Language::English, "Loan"}
+    };
     m_dictionary["DASH_BORROWING"] = {
         {Language::Vietnamese, "Đang mượn sách"},
         {Language::Khmer, "កំពុងខ្ចី"},
@@ -2428,10 +2499,55 @@ void LanguageManager::loadDictionary()
         {Language::Khmer, "បង់ប្រាក់"},
         {Language::English, "PAY"}
     };
-    m_dictionary["BTN_REPRINT_SHORT"] = {
-        {Language::Vietnamese, "In Phiếu"},
-        {Language::Khmer, "បោះពុម្ពប័ណ្ណ"},
-        {Language::English, "Print Slip"}
+    m_dictionary["DIALOG_PAYMENT_TITLE"] = {
+        {Language::Vietnamese, "THANH TOÁN TIỀN PHẠT"},
+        {Language::Khmer, "ការបង់ប្រាក់ពិន័យ (Payment)"},
+        {Language::English, "FINE PAYMENT"}
+    };
+    m_dictionary["DIALOG_REFUND_TITLE"] = {
+        {Language::Vietnamese, "HOÀN TIỀN CHO HỌC VIÊN"},
+        {Language::Khmer, "ការសងប្រាក់ត្រឡប់ទៅសិស្ស (Refund)"},
+        {Language::English, "REFUND TO STUDENT"}
+    };
+    m_dictionary["HEADER_PAYMENT"] = {
+        {Language::Vietnamese, "THÔNG TIN THANH TOÁN"},
+        {Language::Khmer, "ព័ត៌មានបង់ប្រាក់"},
+        {Language::English, "PAYMENT INFORMATION"}
+    };
+    m_dictionary["HEADER_REFUND"] = {
+        {Language::Vietnamese, "THÔNG TIN HOÀN TIỀN"},
+        {Language::Khmer, "ព័ត៌មានសងប្រាក់"},
+        {Language::English, "REFUND INFORMATION"}
+    };
+    m_dictionary["GROUP_PAYMENT_INFO"] = {
+        {Language::Vietnamese, "Chi Tiết Giao Dịch"},
+        {Language::Khmer, "ព័ត៌មានលម្អិតនៃប្រតិបត្តិការ"},
+        {Language::English, "Transaction Details"}
+    };
+    m_dictionary["CB_PRINT_RECEIPT"] = {
+        {Language::Vietnamese, "In biên lai giao dịch"},
+        {Language::Khmer, "បោះពុម្ពវិក្កយបត្រ"},
+        {Language::English, "Print transaction receipt"}
+    };
+    m_dictionary["BTN_CONFIRM_PAYMENT"] = {
+        {Language::Vietnamese, "Xác Nhận Thanh Toán"},
+        {Language::Khmer, "បញ្ជាក់ការបង់ប្រាក់"},
+        {Language::English, "Confirm Payment"}
+    };
+    m_dictionary["BTN_CONFIRM_REFUND"] = {
+        {Language::Vietnamese, "Xác Nhận Đã Hoàn Tiền"},
+        {Language::Khmer, "បញ្ជាក់ថាបានសងប្រាក់រួច"},
+        {Language::English, "Confirm Refund Success"}
+    };
+    m_dictionary["CURRENCY_UNIT"] = {
+        {Language::Vietnamese, "VNĐ"},
+        {Language::Khmer, "រៀល"},
+        {Language::English, "VND"}
+    };
+    m_dictionary["MSG_PAYMENT_SUCCESS"] = {
+        {Language::Vietnamese, "Giao dịch đã được ghi nhận thành công!"},
+        {Language::Khmer, "ប្រតិបត្តិការត្រូវបានកត់ត្រាដោយជោគជ័យ!"},
+        {Language::English, "Transaction recorded successfully!"}
     };
     m_dictionary["TOOLTIP_REFRESH"] = {
         {Language::Vietnamese, "Làm mới danh sách"},
@@ -2463,6 +2579,31 @@ void LanguageManager::loadDictionary()
         {Language::Vietnamese, "ĐÃ TRẢ (NỢ %1)"},
         {Language::Khmer, "បានសង (ជំពាក់ %1)"},
         {Language::English, "RETURNED (DEBT %1)"}
+    };
+    m_dictionary["STATUS_RETURNED_REFUND"] = {
+        {Language::Vietnamese, "ĐÃ TRẢ (HOÀN %1)"},
+        {Language::Khmer, "បានសង (សងវិញ %1)"},
+        {Language::English, "RETURNED (REFUND %1)"}
+    };
+    m_dictionary["STATUS_LOST_DEBT"] = {
+        {Language::Vietnamese, "BÁO MẤT (NỢ %1)"},
+        {Language::Khmer, "រាយការណ៍ថាបាត់ (ជំពាក់ %1)"},
+        {Language::English, "LOST (DEBT %1)"}
+    };
+    m_dictionary["STATUS_LOST_PAID"] = {
+        {Language::Vietnamese, "BÁO MẤT (ĐÃ ĐỀN)"},
+        {Language::Khmer, "បាត់ (សងរួច)"},
+        {Language::English, "LOST (SETTLED)"}
+    };
+    m_dictionary["STATUS_LOST_REFUND_WAIT"] = {
+        {Language::Vietnamese, "TÌM THẤY (CHỜ HOÀN %1)"},
+        {Language::Khmer, "រកឃើញវិញ (រង់ចាំការសង %1)"},
+        {Language::English, "FOUND (WAIT REFUND %1)"}
+    };
+    m_dictionary["STATUS_LOST_REFUND_DONE"] = {
+        {Language::Vietnamese, "TÌM THẤY (ĐÃ HOÀN TRẢ)"},
+        {Language::Khmer, "រកឃើញវិញ (បានសងរួចហើយ)"},
+        {Language::English, "FOUND (REFUNDED)"}
     };
     m_dictionary["STATUS_RETURNED"] = {
         {Language::Vietnamese, "ĐÃ TRẢ"},
@@ -3588,16 +3729,32 @@ void LanguageManager::loadDictionary()
     m_dictionary["LBL_TOTAL_COPIES_INV"] = { {Language::Vietnamese, "Tổng số cuốn"}, {Language::Khmer, "ចំនួនសរុប"}, {Language::English, "Total Copies"} };
     m_dictionary["LBL_BORROWED_INV"] = { {Language::Vietnamese, "Đang cho mượn"}, {Language::Khmer, "កំពុងខ្ចី"}, {Language::English, "On Loan"} };
     m_dictionary["LBL_IN_STOCK_INV"] = { {Language::Vietnamese, "Trong kho (Lý thuyết)"}, {Language::Khmer, "ក្នុងស្តុក"}, {Language::English, "In Stock (Theory)"} };
-    m_dictionary["LBL_MISPLACED_INV"] = { {Language::Vietnamese, "Thất lạc (Mất)"}, {Language::Khmer, "បាត់បង់"}, {Language::English, "Misplaced/Lost"} };
+    m_dictionary["LBL_MISPLACED_INV"] = { {Language::Vietnamese, "Chưa quét"}, {Language::Khmer, "មិនទាន់ស្កេន"}, {Language::English, "Unscanned"} };
     m_dictionary["LBL_AUDIT_RESULTS"] = { {Language::Vietnamese, "Kết quả thực tế (Đang soát)"}, {Language::Khmer, "លទ្ធផលស្កេន"}, {Language::English, "Actual Results (Scanning)"} };
     m_dictionary["NOTE_BORROWED_VALID"] = { {Language::Vietnamese, "Đang mượn (Hợp lệ)"}, {Language::Khmer, "កំពុងខ្ចី (ត្រឹមត្រូវ)"}, {Language::English, "On Loan (Valid)"} };
     m_dictionary["STAT_WRONG_STATUS"] = { {Language::Vietnamese, "Sai trạng thái"}, {Language::Khmer, "ខុសស្ថានភាព"}, {Language::English, "Wrong Status"} };
     m_dictionary["NOTE_WRONG_STATUS"] = { {Language::Vietnamese, "Lý thuyết: Đang mượn"}, {Language::Khmer, "តាមប្រព័ន្ធ៖ កំពុងខ្ចី"}, {Language::English, "Theory: On Loan"} };
+    m_dictionary["NOTE_BORROWED_BUT_FOUND"] = { {Language::Vietnamese, "Cảnh báo: Đã tìm thấy (Sách đang báo mượn)"}, {Language::Khmer, "ព្រមាន: រកឃើញ (សៀវភៅកំពុងខ្ចី)"}, {Language::English, "Warning: Found (Borrowed Book)"} };
+    
+    m_dictionary["LBL_INVENTORY_PROGRESS"] = { {Language::Vietnamese, "Tiến độ kiểm kê"}, {Language::Khmer, "វឌ្ឍនភាពនៃការត្រួតពិនិត្យ"}, {Language::English, "Inventory Progress"} };
+    m_dictionary["LBL_FILTER"] = { {Language::Vietnamese, "Bộ lọc"}, {Language::Khmer, "តម្រង"}, {Language::English, "Filter"} };
+    m_dictionary["FILTER_MATCHED"] = { {Language::Vietnamese, "Đã khớp"}, {Language::Khmer, "ត្រូវគ្នា"}, {Language::English, "Matched"} };
+    m_dictionary["FILTER_ERROR"] = { {Language::Vietnamese, "Lỗi/Sai lệch"}, {Language::Khmer, "កំហុស"}, {Language::English, "Error/Discrepancy"} };
+    m_dictionary["COL_BOOK_TITLE"] = { {Language::Vietnamese, "Tên Sách"}, {Language::Khmer, "ចំណងជើងសៀវភៅ"}, {Language::English, "Book Title"} };
+    m_dictionary["COL_SHELF_LOCATION"] = { {Language::Vietnamese, "Vị trí kệ"}, {Language::Khmer, "ទីតាំងធ្នើ"}, {Language::English, "Shelf Location"} };
 
     // Finance & History Module Keys
     m_dictionary["STATUS_BORROWING"] = { {Language::Vietnamese, "Đang mượn"}, {Language::Khmer, "កំពុងខ្ចី"}, {Language::English, "Borrowing"} };
     m_dictionary["STATUS_RETURNED"] = { {Language::Vietnamese, "Đã trả"}, {Language::Khmer, "បានសង"}, {Language::English, "Returned"} };
     m_dictionary["STATUS_LOST"] = { {Language::Vietnamese, "Làm mất"}, {Language::Khmer, "បាត់បង់"}, {Language::English, "Lost"} };
+    
+    // --- FINANCIAL STATUS DETAILED ---
+    m_dictionary["STATUS_RETURNED_DEBT"] = { {Language::Vietnamese, "Đã trả (Còn nợ: %1)"}, {Language::Khmer, "បានសង (ជំពាក់: %1)"}, {Language::English, "Returned (Debt: %1)"} };
+    m_dictionary["STATUS_LOST_DEBT"] = { {Language::Vietnamese, "Báo mất (Chờ đền: %1)"}, {Language::Khmer, "បាត់ (រង់ចាំសំណង: %1)"}, {Language::English, "Lost (Owe: %1)"} };
+    m_dictionary["STATUS_LOST_PAID"] = { {Language::Vietnamese, "Mất (Đã đền xong)"}, {Language::Khmer, "បាត់ (បានសងរួច)"}, {Language::English, "Lost (Paid)"} };
+    m_dictionary["STATUS_LOST_REFUND_WAIT"] = { {Language::Vietnamese, "Tìm thấy (Chờ hoàn: %1)"}, {Language::Khmer, "រកឃើញ (រង់ចាំសង: %1)"}, {Language::English, "Found (Refund: %1)"} };
+    m_dictionary["STATUS_LOST_REFUND_DONE"] = { {Language::Vietnamese, "Đã hoàn tiền"}, {Language::Khmer, "បានសងប្រាក់វិញ"}, {Language::English, "Refunded"} };
+
     m_dictionary["LBL_SEARCH"] = { {Language::Vietnamese, "Tìm kiếm"}, {Language::Khmer, "ស្វែងរក"}, {Language::English, "Search"} };
     m_dictionary["LBL_FROM"] = { {Language::Vietnamese, "Từ ngày"}, {Language::Khmer, "ចាប់ពី"}, {Language::English, "From"} };
     m_dictionary["LBL_TO"] = { {Language::Vietnamese, "Đến ngày"}, {Language::Khmer, "ដល់"}, {Language::English, "To"} };
@@ -3613,7 +3770,32 @@ void LanguageManager::loadDictionary()
     m_dictionary["MSG_ARCHIVE_SUCCESS"] = { {Language::Vietnamese, "Lưu trữ thành công!"}, {Language::Khmer, "រក្សាទុកបានជោគជ័យ!"}, {Language::English, "Archive Successful!"} };
     m_dictionary["COL_NGAY_MUON"] = { {Language::Vietnamese, "Ngày mượn"}, {Language::Khmer, "កាលបរិច្ឆេទខ្ចី"}, {Language::English, "Borrow Date"} };
     m_dictionary["COL_NGAY_TRA"] = { {Language::Vietnamese, "Ngày trả"}, {Language::Khmer, "កាលបរិច្ឆេទសង"}, {Language::English, "Return Date"} };
-    // COL_DOC_GIA, COL_TEN_SACH, COL_TRANG_THAI might be duplicates if commonly used, checking uniqueness...
-    // Only adding specific missing columns
-    // Check if COL_TRANG_THAI exists already
+    m_dictionary["COL_DOC_GIA"] = { {Language::Vietnamese, "Học viên"}, {Language::Khmer, "សិស្ស/អ្នកអាន"}, {Language::English, "Student"} };
+    m_dictionary["COL_TEN_SACH"] = { {Language::Vietnamese, "Tên sách"}, {Language::Khmer, "ចំណងជើងសៀវភៅ"}, {Language::English, "Book Title"} };
+    m_dictionary["COL_TRANG_THAI"] = { {Language::Vietnamese, "Trạng thái"}, {Language::Khmer, "ស្ថានភាព"}, {Language::English, "Status"} };
+
+    // Dashboard Columns
+    m_dictionary["DASH_COL_TIME"] = { {Language::Vietnamese, "Thời gian"}, {Language::Khmer, "ពេលវេលា"}, {Language::English, "Time"} };
+    m_dictionary["DASH_COL_USER"] = { {Language::Vietnamese, "Người dùng"}, {Language::Khmer, "អ្នកប្រើប្រាស់"}, {Language::English, "User"} };
+    m_dictionary["DASH_COL_ACTION"] = { {Language::Vietnamese, "Hành động"}, {Language::Khmer, "សកម្មភាព"}, {Language::English, "Action"} };
+    m_dictionary["DASH_COL_DETAILS"] = { {Language::Vietnamese, "Chi tiết"}, {Language::Khmer, "ព័ត៌មានលម្អិត"}, {Language::English, "Details"} };
+
+    // Inventory Columns
+    m_dictionary["COL_BOOK_CODE"] = { {Language::Vietnamese, "Mã sách"}, {Language::Khmer, "លេខកូដសៀវភៅ"}, {Language::English, "Book Code"} };
+    m_dictionary["COL_BOOK_TITLE"] = { {Language::Vietnamese, "Tên sách"}, {Language::Khmer, "ចំណងជើងសៀវភៅ"}, {Language::English, "Title"} };
+    m_dictionary["COL_SHELF_LOCATION"] = { {Language::Vietnamese, "Vị trí"}, {Language::Khmer, "ទីតាំង"}, {Language::English, "Location"} };
+    m_dictionary["COL_STATUS"] = { {Language::Vietnamese, "Trạng thái"}, {Language::Khmer, "ស្ថានភាព"}, {Language::English, "Status"} };
+    m_dictionary["COL_NOTE"] = { {Language::Vietnamese, "Ghi chú"}, {Language::Khmer, "ចំណាំ"}, {Language::English, "Note"} };
+    
+    // Additional missing keys
+    m_dictionary["MSG_SELECT_EXTEND_BOOK"] = { {Language::Vietnamese, "Vui lòng chọn sách cần gia hạn!"}, {Language::Khmer, "សូមជ្រើសរើសសៀវភៅដើម្បីបន្ត!"}, {Language::English, "Please select a book to extend!"} };
+    m_dictionary["BTN_REPRINT_SHORT"] = { {Language::Vietnamese, "In lại"}, {Language::Khmer, "បោះពុម្ពម្តងទៀត"}, {Language::English, "Reprint"} };
+    m_dictionary["TABLE_HEADER_STT"] = { {Language::Vietnamese, "STT"}, {Language::Khmer, "លេខរៀង"}, {Language::English, "#"} };
+    m_dictionary["TABLE_HEADER_STATUS"] = { {Language::Vietnamese, "Trạng thái"}, {Language::Khmer, "ស្ថានភាព"}, {Language::English, "Status"} };
+    m_dictionary["TABLE_HEADER_CLASS"] = { {Language::Vietnamese, "Lớp"}, {Language::Khmer, "ថ្នាក់"}, {Language::English, "Class"} };
+    m_dictionary["TABLE_HEADER_PHONE"] = { {Language::Vietnamese, "SĐT"}, {Language::Khmer, "ទូរស័ព្ទ"}, {Language::English, "Phone"} };
+    m_dictionary["TABLE_HEADER_BORROWED"] = { {Language::Vietnamese, "Đang mượn"}, {Language::Khmer, "កំពុងខ្ចី"}, {Language::English, "Borrowed"} };
+    m_dictionary["TABLE_HEADER_OVERDUE"] = { {Language::Vietnamese, "Quá hạn"}, {Language::Khmer, "ហួសកំណត់"}, {Language::English, "Overdue"} };
+    m_dictionary["LBL_DAYS_COUNT"] = { {Language::Vietnamese, "%1 ngày"}, {Language::Khmer, "%1 ថ្ងៃ"}, {Language::English, "%1 days"} };
+    m_dictionary["TABLE_HEADER_LASTNAME_SHORT"] = { {Language::Vietnamese, "Họ"}, {Language::Khmer, "គោត្តនាម"}, {Language::English, "Last Name"} };
 }

@@ -93,7 +93,7 @@ private:
 
     // Thêm hoạt động gần đây
     void appendActivity(const QString &text);
-    void ghiNhatKy(const QString &hanhDong, const QString &noiDung);
+    void ghiNhatKy(const QString &hanhDong, const QString &entity, const QString &noiDung);
     
     // Helper functions for stats calculation
     // REMOVED: Redundant helpers (using shared ThongKe logic now)

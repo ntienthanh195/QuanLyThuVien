@@ -637,10 +637,10 @@ int TachTokenKhoangTrang(const std::string& chuoi, std::string mangToken[], int 
 
 // Tach ISBN tu ma sach (vd: "ISBN-123" -> "ISBN")
 std::string TachISBNTuMaSach(const std::string& maSach) {
-    size_t viTriGachNgang = maSach.find('-');
+    size_t viTriGachNgang = maSach.find_last_of('-');
     
-    if (viTriGachNgang == std::string::npos) {
-        return maSach;  // Khong co dau '-'
+    if (viTriGachNgang == std::string::npos || viTriGachNgang == 0) {
+        return maSach;  // Khong co dau '-' hoac chi co gach ngang o dau
     }
     
     return maSach.substr(0, viTriGachNgang);

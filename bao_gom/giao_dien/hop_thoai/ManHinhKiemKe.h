@@ -15,6 +15,9 @@
 #include <QHBoxLayout>
 #include <QSet>
 #include <QStringList>
+#include <QProgressBar>
+#include <QButtonGroup>
+#include <QMap>
 
 class ManHinhKiemKe : public QDialog {
     Q_OBJECT
@@ -28,6 +31,7 @@ private slots:
     void xuLyKetThuc();
     void xuLyXuatBaoCao();
     void capNhatThongKe();
+    void xuLyLoc();
     void keyPressEvent(QKeyEvent *event) override;
 
 private:
@@ -53,8 +57,21 @@ private:
 
     QPushButton *nutKetThuc;
     QPushButton *nutXuatBaoCao;
+    
+    // Progress & Filters
+    QProgressBar *thanhTienDo;
+    QLabel *nhanPhanTram;
+    QPushButton *nutLocTatCa;
+    QPushButton *nutLocKhop;
+    QPushButton *nutLocLoi;
 
     // Data handling
+    struct ThongTinSachAudit {
+        QString ten;
+        QString viTri;
+        int trangThai;
+    };
+    QMap<QString, ThongTinSachAudit> mapThongTinHeThong;
     QSet<QString> setMaHeThong;     // All books in DB (not counting lost)
     QSet<QString> setMaDaQuet;      // Successfully scanned
     QSet<QString> setMaDangMuon;    // Validly borrowed (not in stock)

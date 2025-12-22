@@ -69,15 +69,8 @@ if (Test-Path "files") {
 	Write-Host "[OK] Files copied" -ForegroundColor Green
 }
 
-# Copy tools (REQUIRED for Excel Import & Self-Healing Logic)
-if (Test-Path "tools") {
-	Write-Host "`nCopying tools folder (Required for Self-Healing Python)..." -ForegroundColor Cyan
-	Copy-Item -Recurse -Force "tools" (Join-Path $DeployDir "tools")
-	Write-Host "[OK] Tools copied" -ForegroundColor Green
-}
-else {
-	Write-Host "[ERROR] tools folder missing! Python features will fail." -ForegroundColor Red
-}
+# Tools folder is no longer required (Native C++ Import)
+
 
 # Optional: create a zip as portable package
 $zipName = "QuanLyThuVien_Portable.zip"

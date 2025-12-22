@@ -179,7 +179,6 @@ void WidgetQuanLyNguoiDung::xuLyThem() {
 
     if (UserManager::instance().addUser(username, password, fullName, roleId)) {
         QMessageBox::information(this, "Thành công", "Đã thêm người dùng mới!");
-        emit EventBus::instance().nguoiDungAdded(username);
         taiDuLieu();
     } else {
         // Show actual SQL error if possible, or generic message

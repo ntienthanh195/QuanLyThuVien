@@ -525,7 +525,7 @@ void HopThoaiThemSach::xuLyNutLuu() {
     
     std::string ketQua = ThemDauSachMoi(isbn, tenChuan, trang, tacGiaChuan, nam, theLoaiChuan, soBanSao, viTriChuan, giaTien, nhaXuatBanChuan);
     
-    if (ketQua.find("Loi") == std::string::npos && ketQua.find("ERROR") == std::string::npos) {
+    if (ketQua.empty()) {
         // Thành công
         AnimationHelper::fadeIn(nhanTrangThai, 200);
         

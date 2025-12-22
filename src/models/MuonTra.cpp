@@ -22,6 +22,8 @@
 #include <QSqlError>
 #include <QVariant>
 #include <QString>
+#include <QMessageBox>
+#include <QLocale>
 #include <sstream>
 #include <iostream>
 
@@ -156,30 +158,49 @@ void CapNhatNgayHetHanSomNhat(PTRDG docGia) {
 std::string MuonSach(PTRDG docGia, const std::string& isbnOrMaSach, PTRDS dsDauSach[], int soLuongDauSach) {
     if (docGia == nullptr) return "Loi: Doc gia khong hop le!";
     
-    // --- BƯỚC 1: KIỂM TRA QUÁ HẠN (OPTIMIZED O(1)) ---
-    time_t now = time(nullptr);
-    // Lazy Load Cache if needed
-    if (docGia->data.soSachDangMuon > 0 && docGia->data.ngayHetHanSomNhat == 0) {
-        CapNhatNgayHetHanSomNhat(docGia);
-    }
+    // --- BƯỚC 1: CẬP NHẬT TRẠNG THÁI QUYỀN MƯỢN (REALTIME) ---
+    // Đảm bảo coTheMuon luôn chính xác (kiểm tra nợ, ngày hết hạn mới nhất từ DB/Memory)
+    CapNhatQuyenMuon(docGia);
     
-    // Check Cache
-    if (docGia->data.ngayHetHanSomNhat != 0 && docGia->data.ngayHetHanSomNhat < now) {
-         // Double check logic (optional, but safe)
-         int daysOver = (now - docGia->data.ngayHetHanSomNhat) / (24*3600);
-         return "Loi: Doc gia co sach qua han (khoang " + std::to_string(daysOver) + " ngay)! Vui long tra sach truoc.";
-    }
-    // ----------------------------------------
+    // --- BƯỚC 2: KIỂM TRA QUYỀN MƯỢN TỔNG QUÁT ---
+    if (!docGia->data.coTheMuon) {
+        if (docGia->data.TrangThai == 0) {
+            return "Loi: The doc gia dang BI KHOA (Vo hieu hoa) boi Admin!";
+        }
+        
+        // Detailed check to explain WHY it's blocked (Professional feedback)
+        time_t hanDung = ChuyenNgaySangTimeT(docGia->data.NgayHetHan);
+        if (hanDung != -1 && time(nullptr) > hanDung) {
+            return "Loi: The doc gia da HET HAN (" + docGia->data.NgayHetHan + ")! Vui long gia han the.";
+        }
+        
+        long long totalDebt = TinhTongNo(docGia);
+        int debtBuffer = SettingsManager::instance().getInt("MAX_DEBT_BUFFER", 10000);
+        if (totalDebt > debtBuffer) {
+            return "Loi: Doc gia dang NO qua han muc cho phep (" + std::to_string(totalDebt) + " > " + std::to_string(debtBuffer) + " VNĐ)!";
+        }
 
-    // --- BƯỚC 2: KIỂM TRA SỐ LƯỢNG MƯỢN ---
+        if (TinhSoNgayQuaHanLonNhat(docGia) > 0) {
+            return "Loi: Doc gia co SACH QUA HAN! Vui long tra sach truoc khi muon moi.";
+        }
+
+        return "Loi: Doc gia dang BI CHAN MUON (Vi pham quy dinh thu vien)!";
+    }
+
+    // --- BƯỚC 3: KIỂM TRA SỐ LƯỢNG MƯỢN ---
     int maxSach = SettingsManager::instance().getInt("SO_SACH_MUON_TOI_DA", 3);
     if (docGia->data.soSachDangMuon >= maxSach) {
         return "Loi: Doc gia da muon toi da " + std::to_string(maxSach) + " cuon!";
     }
 
-    // --- BƯỚC 2.5: KIỂM TRA TRẠNG THÁI ĐỘC GIẢ ---
-    if (docGia->data.TrangThai == 0) { // 0 = Locked
-        return "Loi: The doc gia dang bi khoa! Vui long mo khoa truoc khi muon.";
+    // --- BƯỚC 4: KIỂM TRA QUÁ HẠN CACHE (OPTIMIZED CHECK) ---
+    time_t now = time(nullptr);
+    if (docGia->data.soSachDangMuon > 0 && docGia->data.ngayHetHanSomNhat == 0) {
+        CapNhatNgayHetHanSomNhat(docGia);
+    }
+    if (docGia->data.ngayHetHanSomNhat != 0 && docGia->data.ngayHetHanSomNhat < now) {
+         int daysOver = (now - docGia->data.ngayHetHanSomNhat) / (24*3600);
+         return "Loi: Doc gia co sach qua han (khoang " + std::to_string(daysOver) + " ngay)! Vui long tra sach truoc.";
     }
 
     // --- BƯỚC 3: XỬ LÝ LOGIC MƯỢN THÔNG MINH (Smart Borrow) ---
@@ -201,9 +222,9 @@ std::string MuonSach(PTRDG docGia, const std::string& isbnOrMaSach, PTRDS dsDauS
                 banSaoCanMuon = bs;
                 
                 // Kiểm tra trạng thái của bản sao cụ thể này
-                if (banSaoCanMuon->trangThai == DANG_MUON) return "Loi: Cuon sach nay (" + isbnOrMaSach + ") dang co nguoi muon!";
-                if (banSaoCanMuon->trangThai == THANH_LY) return "Loi: Cuon sach nay da thanh ly!";
-                if (banSaoCanMuon->trangThai != CHO_MUON_DUOC) return "Loi: Cuon sach nay khong the muon duoc!";
+                if (banSaoCanMuon->trangThai == SACH_DANG_MUON) return "Loi: Cuon sach nay (" + isbnOrMaSach + ") dang co nguoi muon!";
+                if (banSaoCanMuon->trangThai == SACH_THANH_LY) return "Loi: Cuon sach nay da thanh ly!";
+                if (banSaoCanMuon->trangThai != SACH_TRONG_KHO) return "Loi: Cuon sach nay khong thể mượn được (Trạng thái: " + std::to_string(banSaoCanMuon->trangThai) + ")!";
             }
         }
     }
@@ -250,12 +271,13 @@ std::string MuonSach(PTRDG docGia, const std::string& isbnOrMaSach, PTRDS dsDauS
     std::stringstream dummyStream;
     std::string ngayMuon = layNgayHienTai(dummyStream);
     QSqlQuery q(db);
-    q.prepare("INSERT INTO muon_tra (ma_the, ban_sao_id, ngay_muon, ngay_tra, trang_thai) VALUES (?, ?, ?, ?, ?)");
+    q.prepare("INSERT INTO muon_tra (ma_the, ban_sao_id, ma_sach, ngay_muon, ngay_tra, trang_thai) VALUES (?, ?, ?, ?, ?, ?)");
     q.addBindValue(docGia->data.MaThe);
     q.addBindValue(banSaoId);
+    q.addBindValue(QString::fromStdString(banSaoCanMuon->maSach));
     q.addBindValue(QString::fromStdString(ngayMuon));
     q.addBindValue("");
-    q.addBindValue(0); // Dang muon
+    q.addBindValue(GD_DANG_MUON); // Dang muon
     
     if (!q.exec()) {
         success = false;
@@ -266,7 +288,7 @@ std::string MuonSach(PTRDG docGia, const std::string& isbnOrMaSach, PTRDS dsDauS
     if (success) {
         QSqlQuery qUpd(db);
         qUpd.prepare("UPDATE ban_sao SET trang_thai=? WHERE id=?");
-        qUpd.addBindValue(1); // DANG_MUON
+        qUpd.addBindValue(SACH_DANG_MUON); 
         qUpd.addBindValue(banSaoId);
         if (!qUpd.exec()) {
             success = false;
@@ -290,7 +312,7 @@ std::string MuonSach(PTRDG docGia, const std::string& isbnOrMaSach, PTRDS dsDauS
     // --- SUCCESS: UPDATE MEMORY ---
     
     // Cập nhật trạng thái sách (Memory)
-    banSaoCanMuon->trangThai = DANG_MUON;
+    banSaoCanMuon->trangThai = SACH_DANG_MUON;
     dauSach->soLuotMuon++; 
     
     // Them vao lich su muon tra (Memory)
@@ -299,7 +321,7 @@ std::string MuonSach(PTRDG docGia, const std::string& isbnOrMaSach, PTRDS dsDauS
     mt.maSachCached = banSaoCanMuon->maSach;
     mt.NgayMuon = ngayMuon; 
     mt.NgayTra = "";
-    mt.TrangThai = 0;  // dang muon
+    mt.TrangThai = GD_DANG_MUON;  // dang muon
     
     themMuonTra(docGia, mt);
     
@@ -312,13 +334,16 @@ std::string MuonSach(PTRDG docGia, const std::string& isbnOrMaSach, PTRDS dsDauS
     
     // Notify listeners (REALTIME UPDATE)
     try {
+        CapNhatQuyenMuon(docGia);
         EventBus::instance().muonTraAdded(docGia->data.MaThe, QString::fromStdString(mt.maSachCached));
         EventBus::instance().docGiaUpdated(docGia->data.MaThe);
     } catch(...) {}
     
     // [AUDIT LOG]
     AuditLogger::log("MUON_SACH", "MUON_TRA", QString::number(docGia->data.MaThe), 
-                     "Muon sach: " + QString::fromStdString(mt.maSachCached));
+                     QString("%1 (Mã sách: %2)")
+                     .arg(QString::fromStdString(dauSach->tenSach))
+                     .arg(QString::fromStdString(mt.maSachCached)));
 
     return "";  // Thanh cong
 }
@@ -336,10 +361,12 @@ std::string TraSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[], 
             thongBao(std::cout, "Phat hien node MUONTRA self-loop trong TraSach. Dung duyet.", CANH_BAO);
             break;
         }
-        // Prefer cached maSach if present (safer than dereferencing possibly-dangling PTRDMS)
+        // Prefer cached maSach if present
         std::string currMaSach = !curr->data.maSachCached.empty() ? curr->data.maSachCached : (curr->data.banSaoSach ? curr->data.banSaoSach->maSach : std::string());
-        // Match exact MaSach AND (Active Loan (0) OR Lost Book (2))
-        if (!currMaSach.empty() && currMaSach == maSach && (curr->data.TrangThai == 0 || curr->data.TrangThai == 2)) {
+        
+        // Match exact MaSach AND (Active Loan OR Lost Book awaiting settlement OR Settled Lost Book)
+        if (!currMaSach.empty() && currMaSach == maSach && 
+           (curr->data.TrangThai == GD_DANG_MUON || curr->data.TrangThai == GD_MAT_CHO_THANH_TOAN || curr->data.TrangThai == GD_MAT_DA_THANH_TOAN)) {
             found = curr;
             break;
         }
@@ -365,39 +392,80 @@ std::string TraSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[], 
     std::string errorMsg = "";
     std::string ngayTra = layNgayHienTai();
     
-    // Calculate Fine if Overdue
+    // Calculate Fine or Adjustment
     long long tienPhat = 0;
+    bool daThanhToanNoCu = found->data.daThanhToan;
+    long long refundAmount = 0;
+    QString thongBaoGiaoDich = "";
+
     std::stringstream dummy;
     int soNgayQuaHan = tinhSoNgayQuaHan(found->data.NgayMuon, dummy);
-    if (soNgayQuaHan > 0) {
-        int phiMoiNgay = SettingsManager::instance().getInt("TIEN_PHAT_MOI_NGAY", 5000);
-        tienPhat = (long long)soNgayQuaHan * phiMoiNgay;
+
+    if (found->data.TrangThai == GD_MAT_CHO_THANH_TOAN || found->data.TrangThai == GD_MAT_DA_THANH_TOAN) {
+        // --- CASE: FOUND LOST BOOK ---
+        int phiPhatMat = SettingsManager::instance().getInt("PHI_MAT_SACH", 20000);
+        
+        if (daThanhToanNoCu) {
+            // Student already paid (Price + Fee). Now found: Refund Price, keep Fee.
+            // Adjust tienHoanTra
+            long long tongDaDong = found->data.tienPhat; 
+            tienPhat = phiPhatMat; 
+            refundAmount = tongDaDong - phiPhatMat;
+            found->data.tienHoanTra = refundAmount; // Track refund
+            
+            thongBaoGiaoDich = QString("Sách báo mất đã tìm thấy! Học viên đã nộp đền bù: %1 VNĐ. \n"
+                                     "Hệ thống giữ lại Phí phạt: %2 VNĐ. \n"
+                                     "Vui lòng HOÀN LẠI cho học viên: %3 VNĐ (Tiền gốc sách).")
+                                     .arg(QLocale(QLocale::Vietnamese).toString((qint64)tongDaDong))
+                                     .arg(QLocale(QLocale::Vietnamese).toString((qint64)phiPhatMat))
+                                     .arg(QLocale(QLocale::Vietnamese).toString((qint64)refundAmount));
+        } else {
+            // Student hasn't paid yet. Adjust debt: from (Price + Fee) down to (Fee).
+            tienPhat = phiPhatMat;
+            thongBaoGiaoDich = QString("Sách báo mất đã tìm thấy! \n"
+                                     "Giảm nợ cho học viên: Chỉ còn nộp Phí phạt %1 VNĐ.")
+                                     .arg(QLocale(QLocale::Vietnamese).toString((qint64)phiPhatMat));
+        }
+    } else {
+        // --- CASE: NORMAL RETURN ---
+        if (soNgayQuaHan > 0) {
+            int phiMoiNgay = SettingsManager::instance().getInt("TIEN_PHAT_MOI_NGAY", 5000);
+            tienPhat = (long long)soNgayQuaHan * phiMoiNgay;
+        }
     }
-    found->data.tienPhat = tienPhat; // Update memory
     
+    found->data.tienPhat = (daThanhToanNoCu && (found->data.TrangThai == GD_MAT_CHO_THANH_TOAN)) ? found->data.tienPhat : tienPhat; 
+    // If already paid lost book, we keep the 'paid' amount as is in record but notify refund.
+    if (found->data.TrangThai == GD_MAT_CHO_THANH_TOAN || found->data.TrangThai == GD_MAT_DA_THANH_TOAN) found->data.tienPhat = tienPhat;
+
     // DB Update muon_tra
     QSqlQuery q(db);
-    // Updated Query to include both active loans (0) and lost books (2)
-    q.prepare("UPDATE muon_tra SET ngay_tra=?, trang_thai=?, tien_phat=? WHERE ma_the=? AND ban_sao_id=(SELECT id FROM ban_sao WHERE ma_sach=?) AND (trang_thai=0 OR trang_thai=2)");
+    // [UPGRADE] Transaction Status: 
+    // Nếu sách đang mất mà đã đền -> Chờ hoàn tiền. Nếu chưa đền hoặc đang mượn -> Đã trả.
+    int nextStatus = (found->data.TrangThai == GD_MAT_DA_THANH_TOAN) ? GD_MAT_CHO_HOAN_TIEN : GD_DA_TRA;
+    
+    q.prepare("UPDATE muon_tra SET ngay_tra=?, trang_thai=?, tien_phat=?, tien_hoan_tra=? "
+              "WHERE ma_the=? AND ban_sao_id=(SELECT id FROM ban_sao WHERE ma_sach=?) "
+              "AND (trang_thai=0 OR trang_thai=2 OR trang_thai=3)");
     q.addBindValue(QString::fromStdString(ngayTra));
-    q.addBindValue(1); // Da tra
-    q.addBindValue((qint64)tienPhat); // Save Fine
+    q.addBindValue(nextStatus); 
+    q.addBindValue((qint64)tienPhat);
+    q.addBindValue((qint64)found->data.tienHoanTra);
     q.addBindValue(docGia->data.MaThe);
     q.addBindValue(QString::fromStdString(maSach));
     
     if (!q.exec()) {
         success = false;
-        errorMsg = "Loi DB: Khong the cap nhat giao dich tra: " + q.lastError().text().toStdString();
-    } else if (q.numRowsAffected() == 0) {
-        // Warning but proceed? No, if 0 rows, it means DB inconsistent with Memory found.
-        std::cerr << "[DB WARNING] Update muon_tra zero rows. Proceeding with Memory Update anyway (Data Fix).\n";
-        // success = true;
+        errorMsg = "Lơi DB: Khong the cap nhat giao dich tra: " + q.lastError().text().toStdString();
     }
+    
+    // Permission Logic handled via CapNhatQuyenMuon at the end
 
     if (success) {
         // DB Update ban_sao
         QSqlQuery qUpd(db);
-        qUpd.prepare("UPDATE ban_sao SET trang_thai=0 WHERE ma_sach=?");
+        qUpd.prepare("UPDATE ban_sao SET trang_thai=? WHERE ma_sach=?");
+        qUpd.addBindValue(SACH_TRONG_KHO); 
         qUpd.addBindValue(QString::fromStdString(maSach));
         if (!qUpd.exec()) {
             success = false;
@@ -421,7 +489,7 @@ std::string TraSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[], 
 
     // B2: Cap nhat trang thai sách (thông qua con trỏ)
     if (found->data.banSaoSach != nullptr) {
-        found->data.banSaoSach->trangThai = CHO_MUON_DUOC;
+        found->data.banSaoSach->trangThai = SACH_TRONG_KHO;
     } else {
         // Fallback: tim theo ma sach neu con tro bi null
         std::string isbn = TachISBNTuMaSach(maSach);
@@ -429,22 +497,31 @@ std::string TraSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[], 
         if (dauSach != nullptr) {
             PTRDMS banSao = TimBanSaoTheoMa(dauSach, maSach);
             if (banSao != nullptr) {
-                banSao->trangThai = CHO_MUON_DUOC;
+                banSao->trangThai = SACH_TRONG_KHO;
             }
         }
     }
     
-    // B3: Cap nhat lich su muon tra
+    // B3: Cap nhat lich su muon tra (Financial State Machine)
+    int oldStatus = found->data.TrangThai;
     found->data.NgayTra = ngayTra;
-    found->data.TrangThai = 1;  // da tra
+    found->data.TrangThai = (oldStatus == GD_MAT_DA_THANH_TOAN) ? GD_MAT_CHO_HOAN_TIEN : GD_DA_TRA;  
     
-    docGia->data.soSachDangMuon--;
-    if (docGia->data.soSachDangMuon < 0) docGia->data.soSachDangMuon = 0; // Guard against negative
+    // Only decrement if it was an active loan. 
+    // If it was already marked LOST (GD_MAT_...), soSachDangMuon was decremented in BaoMatSach already.
+    if (oldStatus == GD_DANG_MUON) {
+        docGia->data.soSachDangMuon--;
+        if (docGia->data.soSachDangMuon < 0) docGia->data.soSachDangMuon = 0; 
+    }
     
     duLieuDaThayDoi = true;
     
     // Notify listeners (REALTIME UPDATE)
     try {
+        CapNhatQuyenMuon(docGia);
+        if (!thongBaoGiaoDich.isEmpty()) {
+            QMessageBox::information(nullptr, "Thông Tin Giao Dịch", thongBaoGiaoDich);
+        }
         EventBus::instance().muonTraUpdated(docGia->data.MaThe, QString::fromStdString(maSach));
         EventBus::instance().docGiaUpdated(docGia->data.MaThe);
     } catch(...) {}
@@ -453,8 +530,16 @@ std::string TraSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[], 
     CapNhatNgayHetHanSomNhat(docGia);
     
     // [AUDIT LOG]
-    AuditLogger::log("TRA_SACH", "MUON_TRA", QString::number(docGia->data.MaThe), 
-                     "Tra sach Ma: " + QString::fromStdString(maSach));
+    QString detailStr = QString("Mã sách: %1").arg(QString::fromStdString(maSach));
+    if (found && found->data.banSaoSach) {
+        // Find title via ISBN
+        std::string isbn = TachISBNTuMaSach(maSach);
+        PTRDS ds = TimDauSachTheoISBN(dsDauSach, soLuongDauSach, isbn);
+        if (ds) {
+            detailStr = QString("%1 (Mã sách: %2)").arg(QString::fromStdString(ds->tenSach)).arg(QString::fromStdString(maSach));
+        }
+    }
+    AuditLogger::log("TRA_SACH", "MUON_TRA", QString::number(docGia->data.MaThe), detailStr);
 
     return "";  // thanh cong
 }
@@ -479,9 +564,9 @@ std::string BaoMatSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[
     // Tim giao dich muon dang hoat dong
     MUONTRA p = docGia->data.dsmt;
     while (p) {
-        if (p->data.banSaoSach == banSao && (p->data.TrangThai == 0 || (p->data.TrangThai == 1 && !p->data.daThanhToan))) {
-            // Cap nhat trang thai = 2 (Mat)
-            p->data.TrangThai = 2;
+        if (p->data.banSaoSach == banSao && (p->data.TrangThai == GD_DANG_MUON || (p->data.TrangThai == GD_DA_TRA && !p->data.daThanhToan))) {
+            // Financial: Chờ thanh toán đền bù (Nợ)
+            p->data.TrangThai = GD_MAT_CHO_THANH_TOAN;
             p->data.NgayTra = layNgayHienTai();
             
             // Tinh tien phat (Gia sach + Phi phat)
@@ -490,48 +575,62 @@ std::string BaoMatSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[
             p->data.tienPhat = giaSach + phiPhat;
             
             // Thanh ly sach
-            banSao->trangThai = THANH_LY;
+            banSao->trangThai = SACH_MAT;
             duLieuDaThayDoi = true;
             
-             // --- DB SYNC ---
-            QSqlQuery q(DatabaseManager::instance().database());
+             // --- DB SYNC (TRANSACTIONAL) ---
+            QSqlDatabase db = DatabaseManager::instance().database();
+            if (!db.transaction()) {
+                std::cerr << "[DB ERROR] Failed to start transaction in BaoMatSach.\n";
+            }
+
+            bool sqlSuccess = true;
             // Update transaction: lost, return date, and FINE
-            q.prepare("UPDATE muon_tra SET ngay_tra=?, trang_thai=2, tien_phat=? WHERE ma_the=? AND ban_sao_id=(SELECT id FROM ban_sao WHERE ma_sach=?) AND (trang_thai=0 OR (trang_thai=1 AND da_thanh_toan=0))");
+            QSqlQuery q(db);
+            q.prepare("UPDATE muon_tra SET ngay_tra=?, trang_thai=?, tien_phat=? "
+                      "WHERE ma_the=? AND ban_sao_id=(SELECT id FROM ban_sao WHERE ma_sach=?)"
+                      " AND (trang_thai=0 OR (trang_thai=1 AND da_thanh_toan=0))");
             q.addBindValue(QString::fromStdString(p->data.NgayTra));
+            q.addBindValue(GD_MAT_CHO_THANH_TOAN);
             q.addBindValue((qint64)p->data.tienPhat); // Save calculated fine
             q.addBindValue(docGia->data.MaThe);
             q.addBindValue(QString::fromStdString(maSach));
             if (!q.exec()) {
+                sqlSuccess = false;
                 std::cerr << "[DB ERROR] Update muon_tra failed: " << q.lastError().text().toStdString() << "\n";
             }
             
-            QSqlQuery qUpd(DatabaseManager::instance().database());
-            qUpd.prepare("UPDATE ban_sao SET trang_thai=2 WHERE ma_sach=?");
-            qUpd.addBindValue(QString::fromStdString(maSach));
-            qUpd.exec();
-            // --- END DB SYNC ---
-            
-            // [NEW] Feature: Auto-Lock Reader if Debt Created
-            if (p->data.tienPhat > 0) {
-                // 1. Lock in Memory
-                docGia->data.TrangThai = 0; // Khoa the
-                
-                // 2. Lock in DB
-                QSqlQuery qLock(DatabaseManager::instance().database());
-                qLock.prepare("UPDATE doc_gia SET trang_thai=0 WHERE ma_the=?");
-                qLock.addBindValue(docGia->data.MaThe);
-                if (qLock.exec()) {
-                     AuditLogger::log(AuditLogger::ACTION_UPDATE, "DOC_GIA", QString::number(docGia->data.MaThe), 
-                                      "Tu dong KHOA the do bao mat sach (co no)");
+            if (sqlSuccess) {
+                QSqlQuery qUpd(db);
+                qUpd.prepare("UPDATE ban_sao SET trang_thai=? WHERE ma_sach=?");
+                qUpd.addBindValue(SACH_MAT);
+                qUpd.addBindValue(QString::fromStdString(maSach));
+                if (!qUpd.exec()) {
+                    sqlSuccess = false;
+                    std::cerr << "[DB ERROR] Update ban_sao failed: " << qUpd.lastError().text().toStdString() << "\n";
                 }
             }
+
+            if (sqlSuccess) {
+                db.commit();
+            } else {
+                db.rollback();
+                return "Loi DB: Khong the cap nhat trang thai mat sach!";
+            }
+            // --- END DB SYNC ---
+            
+            // Permission Logic handled via CapNhatQuyenMuon
             
             // [AUDIT LOG]
-            AuditLogger::log(AuditLogger::ACTION_LOST, "MUON_TRA", QString::number(docGia->data.MaThe), 
-                             QString("Bao mat sach %1. Phat: %2").arg(QString::fromStdString(maSach)).arg(p->data.tienPhat));
+            QString detailStr = QString("%1 (Mã sách: %2). Phạt: %3")
+                                .arg(QString::fromStdString(dauSach->tenSach))
+                                .arg(QString::fromStdString(maSach))
+                                .arg(p->data.tienPhat);
+            AuditLogger::log(AuditLogger::ACTION_LOST, "MUON_TRA", QString::number(docGia->data.MaThe), detailStr);
 
             // [EVENT BUS]
             try {
+                CapNhatQuyenMuon(docGia);
                 EventBus::instance().docGiaUpdated(docGia->data.MaThe);
             } catch(...) {}
 
@@ -635,10 +734,13 @@ int LayDSSachDangMuon(PTRDG docGia, ThongTinSachDangMuon_DTO ketQua[], int maxKe
             break;
         }
 
-        // Update: Include Borrowing (0) OR Returned-Unpaid (1) OR Lost-Unpaid (2)
+        // Update: Include ALL books that librarian needs to see in "Reader Details"
+        // 0: Borrowing, 1: Returned (with debt), 2: Lost (unpaid), 3: Lost (paid - hide?), 4: Lost (found, refund wait)
         if (curr->data.TrangThai == 0 || 
-           (curr->data.TrangThai == 1 && !curr->data.daThanhToan) ||
-           (curr->data.TrangThai == 2 && !curr->data.daThanhToan)) {
+            curr->data.TrangThai == 1 || // Include returned to check for debt
+            curr->data.TrangThai == 2 || 
+            curr->data.TrangThai == 4) {
+            
             // Determine MaSach: prefer cached, then pointer
             std::string maSach = curr->data.maSachCached;
             if (maSach.empty() && curr->data.banSaoSach != nullptr) {
@@ -656,12 +758,23 @@ int LayDSSachDangMuon(PTRDG docGia, ThongTinSachDangMuon_DTO ketQua[], int maxKe
                     ketQua[dem].maSach = maSach;
                     ketQua[dem].tenSach = (dauSach != nullptr) ? dauSach->tenSach : "";
                     ketQua[dem].ngayMuon = curr->data.NgayMuon;
-                    // Calculate soNgayGiu
-                    std::stringstream dummyStream;
-                    int soNgay = tinhSoNgayQuaHan(curr->data.NgayMuon, dummyStream);
-                    ketQua[dem].soNgayGiu = (soNgay >= 0) ? soNgay : 0;
-                    // Feature 4: Pass status to UI (0=Borrowing, 1=Returned/Debt)
+                    
+                    // Populate Financials directly
+                    ketQua[dem].tienPhat = curr->data.tienPhat;
+                    ketQua[dem].tienHoanTra = curr->data.tienHoanTra;
+                    ketQua[dem].daThanhToan = curr->data.daThanhToan;
+                    ketQua[dem].soLanGiaHan = curr->data.soLanGiaHan;
                     ketQua[dem].trangThai = curr->data.TrangThai; 
+
+                    // Calculate soNgayGiu (for current loans only)
+                    if (curr->data.TrangThai == 0) {
+                        std::stringstream dummyStream;
+                        int soNgay = tinhSoNgayQuaHan(curr->data.NgayMuon, dummyStream);
+                        ketQua[dem].soNgayGiu = (soNgay >= 0) ? soNgay : 0;
+                    } else {
+                        ketQua[dem].soNgayGiu = 0;
+                    }
+
                     dem++;
                 }
             }

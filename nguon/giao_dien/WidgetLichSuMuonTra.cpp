@@ -18,10 +18,55 @@
 #include "models/DocGia.h"
 #include <QDebug>
 #include <QMessageBox>
+#include <QShowEvent>
+#include "utils/EventBus.h"
+
+#include <QIdentityProxyModel>
+#include "utils/FinanceHelper.h"
+
+class LichSuProxyModel : public QIdentityProxyModel {
+public:
+    LichSuProxyModel(QObject *parent = nullptr) : QIdentityProxyModel(parent) {}
+
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override {
+        if (!index.isValid()) return QVariant();
+
+        // Financial Status Column (index 5)
+        if (role == Qt::DisplayRole && index.column() == 5) {
+            int status = sourceModel()->data(sourceModel()->index(index.row(), 5)).toInt();
+            long long fine = sourceModel()->data(sourceModel()->index(index.row(), 4)).toLongLong();
+            bool paid = sourceModel()->data(sourceModel()->index(index.row(), 9)).toInt() == 1;
+            long long refund = sourceModel()->data(sourceModel()->index(index.row(), 10)).toLongLong();
+
+            if (status == 1) { // GD_DA_TRA
+                if (fine > 0 && !paid) return LanguageManager::instance().getText("STATUS_RETURNED_DEBT").arg(QLocale(QLocale::Vietnamese).toString(fine));
+                return LanguageManager::instance().getText("STATUS_RETURNED");
+            }
+            if (status == 2) return LanguageManager::instance().getText("STATUS_LOST_DEBT").arg(QLocale(QLocale::Vietnamese).toString(fine));
+            if (status == 3) return LanguageManager::instance().getText("STATUS_LOST_PAID");
+            if (status == 4) return LanguageManager::instance().getText("STATUS_LOST_REFUND_WAIT").arg(QLocale(QLocale::Vietnamese).toString(refund));
+            if (status == 5) return LanguageManager::instance().getText("STATUS_LOST_REFUND_DONE");
+            return LanguageManager::instance().getText("STATUS_BORROWING");
+        }
+
+        // Color Logic
+        if (role == Qt::ForegroundRole) {
+            int status = sourceModel()->data(sourceModel()->index(index.row(), 5)).toInt();
+            long long fine = sourceModel()->data(sourceModel()->index(index.row(), 4)).toLongLong();
+            bool paid = sourceModel()->data(sourceModel()->index(index.row(), 9)).toInt() == 1;
+            
+            if (status == 2 || (status == 1 && fine > 0 && !paid)) return QColor("#FF5252"); // Red
+            if (status == 4) return QColor("#FF9800"); // Orange
+            if (status == 3 || status == 5) return QColor("#4CAF50"); // Green
+        }
+
+        return QIdentityProxyModel::data(index, role);
+    }
+};
 
 WidgetLichSuMuonTra::WidgetLichSuMuonTra(QWidget *parent) : QWidget(parent) {
     thieLapGiaoDien();
-    lamMoi();
+    // lamMoi(); // Chuyển sang showEvent để auto-refresh mỗi khi quay lại tab
     
     connect(&LanguageManager::instance(), &LanguageManager::languageChanged, this, &WidgetLichSuMuonTra::capNhatNgonNgu);
 }
@@ -121,7 +166,35 @@ void WidgetLichSuMuonTra::thieLapGiaoDien() {
     });
     connect(chkBaoGomLuuTru, &QCheckBox::toggled, this, &WidgetLichSuMuonTra::xuLyTimKiem);
 
-    connect(oNhapTimKiem, &QLineEdit::returnPressed, this, &WidgetLichSuMuonTra::xuLyTimKiem);
+    connect(oNhapTimKiem, &QLineEdit::textChanged, this, &WidgetLichSuMuonTra::xuLyTimKiem);
+    connect(ngayBatDau, &QDateEdit::dateChanged, this, &WidgetLichSuMuonTra::xuLyTimKiem);
+    connect(ngayKetThuc, &QDateEdit::dateChanged, this, &WidgetLichSuMuonTra::xuLyTimKiem);
+    connect(hopChonTrangThai, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &WidgetLichSuMuonTra::xuLyTimKiem);
+    
+    // --- REALTIME EVENT BUS CONNECTIONS ---
+    // Update when any borrow/return happens in the system
+    connect(&EventBus::instance(), &EventBus::muonTraAdded, this, [this](int, const QString&){ 
+        if (this->isVisible()) this->xuLyTimKiem(); 
+    });
+    connect(&EventBus::instance(), &EventBus::muonTraRemoved, this, [this](int, const QString&){ 
+        if (this->isVisible()) this->xuLyTimKiem(); 
+    });
+    connect(&EventBus::instance(), &EventBus::muonTraUpdated, this, [this](int, const QString&){ 
+        if (this->isVisible()) this->xuLyTimKiem(); 
+    });
+    
+    // Also update on global data change
+    connect(&EventBus::instance(), &EventBus::dataChanged, this, [this](){
+        if (this->isVisible()) this->xuLyTimKiem();
+    });
+
+    // Initial Load
+    // lamMoi(); // Moved to showEvent
+}
+
+void WidgetLichSuMuonTra::showEvent(QShowEvent *event) {
+    QWidget::showEvent(event);
+    lamMoi();
 }
 
 QString WidgetLichSuMuonTra::xayDungCauLenhSQL() {
@@ -160,17 +233,35 @@ void WidgetLichSuMuonTra::xuLyTimKiem() {
     QSqlQuery q;
     QString dateIso = "SUBSTR(%1, 7, 4) || '-' || SUBSTR(%1, 4, 2) || '-' || SUBSTR(%1, 1, 2)";
     
+    // Prepare filter clause first
+    QString filter = "";
+    if (!oNhapTimKiem->text().isEmpty()) {
+        filter = "AND (dg.ho || ' ' || dg.ten LIKE :search OR dg.ma_the LIKE :search OR ds.ten_sach LIKE :search) ";
+    }
+    
+    int status = hopChonTrangThai->currentData().toInt();
+    if (status != -1) {
+        filter += QString("AND mt.trang_thai = %1 ").arg(status);
+    }
+
     auto generateSql = [&](const QString& tableName) {
-        return QString("SELECT mt.ngay_muon, mt.ngay_tra, (dg.ho || ' ' || dg.ten) as doc_gia, ds.ten_sach, mt.tien_phat, "
-                      "CASE mt.trang_thai WHEN 0 THEN 'Đang mượn' WHEN 1 THEN 'Đã trả' WHEN 2 THEN 'Làm mất' END as trang_thai_text, "
-                      "CASE mt.da_thanh_toan WHEN 0 THEN 'Chưa' ELSE 'Rồi' END as thanh_toan_text, "
-                      "mt.ma_the, bs.ma_sach "
+        // Robust query using LEFT JOIN and redundancy for deleted master data
+        return QString("SELECT mt.ngay_muon, mt.ngay_tra, "
+                      "COALESCE(dg.ho || ' ' || dg.ten, 'Độc giả #' || mt.ma_the), "
+                      "COALESCE(ds.ten_sach, 'Sách #' || COALESCE(NULLIF(mt.ma_sach, ''), bs.ma_sach, 'K.Xác Định')), "
+                      "mt.tien_phat, "
+                      "mt.trang_thai, " // Original status ID for proxy
+                      "mt.da_thanh_toan, " 
+                      "mt.ma_the, COALESCE(NULLIF(mt.ma_sach, ''), bs.ma_sach), "
+                      "mt.da_thanh_toan as paid_bit, mt.tien_hoan_tra " // Added bits for proxy
                       "FROM %1 mt "
-                      "JOIN doc_gia dg ON mt.ma_the = dg.ma_the "
-                      "JOIN ban_sao bs ON mt.ban_sao_id = bs.id "
-                      "JOIN dau_sach ds ON bs.dau_sach_id = ds.id "
-                      "WHERE %2 >= :start AND %2 <= :end ")
-                      .arg(tableName).arg(dateIso.arg("mt.ngay_muon"));
+                      "LEFT JOIN doc_gia dg ON mt.ma_the = dg.ma_the "
+                      "LEFT JOIN ban_sao bs ON mt.ban_sao_id = bs.id "
+                      "LEFT JOIN dau_sach ds ON bs.dau_sach_id = ds.id "
+                      "WHERE %2 >= :start AND %2 <= :end %3")
+                      .arg(tableName)
+                      .arg(dateIso.arg("mt.ngay_muon"))
+                      .arg(filter); // Inject filter here
     };
 
     QString baseSql = generateSql("muon_tra");
@@ -178,17 +269,7 @@ void WidgetLichSuMuonTra::xuLyTimKiem() {
         baseSql = "(" + baseSql + ") UNION ALL (" + generateSql("muon_tra_archive") + ")";
     }
 
-    QString filter = "";
-    if (!oNhapTimKiem->text().isEmpty()) {
-        filter = "AND (dg.ho || ' ' || dg.ten LIKE :search OR dg.ma_the LIKE :search OR ds.ten_sach LIKE :search) ";
-    }
-
-    int status = hopChonTrangThai->currentData().toInt();
-    if (status != -1) {
-        filter += QString("AND mt.trang_thai = %1 ").arg(status);
-    }
-
-    q.prepare(baseSql + filter + "ORDER BY mt.ngay_muon DESC");
+    q.prepare(baseSql + " ORDER BY 1 DESC"); // Order by column 1 (ngay_muon)
     q.bindValue(":start", ngayBatDau->date().toString("yyyy-MM-dd"));
     q.bindValue(":end", ngayKetThuc->date().toString("yyyy-MM-dd"));
     if (!oNhapTimKiem->text().isEmpty()) {
@@ -202,6 +283,11 @@ void WidgetLichSuMuonTra::xuLyTimKiem() {
 
     modelLichSu->setQuery(q);
 
+    // Proxy Setup
+    LichSuProxyModel *proxy = new LichSuProxyModel(this);
+    proxy->setSourceModel(modelLichSu);
+    bangLichSu->setModel(proxy);
+
     // Set headers
     modelLichSu->setHeaderData(0, Qt::Horizontal, LanguageManager::instance().getText("COL_NGAY_MUON"));
     modelLichSu->setHeaderData(1, Qt::Horizontal, LanguageManager::instance().getText("COL_NGAY_TRA"));
@@ -214,9 +300,9 @@ void WidgetLichSuMuonTra::xuLyTimKiem() {
     QSqlQuery sumQ;
     auto generateSumSql = [&](const QString& tableName) {
         return QString("SELECT tien_phat FROM %1 mt "
-                      "JOIN doc_gia dg ON mt.ma_the = dg.ma_the "
-                      "JOIN ban_sao bs ON mt.ban_sao_id = bs.id "
-                      "JOIN dau_sach ds ON bs.dau_sach_id = ds.id "
+                      "LEFT JOIN doc_gia dg ON mt.ma_the = dg.ma_the "
+                      "LEFT JOIN ban_sao bs ON mt.ban_sao_id = bs.id "
+                      "LEFT JOIN dau_sach ds ON bs.dau_sach_id = ds.id "
                       "WHERE %2 >= :start AND %2 <= :end " + filter)
                       .arg(tableName).arg(dateIso.arg("mt.ngay_muon"));
     };
@@ -243,41 +329,87 @@ void WidgetLichSuMuonTra::xuLyTimKiem() {
         .arg(LanguageManager::instance().getText("LBL_TOTAL_FINES"))
         .arg(QLocale(QLocale::Vietnamese).toString(totalPhat)));
     
-    // UI Polish: Hide internal columns if they are shown
-    bangLichSu->setColumnHidden(7, true);
-    bangLichSu->setColumnHidden(8, true);
+    // UI Polish: Hide internal columns
+    bangLichSu->setColumnHidden(6, true); // da_thanh_toan (internal)
+    bangLichSu->setColumnHidden(7, true); // ma_the
+    bangLichSu->setColumnHidden(8, true); // ma_sach
+    bangLichSu->setColumnHidden(9, true); // paid_bit
+    bangLichSu->setColumnHidden(10, true); // tien_hoan_tra
 }
 
 void WidgetLichSuMuonTra::xuLyXuatBaoCao() {
-    QString start = ngayBatDau->date().toString("dd/MM/yyyy");
-    QString end = ngayKetThuc->date().toString("dd/MM/yyyy");
-    QString tieuDe = LanguageManager::instance().getText("BTN_EXPORT_FINANCE");
-    PrintHelper::inBaoCaoTaiChinh(start, end, tieuDe, modelLichSu, this);
+    // 1. Calculate Summary Stats based on CURRENT FILTER
+    double totalTx = modelLichSu->rowCount();
+    double returned = 0;
+    double lost = 0;
+    double revenue = 0;
+    
+    for (int i = 0; i < totalTx; i++) {
+         int status = modelLichSu->data(modelLichSu->index(i, 5)).toInt();
+         double fine = modelLichSu->data(modelLichSu->index(i, 4)).toDouble();
+         bool isPaid = modelLichSu->data(modelLichSu->index(i, 9)).toInt() == 1;
+         
+         if (status == 1) returned++; // Returned
+         if (status == 2 || status == 3) lost++; // Lost
+         
+         if (isPaid) revenue += fine;
+    }
+    
+    QMap<QString, double> stats;
+    stats["total_tx"] = totalTx;
+    stats["returned"] = returned;
+    stats["lost"] = lost;
+    stats["revenue"] = revenue;
+
+    QString range = QString("%1 - %2")
+        .arg(ngayBatDau->date().toString("dd/MM/yyyy"))
+        .arg(ngayKetThuc->date().toString("dd/MM/yyyy"));
+
+    PrintHelper::inLichSuMuonTra(modelLichSu, range, stats, this);
 }
 
 void WidgetLichSuMuonTra::xuLyMenuChuotPhai(const QPoint &pos) {
     QModelIndex index = bangLichSu->indexAt(pos);
     if (!index.isValid()) return;
 
-    // Check if Paid (Column 6 contains status text "Chưa" or "Rồi")
-    QString thanhToan = modelLichSu->data(modelLichSu->index(index.row(), 6)).toString();
+    int status = modelLichSu->data(modelLichSu->index(index.row(), 5)).toInt();
     long long fine = modelLichSu->data(modelLichSu->index(index.row(), 4)).toLongLong();
+    bool isPaid = modelLichSu->data(modelLichSu->index(index.row(), 9)).toInt() == 1;
+    long long refundAmount = modelLichSu->data(modelLichSu->index(index.row(), 10)).toLongLong();
 
     QMenu menu(this);
-    if (thanhToan.contains("Chưa") && fine > 0) {
-        QAction *actPay = menu.addAction(QIcon(":/icons/exchange.svg"), LanguageManager::instance().getText("COL_THANH_TOAN"));
-        connect(actPay, &QAction::triggered, this, [this, index]() {
+    
+    // Case 1: Need Payment (Lost-Wait-Pay or Returned-Debt)
+    bool needPay = (status == 2) || (status == 1 && fine > 0 && !isPaid);
+    
+    // Case 2: Need Refund (Lost-Found-Wait-Refund)
+    bool needRefund = (status == 4);
+
+    if (needPay || needRefund) {
+        QString actionText = needRefund ? LanguageManager::instance().getText("BTN_CONFIRM_REFUND") 
+                                         : LanguageManager::instance().getText("BTN_PAY");
+        
+        QAction *actFin = menu.addAction(QIcon(needRefund ? ":/icons/exchange.svg" : ":/icons/payment.svg"), actionText);
+        
+        connect(actFin, &QAction::triggered, this, [this, index, status, fine, refundAmount, needRefund]() {
             int maThe = modelLichSu->data(modelLichSu->index(index.row(), 7)).toInt();
             QString maSach = modelLichSu->data(modelLichSu->index(index.row(), 8)).toString();
-            long long fineAmount = modelLichSu->data(modelLichSu->index(index.row(), 4)).toLongLong();
             
-            // Re-fetch objects for payment dialog
             extern PTRDG rootDocGia;
             PTRDG reader = timDocGia(rootDocGia, maThe);
             if (reader) {
-                QString reason = LanguageManager::instance().getText("COL_TIEN_PHAT") + ": " + maSach;
-                HopThoaiThanhToan dialog(reader, reason, fineAmount, this);
-                if (dialog.exec() == QDialog::Accepted) {
+                // Bridge SQL model to FinanceHelper Context
+                FinanceHelper::PaymentContext ctx;
+                ctx.maSach = maSach;
+                ctx.amount = needRefund ? refundAmount : fine;
+                ctx.isRefund = needRefund;
+                ctx.canProcess = true;
+                
+                if (needRefund) ctx.reason = QString("Hoàn tiền (Tìm thấy sách %1)").arg(maSach);
+                else if (status == 2) ctx.reason = QString("Đền bù sách mất: %1").arg(maSach);
+                else ctx.reason = QString("Phạt quá hạn: %1").arg(maSach);
+
+                if (FinanceHelper::processPaymentFlow(reader, ctx, this)) {
                     lamMoi();
                 }
             }

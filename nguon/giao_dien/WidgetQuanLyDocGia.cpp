@@ -101,7 +101,7 @@ public:
             switch (section) {
             case 0: return LanguageManager::instance().getText("TABLE_HEADER_STT");
             case 1: return LanguageManager::instance().getText("TABLE_HEADER_CODE");
-            case 2: return LanguageManager::instance().getText("TABLE_HEADER_LASTNAME");
+            case 2: return LanguageManager::instance().getText("TABLE_HEADER_LASTNAME_SHORT");
             case 3: return LanguageManager::instance().getText("TABLE_HEADER_FIRSTNAME");
             case 4: return LanguageManager::instance().getText("TABLE_HEADER_CLASS"); // New Key
             case 5: return LanguageManager::instance().getText("TABLE_HEADER_PHONE"); // New Key
@@ -539,6 +539,12 @@ void WidgetQuanLyDocGia::xuLyNutXoaDocGia() {
             .arg(docGiaDangChon->data.soSachDangMuon)
     );
     
+    if (docGiaDangChon->data.soSachDangMuon > 0) {
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"), 
+            "Không thể xóa học viên đang mượn sách! Vui lòng yêu cầu trả sách trước khi xóa.");
+        return;
+    }
+
     if (xacNhan) {
         // extern declaration removed, available via header
         

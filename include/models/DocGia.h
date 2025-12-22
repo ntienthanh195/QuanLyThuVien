@@ -15,16 +15,26 @@
 using std::string;
 using std::vector;
 
+enum TrangThaiGiaoDich {
+    GD_DANG_MUON = 0,           // Đang mượn (Chưa trả)
+    GD_DA_TRA = 1,              // Đã trả (Hoàn tất)
+    GD_MAT_CHO_THANH_TOAN = 2,  // Báo mất - Chờ đền bù (Nợ)
+    GD_MAT_DA_THANH_TOAN = 3,   // Đã đền bù (Xong trách nhiệm)
+    GD_MAT_CHO_HOAN_TIEN = 4,   // Tìm thấy sách sau khi đền - Chờ hoàn tiền
+    GD_MAT_DA_HOAN_TIEN = 5     // Đã hoàn tiền cho học viên (Kết thúc luồng tiền)
+};
+
 //danh sach muon tra
 struct MuonTra{
     PTRDMS banSaoSach;// thay the string maSach thanh con tro chi toi DanhMucSach* va khai bao trang thai 
     string NgayMuon;
     string NgayTra;
-    int TrangThai;//0: dang muon, 1: da tra, 2: lam mat sach
+    int TrangThai;// 0,1,2,3 theo enum TrangThaiGiaoDich
     // Feature 4: Financial & Extension
     int soLanGiaHan = 0;
     bool daThanhToan = false;
     long long tienPhat = 0;
+    long long tienHoanTra = 0; // Số tiền cần hoàn trả cho học viên (nếu tìm thấy sách sau khi đã đền)
     // Cache the ma_sach value at the time of transaction to avoid dangling pointer derefs
     string maSachCached;
 };
@@ -43,7 +53,8 @@ struct TheDocGia{
     string Ho;
     string Ten;
     bool Phai;//0 nam 1 nu
-    int TrangThai = 1;//0 = khoa, 1=hoat dong
+    int TrangThai = 1;//0 = khoa (vô hiệu hóa thẻ), 1=hoat dong
+    bool coTheMuon = true; // Quyền mượn sách (Phụ thuộc vào nợ/quá hạn)
     
     // Feature 5 Details
     string NgayLapThe; 
@@ -91,6 +102,7 @@ struct ThongTinSachDangMuon_DTO {
     
     // Feature 4 Extras
     long long tienPhat = 0;
+    long long tienHoanTra = 0; // [NEW] Added for refund scenarios
     bool daThanhToan = false;
     int soLanGiaHan = 0; // Feature Renewal
 };
@@ -140,6 +152,7 @@ void giaiPhongDsmt(MUONTRA& dsmt);
 // Feature 4: Financial & Extension functions
 
 long long TinhTongNo(PTRDG docGia);
+void CapNhatQuyenMuon(PTRDG docGia); // [NEW] Realtime Permission Check
 
 // Prototype (h)
 // LayDSSachDangMuon moved to MuonTra.h

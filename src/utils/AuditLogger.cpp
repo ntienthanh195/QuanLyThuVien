@@ -61,6 +61,6 @@ void AuditLogger::log(const QString& action, const QString& table, const QString
     } else {
         qDebug() << "[Audit] Logged:" << action << table << objectId;
         // Notify UI via EventBus
-        EventBus::instance().newSystemLog(action, details);
+        EventBus::instance().newSystemLog(action, table, details);
     }
 }

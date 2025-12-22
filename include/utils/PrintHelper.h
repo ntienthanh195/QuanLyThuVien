@@ -111,12 +111,21 @@ public:
     static bool inNhieuTemSachBatch(const QList<QPair<PTRDS, int>>& list, QWidget* parent = nullptr);
     static bool inTemSachTuyChon(PTRDS dauSach, const QStringList& codes, QWidget* parent = nullptr);
     // ===== IN BÁO CÁO =====
+    // ===== IN BÁO CÁO (REPORTS) =====
     static bool inDanhSachDocGia(PTRDG root, QWidget* parent = nullptr);
     static bool inDanhMucSach(PTRDS* dsDauSach, int soLuong, QWidget* parent = nullptr);
     static bool inDanhSachSach(PTRDS* dsDauSach, int soLuong, QWidget* parent = nullptr);
     static bool inBaoCaoThongKe(const QString& tieuDe, const QString& noiDungHTML, 
                                  QWidget* parent = nullptr);
     static bool inBaoCaoTuyChinh(const QString& tieuDe, const QString& html, QWidget* parent = nullptr);
+    
+    // In Lịch Sử Mượn Trả (Refactored Unified)
+    static bool inLichSuMuonTra(QAbstractItemModel* model, 
+                               const QString& timeRange, 
+                               const QMap<QString, double>& stats, 
+                               QWidget* parent = nullptr);
+
+    // In Phiếu Mượn/Trả (Receipts)
     static bool inPhieuMuonTra(PTRDG docGia, const QList<QString>& danhSachSach,
                                 bool laMuon, QWidget* parent = nullptr);
     static bool inPhieuMuonTuDong(PTRDG docGia, const QString& maSach, const QString& tenSach,
@@ -124,9 +133,13 @@ public:
     static bool inPhieuMuonBatch(PTRDG docGia, const QList<ThongTinSachDangMuon_DTO>& danhSachSach, QWidget* parent = nullptr);
     static bool inPhieuTraTuDong(PTRDG docGia, const QString& maSach, const QString& tenSach,
                                   const QString& ngayTra, QWidget* parent = nullptr, bool forcePreview = false);
-    static bool inBienLaiPhat(PTRDG docGia, const QString& lyDo, long long soTien, QWidget* parent = nullptr);
+    static bool inBienLaiPhat(PTRDG docGia, const QString& lyDo, long long soTien, bool isRefund = false, QWidget* parent = nullptr);
+    
+    // Legacy - Remove if unused or redirect
     static bool xuatLichSuMuonTraToPDF(PTRDG docGia, QWidget* parent = nullptr); 
     static bool inBaoCaoTaiChinh(const QString& start, const QString& end, const QString& tieuDe, QAbstractItemModel* model, QWidget* parent = nullptr);
+    
+    // In báo cáo kiểm kê (Updated Signature)
     static bool inBaoCaoKiemKe(const QStringList& missing, const QStringList& unknown, const QStringList& borrowedAnomalies,
                                const QStringList& borrowed, const QMap<QString, int>& stats, QWidget* parent = nullptr);
 

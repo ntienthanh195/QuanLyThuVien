@@ -93,7 +93,7 @@ Ket qua se nam trong thu muc `release_v2/`.
 
 ## 5. THONG TIN BAN QUYEN
 
-San pham thuoc so huu cua TopDev Team.
+San pham thuoc so huu cua Chăm Rốch Thi.
 Nghiem cam sao chep, phan phoi duoi hinh thuc thuong mai ma khong co su dong y bang van ban.
 
 (c) 2025 Rocco & Team. All rights reserved.

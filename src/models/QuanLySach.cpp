@@ -1193,6 +1193,11 @@ std::string ThemDauSachMoi(const std::string& isbn, const std::string& ten, int 
     AuditLogger::log(AuditLogger::ACTION_INSERT, "DAU_SACH", QString::fromStdString(isbn), 
                      "Them dau sach moi: " + QString::fromStdString(ten));
     
+    // [REALTIME UPDATE]
+    try {
+        EventBus::instance().dauSachAdded(QString::fromStdString(isbn));
+    } catch(...) {}
+    
     return "";  // thanh cong
 }
 
@@ -1267,7 +1272,10 @@ std::string ThemBanSaoMoi(const std::string& isbn, int soLuong, const std::strin
 
     // [AUDIT LOG]
     AuditLogger::log(AuditLogger::ACTION_INSERT, "BAN_SAO", QString::fromStdString(isbn), 
-                     QString("Them %1 ban sao vao dau sach %2").arg(soLuong).arg(QString::fromStdString(isbn)));
+                     QString("%1 bản sao cho: %2 (ISBN: %3)")
+                     .arg(soLuong)
+                     .arg(QString::fromStdString(dauSach->tenSach))
+                     .arg(QString::fromStdString(isbn)));
 
     return "";  // thanh cong
 }
@@ -1325,7 +1333,12 @@ std::string CapNhatThongTinDauSach(const std::string& isbn, const std::string& t
         
         // [AUDIT LOG]
         AuditLogger::log(AuditLogger::ACTION_UPDATE, "DAU_SACH", QString::fromStdString(isbn), 
-                         "Cap nhat thong tin dau sach: " + QString::fromStdString(ten));
+                         QString("%1 (ISBN: %2)").arg(QString::fromStdString(ten)).arg(QString::fromStdString(isbn)));
+                         
+        // [REALTIME UPDATE]
+        try {
+            EventBus::instance().dauSachUpdated(QString::fromStdString(isbn));
+        } catch(...) {}
     }
     
     return loi;  // rong = thanh cong, khac rong = loi
@@ -1362,7 +1375,13 @@ std::string XoaDauSachTheoISBN(const std::string& isbn) {
         // --- END DB SYNC ---
 
         // [AUDIT LOG]
-        AuditLogger::log(AuditLogger::ACTION_DELETE, "DAU_SACH", QString::fromStdString(isbn), "Xoa dau sach");
+        AuditLogger::log(AuditLogger::ACTION_DELETE, "DAU_SACH", QString::fromStdString(isbn), 
+                         QString("%1 (ISBN: %2)").arg(QString::fromStdString(dauSach->tenSach)).arg(QString::fromStdString(isbn)));
+
+        // [REALTIME UPDATE]
+        try {
+            EventBus::instance().dauSachRemoved(QString::fromStdString(isbn));
+        } catch(...) {}
     }
     
     return loi;
@@ -1400,6 +1419,12 @@ std::string ThanhLyBanSaoTheoMa(const std::string& maSach) {
     q.exec();
     // --- END DB SYNC ---
     
+    // [AUDIT LOG]
+    AuditLogger::log(AuditLogger::ACTION_DELETE, "BAN_SAO", QString::fromStdString(maSach), 
+                     QString("Mã sách: %1 (Dưới tên: %2)")
+                     .arg(QString::fromStdString(maSach))
+                     .arg(QString::fromStdString(dauSach->tenSach)));
+                     
     return "";  // thanh cong
 }
 
@@ -1436,6 +1461,10 @@ std::string XoaBanSaoTheoMa(const std::string& maSach) {
     q.addBindValue(QString::fromStdString(maSach));
     q.exec();
     // --- END DB SYNC ---
+
+    // [AUDIT LOG]
+    AuditLogger::log(AuditLogger::ACTION_DELETE, "BAN_SAO", QString::fromStdString(maSach), 
+                     QString("Mã sách: %1").arg(QString::fromStdString(maSach)));
     
     return "";  // thanh cong
 }

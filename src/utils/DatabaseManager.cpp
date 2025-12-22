@@ -195,12 +195,14 @@ bool DatabaseManager::createTables() {
         "id INTEGER PRIMARY KEY AUTOINCREMENT,"
         "ma_the INTEGER NOT NULL,"
         "ban_sao_id INTEGER NOT NULL,"
+        "ma_sach TEXT,"         // [NEW] Redundant but critical for simpler logic/audit
         "ngay_muon TEXT NOT NULL,"
         "ngay_tra TEXT,"
         "trang_thai INTEGER DEFAULT 0,"
         "tien_phat INTEGER DEFAULT 0,"
         "so_lan_gia_han INTEGER DEFAULT 0,"
         "da_thanh_toan INTEGER DEFAULT 0,"
+        "tien_hoan_tra INTEGER DEFAULT 0," // [NEW] Added for refund scenarios
         "FOREIGN KEY(ma_the) REFERENCES doc_gia(ma_the) ON DELETE CASCADE,"
         "FOREIGN KEY(ban_sao_id) REFERENCES ban_sao(id)"
         ");"
@@ -217,7 +219,9 @@ bool DatabaseManager::createTables() {
         "trang_thai INTEGER,"
         "tien_phat INTEGER,"
         "so_lan_gia_han INTEGER,"
-        "da_thanh_toan INTEGER"
+        "da_thanh_toan INTEGER,"
+        "tien_hoan_tra INTEGER,"
+        "ma_sach TEXT"           // [NEW] Added for consistency and search
         ");"
     );
 
@@ -251,6 +255,39 @@ bool DatabaseManager::createTables() {
             addCol.exec("ALTER TABLE muon_tra ADD COLUMN da_thanh_toan INTEGER DEFAULT 0");
         }
     }
+    // tien_hoan_tra
+    {
+        QSqlQuery checkCol(m_db);
+        if (!checkCol.exec("SELECT tien_hoan_tra FROM muon_tra LIMIT 0")) {
+            qDebug() << "[DatabaseManager] Adding missing column 'tien_hoan_tra' to 'muon_tra'...";
+            QSqlQuery addCol(m_db);
+            addCol.exec("ALTER TABLE muon_tra ADD COLUMN tien_hoan_tra INTEGER DEFAULT 0");
+        }
+    }
+    // muon_tra (muon_tra) force fill & archival sync
+    {
+        QSqlQuery checkCol(m_db);
+        bool hasCol = checkCol.exec("SELECT ma_sach FROM muon_tra LIMIT 0");
+        if (!hasCol) {
+            qDebug() << "[DatabaseManager] Adding missing column 'ma_sach' to 'muon_tra'...";
+            QSqlQuery addCol(m_db);
+            addCol.exec("ALTER TABLE muon_tra ADD COLUMN ma_sach TEXT");
+        }
+        
+        // Archival sync
+        bool hasArchiveMaSach = checkCol.exec("SELECT ma_sach FROM muon_tra_archive LIMIT 0");
+        if (!hasArchiveMaSach) {
+            QSqlQuery addCol(m_db);
+            addCol.exec("ALTER TABLE muon_tra_archive ADD COLUMN ma_sach TEXT");
+        }
+        
+        // ALWAYS try to recover missing ma_sach from ban_sao_id if ma_sach is NULL or empty
+        QSqlQuery recover(m_db);
+        recover.exec("UPDATE muon_tra SET ma_sach = (SELECT ma_sach FROM ban_sao WHERE ban_sao.id = muon_tra.ban_sao_id) "
+                     "WHERE ma_sach IS NULL OR ma_sach = ''");
+        recover.exec("UPDATE muon_tra_archive SET ma_sach = (SELECT ma_sach FROM ban_sao WHERE ban_sao.id = muon_tra_archive.ban_sao_id) "
+                     "WHERE ma_sach IS NULL OR ma_sach = ''");
+    }
 
     // PHASE 2 MIGRATION: DOC_GIA & DAU_SACH
     // Table: doc_gia - New Headers: lop, ngay_sinh, loai_doc_gia (sdt, email already exist in create but maybe missing in old DB)
@@ -271,7 +308,7 @@ bool DatabaseManager::createTables() {
             }
         }
     }
-    // Table: dau_sach - New Headers: nha_xuat_ban
+     // Table: dau_sach - New Headers: nha_xuat_ban
     {
          QSqlQuery check(m_db);
          if (!check.exec("SELECT nha_xuat_ban FROM dau_sach LIMIT 0")) {
@@ -279,6 +316,48 @@ bool DatabaseManager::createTables() {
              QSqlQuery add(m_db);
              add.exec("ALTER TABLE dau_sach ADD COLUMN nha_xuat_ban TEXT");
          }
+    }
+
+    // ==========================================
+    // LOGIC UPGRADE MIGRATION (PHASE 4)
+    // ==========================================
+    
+    // 1. Add 'tien_hoan_tra' to 'muon_tra'
+    {
+        QSqlQuery check(m_db);
+        if (!check.exec("SELECT tien_hoan_tra FROM muon_tra LIMIT 0")) {
+            qDebug() << "[DatabaseManager] Adding missing column 'tien_hoan_tra' to 'muon_tra'...";
+            QSqlQuery add(m_db);
+            add.exec("ALTER TABLE muon_tra ADD COLUMN tien_hoan_tra INTEGER DEFAULT 0");
+        }
+    }
+    
+    // 2. Add 'co_the_muon' to 'doc_gia'
+    {
+        QSqlQuery check(m_db);
+        if (!check.exec("SELECT co_the_muon FROM doc_gia LIMIT 0")) {
+            qDebug() << "[DatabaseManager] Adding missing column 'co_the_muon' to 'doc_gia'...";
+            QSqlQuery add(m_db);
+            add.exec("ALTER TABLE doc_gia ADD COLUMN co_the_muon INTEGER DEFAULT 1");
+        }
+    }
+
+    // 3. Shift Legacy Book Status: 2 (THANH_LY old) -> 3 (SACH_THANH_LY new)
+    // We only do this once. If we already have SACH_THANH_LY used, we might double-shift? 
+    // Actually SACH_TRONG_KHO=0, SACH_DANG_MUON=1 remain. 2 was THANH_LY.
+    // In new model, 2 is SACH_MAT, 3 is SACH_THANH_LY.
+    // So all records with 2 must move to 3 to stay as "Liquidated".
+    {
+        qDebug() << "[DatabaseManager] Migrating legacy Book Status (2 -> 3)...";
+        QSqlQuery qShift(m_db);
+        qShift.exec("UPDATE ban_sao SET trang_thai = 3 WHERE trang_thai = 2");
+    }
+
+    // 4. Shift Legacy Transaction Status: 2 (LOST old) -> 3 (LOST_PAID new) if da_thanh_toan=1
+    {
+        qDebug() << "[DatabaseManager] Migrating legacy Transaction Status (2 -> 3 for paid)...";
+        QSqlQuery qShift(m_db);
+        qShift.exec("UPDATE muon_tra SET trang_thai = 3 WHERE trang_thai = 2 AND da_thanh_toan = 1");
     }
 
     // ==========================================

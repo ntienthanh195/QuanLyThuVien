@@ -131,59 +131,11 @@ BangDieuKhien::BangDieuKhien(QWidget *cha) : QWidget(cha),
     qDebug() << "Bắt đầu khởi tạo BangDieuKhien";
     thieLapGiaoDien();
     qDebug() << "Hoàn thành thieLapGiaoDien, bỏ qua capNhatThongKe trong constructor";
-    // KHÔNG gọi capNhatThongKe() ở đây - sẽ gọi sau khi window hiển thị
-
-    // Kết nối EventBus để nhận các sự kiện và ghi vào bảng Hoạt động gần đây
-    // Kết nối EventBus để nhận các sự kiện và ghi vào bảng Hoạt động gần đây
     try {
-        connect(&EventBus::instance(), &EventBus::docGiaAdded, this, [this](int maThe){
-            AuditLogger::log(AuditLogger::ACTION_INSERT, "DOC_GIA", QString::number(maThe), QString("Độc giả - Mã thẻ: %1").arg(maThe));
-        });
-        connect(&EventBus::instance(), &EventBus::docGiaUpdated, this, [this](int maThe){
-            AuditLogger::log(AuditLogger::ACTION_UPDATE, "DOC_GIA", QString::number(maThe), QString("Độc giả - Mã thẻ: %1").arg(maThe));
-        });
-        connect(&EventBus::instance(), &EventBus::docGiaRemoved, this, [this](int maThe){
-            AuditLogger::log(AuditLogger::ACTION_DELETE, "DOC_GIA", QString::number(maThe), QString("Độc giả - Mã thẻ: %1").arg(maThe));
-        });
-
-        connect(&EventBus::instance(), &EventBus::dauSachAdded, this, [this](const QString &isbn){
-            AuditLogger::log(AuditLogger::ACTION_INSERT, "DAU_SACH", isbn, QString("Sách - ISBN: %1").arg(isbn));
-        });
-        connect(&EventBus::instance(), &EventBus::dauSachUpdated, this, [this](const QString &isbn){
-            AuditLogger::log(AuditLogger::ACTION_UPDATE, "DAU_SACH", isbn, QString("Sách - ISBN: %1").arg(isbn));
-        });
-        connect(&EventBus::instance(), &EventBus::dauSachRemoved, this, [this](const QString &isbn){
-            AuditLogger::log(AuditLogger::ACTION_DELETE, "DAU_SACH", isbn, QString("Sách - ISBN: %1").arg(isbn));
-        });
-
-        connect(&EventBus::instance(), &EventBus::nguoiDungAdded, this, [this](const QString &username){
-            AuditLogger::log(AuditLogger::ACTION_INSERT, "NGUOI_DUNG", username, QString("Nhân viên - User: %1").arg(username));
-        });
-        connect(&EventBus::instance(), &EventBus::nguoiDungUpdated, this, [this](const QString &username){
-            AuditLogger::log(AuditLogger::ACTION_UPDATE, "NGUOI_DUNG", username, QString("Nhân viên - User: %1").arg(username));
-        });
-        connect(&EventBus::instance(), &EventBus::nguoiDungRemoved, this, [this](const QString &username){
-            AuditLogger::log(AuditLogger::ACTION_DELETE, "NGUOI_DUNG", username, QString("Nhân viên - User: %1").arg(username));
-        });
-
-        connect(&EventBus::instance(), &EventBus::muonTraAdded, this, [this](int maThe, const QString &maSach){
-            AuditLogger::log(AuditLogger::ACTION_BORROW, "MUON_TRA", QString("%1-%2").arg(maThe).arg(maSach), QString("Thẻ: %1 | Sách: %2").arg(maThe).arg(maSach));
-        });
-        connect(&EventBus::instance(), &EventBus::muonTraUpdated, this, [this](int maThe, const QString &maSach){
-            AuditLogger::log(AuditLogger::ACTION_UPDATE, "MUON_TRA", QString("%1-%2").arg(maThe).arg(maSach), QString("Thẻ: %1 | Sách: %2").arg(maThe).arg(maSach));
-        });
-        connect(&EventBus::instance(), &EventBus::muonTraRemoved, this, [this](int maThe, const QString &maSach){
-            AuditLogger::log(AuditLogger::ACTION_RETURN, "MUON_TRA", QString("%1-%2").arg(maThe).arg(maSach), QString("Thẻ: %1 | Sách: %2").arg(maThe).arg(maSach));
-        });
-
-        connect(&EventBus::instance(), &EventBus::dataChanged, this, [this](){
-            AuditLogger::log(AuditLogger::ACTION_SYSTEM, "DATA", "", "Dữ liệu bên ngoài thay đổi");
-        });
-
         // CENTRAL LOG LISTENER: receives events from AuditLogger (and thus DB)
-        connect(&EventBus::instance(), &EventBus::newSystemLog, this, [this](const QString &action, const QString &details){
-            ghiNhatKy(action, details);
-            yeuCauCapNhatThongKe(); // Use debounced version to avoid excessive updates
+        connect(&EventBus::instance(), &EventBus::newSystemLog, this, [this](const QString &action, const QString &entity, const QString &details){
+            ghiNhatKy(action, entity, details);
+            yeuCauCapNhatThongKe(); 
         });
     } catch (...) {
         qWarning() << "Không thể kết nối EventBus trong BangDieuKhien constructor";
@@ -657,84 +609,12 @@ void BangDieuKhien::capNhatRealtimeTuWidget() {
         
         // TODO: Cập nhật bảng hoạt động gần đây (nếu cần)
         // Cập nhật bảng hoạt động gần đây: làm mới các hàng (in-place)
-        if (bangHoatDong) {
-            try {
-                // Xây dựng lại danhSachGiaoDich giống như trong taoBangHoatDongGanDay
-                PTRDG dsDocGia[100];
-                int dem = 0;
-#if defined(__has_include) && __has_include("utils/DBBatcher.h")
-                std::vector<PTRDG> _tmp = DBBatcher::snapshotDocGia();
-                dem = static_cast<int>(std::min<size_t>(_tmp.size(), 100));
-                for (int _i = 0; _i < dem; ++_i) dsDocGia[_i] = _tmp[_i];
-#else
-                DuyetCayRaMang(rootDocGia, dsDocGia, dem);
-#endif
-
-                struct GiaoDichInfo { QString thoiGian; QString tenDocGia; QString tenSach; int trangThai; };
-                std::vector<GiaoDichInfo> danhSachGiaoDich;
-
-                for (int i = 0; i < dem && (int)danhSachGiaoDich.size() < 20; i++) {
-                    if (!dsDocGia[i]) continue;
-                    if (!dsDocGia[i]->data.dsmt) continue;
-                    auto mt = dsDocGia[i]->data.dsmt;
-                    while (mt && (int)danhSachGiaoDich.size() < 20) {
-                        GiaoDichInfo gd;
-                        gd.thoiGian = QString::fromStdString(mt->data.NgayMuon);
-                        gd.tenDocGia = QString::fromStdString(dsDocGia[i]->data.Ho) + " " + QString::fromStdString(dsDocGia[i]->data.Ten);
-                        gd.trangThai = mt->data.TrangThai;
-                        gd.tenSach = QString();
-                        if (mt->data.banSaoSach) {
-                            QString maSach = QString::fromStdString(mt->data.banSaoSach->maSach);
-                            extern PTRDS dsDauSach[];
-                            extern int soLuongDauSach;
-                            for (int j = 0; j < soLuongDauSach; j++) {
-                                if (dsDauSach[j]) {
-                                    PTRDMS banSao = dsDauSach[j]->dms;
-                                    while (banSao) {
-                                        if (QString::fromStdString(banSao->maSach) == maSach) {
-                                            gd.tenSach = QString::fromStdString(dsDauSach[j]->tenSach);
-                                            break;
-                                        }
-                                        banSao = banSao->next;
-                                    }
-                                    if (!gd.tenSach.isEmpty()) break;
-                                }
-                            }
-                        }
-                        danhSachGiaoDich.push_back(gd);
-                        mt = mt->next;
-                    }
-                }
-
-                // Build model data and set into modelHoatDong (if available)
-            // Build model data and set into modelHoatDong (if available)
-                int maxRows = qMin(9, (int)danhSachGiaoDich.size());
-                std::vector<GiaoDichInfoLocal> modelList;
-                modelList.reserve(maxRows);
-                for (int i = 0; i < maxRows; ++i) {
-                    GiaoDichInfoLocal it;
-                    it.thoiGian = danhSachGiaoDich[i].thoiGian;
-                    it.nguoiDung = LanguageManager::instance().getText("DASH_READER_PREFIX") + danhSachGiaoDich[i].tenDocGia;
-                    it.hanhDong = (danhSachGiaoDich[i].trangThai == 0) ? LanguageManager::instance().getText("DASH_STATUS_BORROWING") : ((danhSachGiaoDich[i].trangThai == 1) ? LanguageManager::instance().getText("DASH_STATUS_RETURNED") : LanguageManager::instance().getText("DASH_STATUS_LOST"));
-                    it.noiDung = danhSachGiaoDich[i].tenSach;
-                    // Color mapping
-                    if (danhSachGiaoDich[i].trangThai == 0) it.trangThaiColor = "#fbbf24"; // Borrow - Orange
-                    else if (danhSachGiaoDich[i].trangThai == 1) it.trangThaiColor = "#34d399"; // Return - Green
-                    else it.trangThaiColor = "#f87171"; // Lost - Red
-                    
-                    modelList.push_back(it);
-                }
-                if (modelHoatDong) {
-                    if (auto am = dynamic_cast<ActivityModel*>(modelHoatDong)) {
-                        am->setList(modelList);
-                    }
-                }
-            } catch (...) {
-                qWarning() << "Lỗi khi cập nhật bangHoatDong realtime";
-            }
-        }
+        // Activity log is strictly handled by DB-backed newSystemLog signal and ghiNhatKy().
+        // No manual memory traversal here to avoid duplication and performance lag.
+        // Activity log is handled by ghiNhatKy() and signal connections,
+        // no need to reconstruct it here which causes dups/flicker.
         
-        qDebug() << "✅ Dashboard đã cập nhật realtime thành công!";
+        qDebug() << "✅ Dashboard stats updated!";
         
     } catch (const std::exception& e) {
         qCritical() << "Lỗi khi cập nhật realtime:" << e.what();
@@ -1135,153 +1015,90 @@ QWidget* BangDieuKhien::taoBangHoatDongGanDay() {
     // Global vars from headers
 
     
-    // KIỂM TRA AN TOÀN trước khi truy cập dữ liệu
-    if (rootDocGia && soLuongDauSach >= 0 && soLuongDauSach <= MAX_DAUSACH) {
-        PTRDG dsDocGia[100];
-        int dem = 0;
-        
-        try {
-            DuyetCayRaMang(rootDocGia, dsDocGia, dem);
-        } catch (...) {
-            qWarning() << "Lỗi khi duyệt cây độc giả";
-            dem = 0;
-        }
-        
-        // int soHang = 0; // Unused
-        
-        // Tạo list tất cả giao dịch để sắp xếp theo thời gian
-        struct GiaoDichInfo {
-            QString thoiGian;
-            QString tenDocGia;
-            QString tenSach;
-            int trangThai;
-        };
-        std::vector<GiaoDichInfo> danhSachGiaoDich;
-        
-        for (int i = 0; i < dem && i < 100; i++) {
-            if (!dsDocGia[i]) continue;
-            if (!dsDocGia[i]->data.dsmt) continue;
-            
-            // Duyệt qua tất cả giao dịch của độc giả
-            auto mt = dsDocGia[i]->data.dsmt;
-            while (mt && danhSachGiaoDich.size() < 20) {
-                GiaoDichInfo gd;
-                gd.thoiGian = QString::fromStdString(mt->data.NgayMuon);
-                gd.tenDocGia = QString("%1 %2")
-                    .arg(QString::fromStdString(dsDocGia[i]->data.Ho))
-                    .arg(QString::fromStdString(dsDocGia[i]->data.Ten));
-                gd.trangThai = mt->data.TrangThai;
-                
-                // Tìm tên sách
-                if (mt->data.banSaoSach) {
-                    QString maSach = QString::fromStdString(mt->data.banSaoSach->maSach);
-                    for (int j = 0; j < soLuongDauSach; j++) {
-                        if (dsDauSach[j]) {
-                            PTRDMS banSao = dsDauSach[j]->dms;
-                            while (banSao) {
-                                if (QString::fromStdString(banSao->maSach) == maSach) {
-                                    gd.tenSach = QString::fromStdString(dsDauSach[j]->tenSach);
-                                    break;
-                                }
-                                banSao = banSao->next;
-                            }
-                            if (!gd.tenSach.isEmpty()) break;
-                        }
-                    }
-                }
-                
-                danhSachGiaoDich.push_back(gd);
-                mt = mt->next;
-            }
-        }
-        
-        // Build model data and attach to view
-        std::vector<GiaoDichInfoLocal> modelList;
-        modelList.reserve(20);
+    // Legacy memory-based log retrieval removed.
+    // Dashboard Activity Log now uses AuditLogger DB records for persistence and real-time.
+    
+    // Build model data and attach to view
+    std::vector<GiaoDichInfoLocal> modelList;
+    modelList.reserve(20);
 
-        // 1. Fetch System Logs from DB (Persistent History)
-        QSqlQuery qLog("SELECT u.ten_dang_nhap, n.hanh_dong, n.chi_tiet, n.thoi_gian "
-                    "FROM nhat_ky_he_thong n "
-                    "LEFT JOIN nguoi_dung u ON n.nguoi_dung_id = u.id "
-                    "ORDER BY n.id DESC LIMIT 20", DatabaseManager::instance().database());
-        while (qLog.next()) {
-            GiaoDichInfoLocal it;
-            // Format time for shorter display? User wanted "Hiện đủ".
-            // DB format: yyyy-MM-dd HH:mm:ss. 
-            // Let's shorten to MM-dd HH:mm if convenient, or keep full.
-            QDateTime dt = QDateTime::fromString(qLog.value(3).toString(), "yyyy-MM-dd HH:mm:ss");
-            if (dt.isValid()) it.thoiGian = dt.toString("dd/MM HH:mm");
-            else it.thoiGian = qLog.value(3).toString();
+    // 1. Fetch System Logs from DB (Persistent History)
+    QSqlQuery qLog("SELECT u.ten_dang_nhap, n.hanh_dong, n.chi_tiet, n.thoi_gian, n.bang_du_lieu "
+                "FROM nhat_ky_he_thong n "
+                "LEFT JOIN nguoi_dung u ON n.nguoi_dung_id = u.id "
+                "ORDER BY n.id DESC LIMIT 20", DatabaseManager::instance().database());
+    while (qLog.next()) {
+        GiaoDichInfoLocal it;
+        QDateTime dt = QDateTime::fromString(qLog.value(3).toString(), "yyyy-MM-dd HH:mm:ss");
+        if (dt.isValid()) it.thoiGian = dt.toString("dd/MM HH:mm");
+        else it.thoiGian = qLog.value(3).toString();
 
-            QString user = qLog.value(0).toString();
-            it.nguoiDung = user.isEmpty() ? LanguageManager::instance().getText("DASH_USER_SYSTEM") : user;
-            it.hanhDong = qLog.value(1).toString();
-            it.noiDung = qLog.value(2).toString();
+        QString user = qLog.value(0).toString();
+        it.nguoiDung = user.isEmpty() ? LanguageManager::instance().getText("DASH_USER_SYSTEM") : user;
+        
+        QString rawHanhDong = qLog.value(1).toString();
+        QString rawNoiDung = qLog.value(2).toString();
+        QString rawEntity = qLog.value(4).toString();
 
-            // Color map
-            if (it.hanhDong.contains("Thêm")) it.trangThaiColor = "#34d399";
-            else if (it.hanhDong.contains("Xóa")) it.trangThaiColor = "#f87171";
-            else if (it.hanhDong.contains("Mượn")) it.trangThaiColor = "#fbbf24";
-            else if (it.hanhDong.contains("Trả")) it.trangThaiColor = "#a78bfa";
-            else if (it.hanhDong.contains("Sửa")) it.trangThaiColor = "#3699ff";
-            else it.trangThaiColor = "#94a3b8";
+        // Entity Localized prefix for Details
+        QString entityPrefix = "";
+        if (rawEntity == "DOC_GIA") entityPrefix = LanguageManager::instance().getText("ENTITY_READER") + ": ";
+        else if (rawEntity == "DAU_SACH") entityPrefix = LanguageManager::instance().getText("ENTITY_BOOK") + ": ";
+        else if (rawEntity == "BAN_SAO") entityPrefix = LanguageManager::instance().getText("ENTITY_COPY") + ": ";
+        else if (rawEntity == "MUON_TRA") entityPrefix = LanguageManager::instance().getText("ENTITY_LOAN") + ": ";
+        else if (rawEntity == "KHO_SACH") entityPrefix = LanguageManager::instance().getText("ENTITY_STOCKS") + ": ";
+        else if (rawEntity == "HE_THONG") entityPrefix = LanguageManager::instance().getText("ENTITY_SYSTEM") + ": ";
 
-            modelList.push_back(it);
+        // Color map & Standardized label
+        if (rawHanhDong == "INSERT" || rawHanhDong.contains("Thêm")) {
+            it.trangThaiColor = "#34d399";
+            it.hanhDong = LanguageManager::instance().getText("LOG_ACTION_ADD");
+        } else if (rawHanhDong == "DELETE" || rawHanhDong.contains("Xóa")) {
+            it.trangThaiColor = "#f87171";
+            it.hanhDong = LanguageManager::instance().getText("LOG_ACTION_DELETE");
+        } else if (rawHanhDong == "MUON_SACH" || rawHanhDong.contains("Mượn")) {
+            it.trangThaiColor = "#fbbf24";
+            it.hanhDong = LanguageManager::instance().getText("LOG_ACTION_BORROW");
+        } else if (rawHanhDong == "TRA_SACH" || rawHanhDong.contains("Trả")) {
+            it.trangThaiColor = "#a78bfa";
+            it.hanhDong = LanguageManager::instance().getText("LOG_ACTION_RETURN");
+        } else if (rawHanhDong == "BAO_MAT" || rawHanhDong.contains("Mất")) {
+            it.trangThaiColor = "#ef4444";
+            it.hanhDong = LanguageManager::instance().getText("LOG_ACTION_LOST");
+        } else if (rawHanhDong == "UPDATE" || rawHanhDong.contains("Sửa")) {
+            it.trangThaiColor = "#3b82f6";
+            it.hanhDong = LanguageManager::instance().getText("LOG_ACTION_EDIT");
+        } else if (rawHanhDong == "INVENTORY") {
+            it.trangThaiColor = "#8b5cf6";
+            it.hanhDong = LanguageManager::instance().getText("LOG_ACTION_INVENTORY");
+        } else {
+            it.trangThaiColor = "#94a3b8";
+            it.hanhDong = rawHanhDong;
         }
 
-        // 2. Merge with Legacy Borrow Data (danhSachGiaoDich)
-        // Only take items that are NOT in DB (simple heuristic: if we have DB logs, maybe ignore legacy? 
-        // No, keep legacy for old borrows not in DB yet).
-        int legacyCount = 0;
-        int maxLegacy = 10;
-        for (int i = 0; i < (int)danhSachGiaoDich.size(); ++i) {
-            if (legacyCount >= maxLegacy) break;
-            // ... legacy mapping logic follows ...
-            GiaoDichInfoLocal it;
-            it.thoiGian = danhSachGiaoDich[i].thoiGian;
-            
-            // Historical data lacks Admin info, so we credit System.
-            it.nguoiDung = "Hệ thống"; 
-            
-            // Map status to Action Verb
-            int stt = danhSachGiaoDich[i].trangThai;
-            if (stt == 1) {
-                it.hanhDong = "Trả";
-                it.trangThaiColor = "#a78bfa"; // Purple
-            } else if (stt == 2) {
-                it.hanhDong = "Mất";
-                it.trangThaiColor = "#f87171"; // Red
-            } else {
-                it.hanhDong = "Mượn";
-                it.trangThaiColor = "#fbbf24"; // Orange
-            }
-            
-            // Details: User + Book
-            it.noiDung = LanguageManager::instance().getText("DASH_READER_PREFIX") + danhSachGiaoDich[i].tenDocGia;
-            if (!danhSachGiaoDich[i].tenSach.isEmpty()) {
-                it.noiDung += " | " + danhSachGiaoDich[i].tenSach;
-            }
-            
-            modelList.push_back(it);
-        }
-
-        ActivityModel *model = new ActivityModel(this);
-        model->setList(modelList);
-        this->modelHoatDong = model;
-        view->setModel(model);
-        
-        // Căn chỉnh độ rộng cột
-        QHeaderView *headerView = view->horizontalHeader();
-        headerView->setSectionResizeMode(0, QHeaderView::Fixed); 
-        view->setColumnWidth(0, 140); // Time fixed width
-        headerView->setSectionResizeMode(1, QHeaderView::ResizeToContents); // User
-        headerView->setSectionResizeMode(2, QHeaderView::Fixed); 
-        view->setColumnWidth(2, 100); // Action fixed width
-        
-        // Use ResizeToContents for Details to allow scrolling (don't limit/cut off)
-        headerView->setSectionResizeMode(3, QHeaderView::ResizeToContents);          
-        view->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+        it.noiDung = entityPrefix + rawNoiDung;
+        modelList.push_back(it);
     }
+
+    // 2. Legacy items removed to avoid duplication.
+    // All important actions are now logged to DB via AuditLogger.
+
+    ActivityModel *model = new ActivityModel(this);
+    model->setList(modelList);
+    this->modelHoatDong = model;
+    view->setModel(model);
+    
+    // Căn chỉnh độ rộng cột
+    QHeaderView *headerView = view->horizontalHeader();
+    headerView->setSectionResizeMode(0, QHeaderView::Fixed); 
+    view->setColumnWidth(0, 140); // Time fixed width
+    headerView->setSectionResizeMode(1, QHeaderView::ResizeToContents); // User
+    headerView->setSectionResizeMode(2, QHeaderView::Fixed); 
+    view->setColumnWidth(2, 100); // Action fixed width
+    
+    // Use ResizeToContents for Details to allow scrolling (don't limit/cut off)
+    headerView->setSectionResizeMode(3, QHeaderView::ResizeToContents);          
+    view->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     
     boTri->addWidget(header);
     boTri->addWidget(view);
@@ -2050,7 +1867,7 @@ QWidget* BangDieuKhien::taoHeaderDashboard() {
 }
 
 
-void BangDieuKhien::ghiNhatKy(const QString &hanhDong, const QString &noiDung) {
+void BangDieuKhien::ghiNhatKy(const QString &hanhDong, const QString &entity, const QString &noiDung) {
     if (!modelHoatDong) return;
     
     // 1. Get Time
@@ -2065,19 +1882,51 @@ void BangDieuKhien::ghiNhatKy(const QString &hanhDong, const QString &noiDung) {
         }
     } catch (...) {}
     
-    // 3. Determine Color
-    QString mau = "#3699ff"; // Default Blue
-    if (hanhDong.contains("Thêm") || hanhDong.contains("Add")) mau = "#34d399"; // Green
-    else if (hanhDong.contains("Xóa") || hanhDong.contains("Delete")) mau = "#f87171"; // Red
-    else if (hanhDong.contains("Mượn") || hanhDong.contains("Borrow")) mau = "#fbbf24"; // Orange
-    else if (hanhDong.contains("Trả") || hanhDong.contains("Return")) mau = "#a78bfa"; // Purple
+    // 3. Determine Color & Localized label
+    QString mau = "#3699ff"; // Default Blue (Sửa/Update)
+    QString labelAction = hanhDong;
     
+    // Entity Localized prefix for Details
+    QString entityPrefix = "";
+    if (entity == "DOC_GIA") entityPrefix = LanguageManager::instance().getText("ENTITY_READER") + ": ";
+    else if (entity == "DAU_SACH") entityPrefix = LanguageManager::instance().getText("ENTITY_BOOK") + ": ";
+    else if (entity == "BAN_SAO") entityPrefix = LanguageManager::instance().getText("ENTITY_COPY") + ": ";
+    else if (entity == "MUON_TRA") entityPrefix = LanguageManager::instance().getText("ENTITY_LOAN") + ": ";
+    else if (entity == "KHO_SACH") entityPrefix = LanguageManager::instance().getText("ENTITY_STOCKS") + ": ";
+    else if (entity == "HE_THONG") entityPrefix = LanguageManager::instance().getText("ENTITY_SYSTEM") + ": ";
+
+    // Match against AuditLogger constants OR Vietnamese verbs
+    if (hanhDong == "INSERT" || hanhDong.contains("Thêm") || hanhDong.contains("Add")) {
+        mau = "#34d399"; // Green
+        labelAction = LanguageManager::instance().getText("LOG_ACTION_ADD"); 
+    } else if (hanhDong == "DELETE" || hanhDong.contains("Xóa") || hanhDong.contains("Delete")) {
+        mau = "#f87171"; // Red
+        labelAction = LanguageManager::instance().getText("LOG_ACTION_DELETE");
+    } else if (hanhDong == "MUON_SACH" || hanhDong.contains("Mượn") || hanhDong.contains("Borrow")) {
+        mau = "#fbbf24"; // Orange
+        labelAction = LanguageManager::instance().getText("LOG_ACTION_BORROW");
+    } else if (hanhDong == "TRA_SACH" || hanhDong.contains("Trả") || hanhDong.contains("Return")) {
+        mau = "#a78bfa"; // Purple
+        labelAction = LanguageManager::instance().getText("LOG_ACTION_RETURN");
+    } else if (hanhDong == "BAO_MAT" || hanhDong.contains("Mất") || hanhDong.contains("Lost")) {
+        mau = "#ef4444"; // Harsh Red
+        labelAction = LanguageManager::instance().getText("LOG_ACTION_LOST");
+    } else if (hanhDong == "UPDATE" || hanhDong.contains("Sửa") || hanhDong.contains("Edit")) {
+        mau = "#3b82f6"; // Bright Blue
+        labelAction = LanguageManager::instance().getText("LOG_ACTION_EDIT");
+    } else if (hanhDong == "INVENTORY") {
+        mau = "#8b5cf6"; // Violet
+        labelAction = LanguageManager::instance().getText("LOG_ACTION_INVENTORY");
+    }
+
     // 4. Prepend to Model
     GiaoDichInfoLocal item;
     item.thoiGian = thoiGian;
     item.nguoiDung = nguoiDung;
-    item.hanhDong = hanhDong;
-    item.noiDung = noiDung;
+    item.hanhDong = labelAction.isEmpty() ? hanhDong : labelAction;
+    
+    // Combine entity prefix with content for detail column
+    item.noiDung = entityPrefix + noiDung;
     item.trangThaiColor = mau;
     
     ActivityModel *model = dynamic_cast<ActivityModel*>(modelHoatDong);

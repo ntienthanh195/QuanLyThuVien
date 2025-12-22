@@ -26,7 +26,7 @@ bool NapDauSachTuDB(const QString &dbPath, PTRDS dsDauSach[], int &soLuongDauSac
     QSqlQuery q(db);
 
     // Read dau_sach
-    if (!q.exec("SELECT id, isbn, ten_sach, so_trang, tac_gia, nam_xuat_ban, the_loai FROM dau_sach")) {
+    if (!q.exec("SELECT id, isbn, ten_sach, so_trang, tac_gia, nam_xuat_ban, the_loai, gia_tien, nha_xuat_ban FROM dau_sach")) {
         std::cout << "Query failed: " << q.lastError().text().toStdString() << std::endl;
         db.close();
         QSqlDatabase::removeDatabase("loader_conn");
@@ -44,6 +44,8 @@ bool NapDauSachTuDB(const QString &dbPath, PTRDS dsDauSach[], int &soLuongDauSac
         QString tacGia = q.value(4).toString();
         int nam = q.value(5).toInt();
         QString theLoai = q.value(6).toString();
+        long long giaTien = q.value(7).toLongLong();
+        QString nhaXuatBan = q.value(8).toString();
 
         PTRDS d = new DauSach();
         d->ISBN = isbn.toStdString();
@@ -52,6 +54,8 @@ bool NapDauSachTuDB(const QString &dbPath, PTRDS dsDauSach[], int &soLuongDauSac
         d->tacGia = tacGia.toStdString();
         d->namXuatBan = nam;
         d->theLoai = theLoai.toStdString();
+        d->giaTien = giaTien;
+        d->NhaXuatBan = nhaXuatBan.toStdString();
         d->dms = nullptr;
         d->tongBanSao = 0;
         d->soLuotMuon = 0;

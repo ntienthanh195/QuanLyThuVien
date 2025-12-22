@@ -6,9 +6,15 @@
 #include "Constants.h"
 
 enum TrangThaiSach {
-    CHO_MUON_DUOC = 0,  // co the muon
-    DANG_MUON = 1,      // dg co doc gia muon
-    THANH_LY = 2        // Sach da hong, mat, hoac het han su dung
+    SACH_TRONG_KHO = 0,     // Trong kho (Có thể mượn)
+    SACH_DANG_MUON = 1,     // Đang mượn
+    SACH_MAT = 2,           // Mất (Chưa tìm thấy)
+    SACH_THANH_LY = 3,      // Đã thanh lý (Không còn trong biên chế)
+    
+    // Legacy Compatibility
+    CHO_MUON_DUOC = SACH_TRONG_KHO,
+    DANG_MUON = SACH_DANG_MUON,
+    THANH_LY = SACH_THANH_LY
 };
 
 // cau truc Danh Muc Sach (DSLK don cac ban sao cua mot Dau Sach)

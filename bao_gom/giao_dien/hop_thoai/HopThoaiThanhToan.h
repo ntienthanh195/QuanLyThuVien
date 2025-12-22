@@ -13,10 +13,10 @@ class HopThoaiThanhToan : public QDialog {
     Q_OBJECT
     
 public:
-    explicit HopThoaiThanhToan(PTRDG docGia, const QString& lyDo, long long soTien, QWidget *parent = nullptr);
+    explicit HopThoaiThanhToan(PTRDG docGia, const QString& lyDo, long long soTien, bool isRefund = false, QWidget *parent = nullptr);
     
     // Helper static function for convenience
-    static bool hienThiThanhToan(PTRDG docGia, const QString& lyDo, long long soTien, QWidget *parent = nullptr);
+    static bool hienThiThanhToan(PTRDG docGia, const QString& lyDo, long long soTien, bool isRefund = false, QWidget *parent = nullptr);
 
 private slots:
     void xuLyThanhToan();
@@ -28,6 +28,7 @@ private:
     PTRDG m_docGia;
     QString m_lyDo;
     long long m_soTien;
+    bool m_isRefund;
     
     QPushButton *nutThanhToan;
     QPushButton *nutHuy;

@@ -14,6 +14,7 @@
 #include "giao_dien/hop_thoai/HopThoaiThanhToan.h" // Added Logic
 #include "utils/FilePathManager.h"
 #include "utils/AuditLogger.h"
+#include "utils/XuLyChuoi.h"
 #include "utils/PrintHelper.h"
 #include "models/DocGia.h"
 #include "models/QuanLySach.h"
@@ -41,6 +42,7 @@
 #include "utils/EventBus.h"
 #include "utils/ToastNotification.h"
 #include "utils/SafeGui.h"
+#include "utils/FinanceHelper.h"
 #include <QKeyEvent>
 #include <QApplication>
 #include <QLineEdit>
@@ -134,7 +136,7 @@ public:
 
     int columnCount(const QModelIndex &parent = QModelIndex()) const override {
         Q_UNUSED(parent)
-        return 7; // STT, MaThe, Ho, Ten, Phai, TrangThai, Sach
+        return 9; // STT, MaThe, Ho, Ten, Lop, SDT, Phai, TrangThai, Sach
     }
 
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override {
@@ -157,11 +159,16 @@ public:
         case 1: return QString::number(docGia->data.MaThe);
         case 2: return QString::fromStdString(docGia->data.Ho);
         case 3: return QString::fromStdString(docGia->data.Ten);
-        case 4: return docGia->data.Phai ? LanguageManager::instance().getText("GENDER_FEMALE") : LanguageManager::instance().getText("GENDER_MALE");
-        case 5: return docGia->data.TrangThai == 1 ? LanguageManager::instance().getText("STATUS_ACTIVE") : LanguageManager::instance().getText("STATUS_LOCKED");
+        case 4: return QString::fromStdString(docGia->data.Lop); // Class
+        case 5: return QString::fromStdString(docGia->data.SDT); // Phone
         case 6: {
             int maxSach = SettingsManager::instance().getInt("SO_SACH_MUON_TOI_DA", 3);
-            return QString("%1/%2").arg(docGia->data.soSachDangMuon).arg(maxSach);
+            return QString("%1 / %2").arg(docGia->data.soSachDangMuon).arg(maxSach);
+        }
+        case 7: return docGia->data.TrangThai == 1 ? LanguageManager::instance().getText("STATUS_ACTIVE") : LanguageManager::instance().getText("STATUS_LOCKED");
+        case 8: {
+            int soNgay = TinhSoNgayQuaHanLonNhat(docGia);
+            return soNgay > 0 ? LanguageManager::instance().getText("LBL_DAYS_COUNT").arg(soNgay) : QStringLiteral("—");
         }
         default: return QVariant();
         }
@@ -172,11 +179,13 @@ public:
             switch (section) {
             case 0: return LanguageManager::instance().getText("TABLE_HEADER_STT");
             case 1: return LanguageManager::instance().getText("TABLE_HEADER_CODE");
-            case 2: return LanguageManager::instance().getText("TABLE_HEADER_LASTNAME");
+            case 2: return LanguageManager::instance().getText("TABLE_HEADER_LASTNAME_SHORT");
             case 3: return LanguageManager::instance().getText("TABLE_HEADER_FIRSTNAME");
-            case 4: return LanguageManager::instance().getText("TABLE_HEADER_GENDER");
-            case 5: return LanguageManager::instance().getText("TABLE_HEADER_STATUS");
-            case 6: return LanguageManager::instance().getText("TABLE_HEADER_BOOKS");
+            case 4: return LanguageManager::instance().getText("TABLE_HEADER_CLASS");
+            case 5: return LanguageManager::instance().getText("TABLE_HEADER_PHONE");
+            case 6: return LanguageManager::instance().getText("TABLE_HEADER_BORROWED");
+            case 7: return LanguageManager::instance().getText("TABLE_HEADER_STATUS");
+            case 8: return LanguageManager::instance().getText("TABLE_HEADER_OVERDUE");
             }
         }
         return QAbstractTableModel::headerData(section, orientation, role);
@@ -225,34 +234,46 @@ public:
             case 3: {
                  // Trạng Thái / Phạt logic
                  
-                 // 1. Sách Đã Trả (Status 1)
-                 if (dto.trangThai == 1) {
-                     if (dto.tienPhat > 0 && !dto.daThanhToan) {
-                         return LanguageManager::instance().getText("STATUS_RETURNED_DEBT").arg(QLocale(QLocale::Vietnamese).toString((qint64)dto.tienPhat));
-                     }
-                     return LanguageManager::instance().getText("STATUS_RETURNED");
-                 }
-                 
-                 // 2. Sách Báo Mất (Status 2) - [NEW FIX]
-                 if (dto.trangThai == 2) {
-                     if (!dto.daThanhToan) {
-                          return LanguageManager::instance().getText("STATUS_LOST_DEBT").arg(QLocale(QLocale::Vietnamese).toString((qint64)dto.tienPhat));
-                     }
-                     return LanguageManager::instance().getText("STATUS_LOST_PAID");
-                 }
-                 
-                 // 3. Sách Đang Mượn (Status 0)
-                 QDate nm = QDate::fromString(QString::fromStdString(dto.ngayMuon), "dd/MM/yyyy");
-                 if (!nm.isValid()) return "N/A";
-                 int maxDays = SettingsManager::instance().getInt("SO_NGAY_MUON_TOI_DA", 14); 
-                 
-                 qint64 days = nm.daysTo(QDate::currentDate());
-                 
-                 if (days > maxDays) {
-                     return LanguageManager::instance().getText("STATUS_OVERDUE").arg(days - maxDays);
-                 } else {
-                     return LanguageManager::instance().getText("STATUS_DUE_IN").arg(maxDays - days);
-                 }
+                // 1. Sách Đã Trả (GD_DA_TRA)
+                if (dto.trangThai == 1) {
+                    if (dto.tienPhat > 0 && !dto.daThanhToan) {
+                        return LanguageManager::instance().getText("STATUS_RETURNED_DEBT").arg(QLocale(QLocale::Vietnamese).toString((qint64)dto.tienPhat));
+                    }
+                    return LanguageManager::instance().getText("STATUS_RETURNED");
+                }
+                
+                // 2. Sách Báo Mất - Chờ đền bù (GD_MAT_CHO_THANH_TOAN)
+                if (dto.trangThai == 2) {
+                     return LanguageManager::instance().getText("STATUS_LOST_DEBT").arg(QLocale(QLocale::Vietnamese).toString((qint64)dto.tienPhat));
+                }
+
+                // 3. Sách Báo Mất - Đã đền (GD_MAT_DA_THANH_TOAN)
+                if (dto.trangThai == 3) {
+                    return LanguageManager::instance().getText("STATUS_LOST_PAID");
+                }
+
+                // 4. Tìm thấy sách - Chờ hoàn tiền (GD_MAT_CHO_HOAN_TIEN)
+                if (dto.trangThai == 4) {
+                    return LanguageManager::instance().getText("STATUS_LOST_REFUND_WAIT").arg(QLocale(QLocale::Vietnamese).toString((qint64)dto.tienHoanTra));
+                }
+
+                // 5. Tìm thấy sách - Đã hoàn tiền (GD_MAT_DA_HOAN_TIEN)
+                if (dto.trangThai == 5) {
+                    return LanguageManager::instance().getText("STATUS_LOST_REFUND_DONE");
+                }
+                
+                // 6. Sách Đang Mượn (GD_DANG_MUON)
+                QDate nm = QDate::fromString(QString::fromStdString(dto.ngayMuon), "dd/MM/yyyy");
+                if (!nm.isValid()) return "N/A";
+                int maxDays = SettingsManager::instance().getInt("SO_NGAY_MUON_TOI_DA", 14); 
+                
+                qint64 days = nm.daysTo(QDate::currentDate());
+                
+                if (days > maxDays) {
+                    return LanguageManager::instance().getText("STATUS_OVERDUE").arg(days - maxDays);
+                } else {
+                    return LanguageManager::instance().getText("STATUS_DUE_IN").arg(maxDays - days);
+                }
             }
             }
         }
@@ -262,28 +283,38 @@ public:
         }
         if (role == Qt::ForegroundRole) {
              const ThongTinSachDangMuon_DTO &dto = (*m_data)[index.row()];
-             // 1. Debt Logic (Returned but not paid OR Lost but not paid)
-             if ((dto.trangThai == 1 || dto.trangThai == 2) && dto.tienPhat > 0 && !dto.daThanhToan) {
-                 return QColor("#FF5252"); // Red for debt
+             // Debt Logic (Red)
+             if (dto.trangThai == 2 || (dto.trangThai == 1 && dto.tienPhat > 0 && !dto.daThanhToan)) {
+                 return QColor("#FF5252"); 
              }
-             // 2. Overdue Logic (Still borrowed and overdue)
+             // Waiting Refund Logic (Gold/Orange)
+             if (dto.trangThai == 4) {
+                 return QColor("#FF9800"); 
+             }
+             // Settled / Refunded Logic (Green)
+             if (dto.trangThai == 3 || dto.trangThai == 5 || dto.tienHoanTra > 0) {
+                 return QColor("#4CAF50"); 
+             }
+             // Overdue Logic
              if (dto.trangThai == 0) {
                  QDate nm = QDate::fromString(QString::fromStdString(dto.ngayMuon), "dd/MM/yyyy");
                  if (nm.isValid()) {
                      int maxDays = SettingsManager::instance().getInt("SO_NGAY_MUON_TOI_DA", 14);
                      qint64 days = nm.daysTo(QDate::currentDate());
-                     if (days > maxDays) {
-                         return QColor("#FF5252"); // Red for overdue
-                     }
+                     if (days > maxDays) return QColor("#FF5252");
                  }
              }
         }
         // [NEW] Feature: Background Color for Debt Rows (Visual Separation)
         if (role == Qt::BackgroundRole) {
              const ThongTinSachDangMuon_DTO &dto = (*m_data)[index.row()];
-             // Debt Logic: Returned/Lost but Has Debt
-             if ((dto.trangThai == 1 || dto.trangThai == 2) && dto.tienPhat > 0 && !dto.daThanhToan) {
-                 return QColor("#FFEBEE"); // Light Red (Material Red 50) - Softer warning, good for background
+             // Debt Logic
+             if (dto.trangThai == 2 || (dto.trangThai == 1 && dto.tienPhat > 0 && !dto.daThanhToan)) {
+                 return QColor("#FFEBEE"); // Light Red
+             }
+             // Refund Logic
+             if (dto.tienHoanTra > 0) {
+                 return QColor("#E8F5E9"); // Light Green
              }
         }
         return QVariant();
@@ -405,7 +436,30 @@ void WidgetMuonTraSach::thieLapTabMuonSach() {
     bangDocGia = new QTableView();
     modelDocGia = new DocGiaTableModel(&danhSachDocGia, this);
     bangDocGia->setModel(modelDocGia);
-    thieLapBangDocGia();
+    
+    // Configure table columns - All visible
+    bangDocGia->setColumnWidth(0, 50);   // STT
+    bangDocGia->setColumnWidth(1, 80);   // Mã thẻ
+    bangDocGia->setColumnWidth(2, 80);  // Họ đệm
+    bangDocGia->setColumnWidth(3, 100);   // Tên
+    bangDocGia->setColumnHidden(4, true); // Ẩn Lớp (không quan trọng)
+    bangDocGia->setColumnHidden(5, true); // Ẩn SĐT (không quan trọng)
+    bangDocGia->setColumnWidth(6, 100);   // Đang mượn (Books)
+    bangDocGia->setColumnWidth(7, 90);   // Trạng thái
+    bangDocGia->setColumnWidth(8, 90);   // Quá hạn (Overdue)
+    
+    // Highlight selected row with blue color
+    bangDocGia->setStyleSheet(
+        "QTableView {"
+        "    selection-background-color: #3b82f6;"  // Blue-500
+        "    selection-color: white;"
+        "}"
+        "QTableView::item:selected {"
+        "    background-color: #3b82f6;"
+        "    color: white;"
+        "}"
+    );
+    
     // Match row height to Quản Lý Sách
     bangDocGia->verticalHeader()->setDefaultSectionSize(45);
     // Hide the vertical header numbers to avoid duplicate numbering UX
@@ -585,47 +639,6 @@ void WidgetMuonTraSach::thieLapTabMuonSach() {
     connect(&LanguageManager::instance(), &LanguageManager::languageChanged, this, &WidgetMuonTraSach::capNhatNgonNgu);
 }
 
-void WidgetMuonTraSach::thieLapBangDocGia() {
-    // View already has model set (DocGiaTableModel). Configure visual aspects here.
-    bangDocGia->setSelectionBehavior(QAbstractItemView::SelectRows);
-    bangDocGia->setSelectionMode(QAbstractItemView::SingleSelection);
-    bangDocGia->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    // bangDocGia->horizontalHeader()->setStretchLastSection(true); // Disable this conflict
-    bangDocGia->setAlternatingRowColors(true);
-    bangDocGia->setMinimumHeight(350);
-
-    // Make the table expand to fill available space
-    bangDocGia->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    
-    bangDocGia->setProperty("class", "InnerTable");
-
-    // Set Fixed Widths
-    bangDocGia->setColumnWidth(0, 40);  // STT gọn hơn
-    bangDocGia->setColumnWidth(1, 80);  // Mã thẻ
-    // Cột 2 (Họ Tên) để tự giãn (Stretch)
-    bangDocGia->setColumnWidth(4, 70);  // Phái
-    bangDocGia->setColumnWidth(5, 100); // Trạng Thái
-    if (bangDocGia->horizontalHeader()->count() > 6)
-        bangDocGia->setColumnWidth(6, 60);  // Sách
-
-    QHeaderView *header = bangDocGia->horizontalHeader();
-    header->setSectionResizeMode(0, QHeaderView::Fixed);      // STT
-    header->setSectionResizeMode(1, QHeaderView::Fixed);      // Ma The
-    header->setSectionResizeMode(2, QHeaderView::Fixed);      // Ho
-    header->setSectionResizeMode(3, QHeaderView::Stretch);    // Ten (STRETCH)
-    header->setSectionResizeMode(4, QHeaderView::Fixed);      // Gioi Tinh
-    header->setSectionResizeMode(5, QHeaderView::Fixed);      // Trang Thai
-    header->setSectionResizeMode(6, QHeaderView::Fixed);      // Sach
-
-    // Ensure column widths
-    bangDocGia->setColumnWidth(2, 120); 
-    bangDocGia->setColumnWidth(4, 70);
-    bangDocGia->setColumnWidth(5, 110);
-    bangDocGia->setColumnWidth(6, 70);
-    
-    // Prevent Qt from eliding long text with '...'
-    bangDocGia->setTextElideMode(Qt::ElideNone);
-}
 
 void WidgetMuonTraSach::hienThiDanhSachDocGia() {
     // ⚡ OPTIMIZED: Fetch reader IDs from SQL (highly efficient sorting/paging)
@@ -719,7 +732,7 @@ void WidgetMuonTraSach::xuLyTimKiem() {
         
         // Focus ngay vào ô nhập sách để mượn luôn
         if (oNhapISBN->isEnabled()) {
-            oNhapISBN->setFocus();
+            // oNhapISBN->setFocus(); // DISABLE AUTO-FOCUS (Silent Mode)
         }
     }
 }
@@ -814,7 +827,7 @@ void WidgetMuonTraSach::xuLyChonDocGia(int hang, int) {
     if (docGiaHienTai->data.TrangThai == 1 && docGiaHienTai->data.soSachDangMuon < 3) {
         oNhapISBN->setEnabled(true);
         // Focus ISBN immediately for faster workflow
-        oNhapISBN->setFocus();
+        // oNhapISBN->setFocus(); // DISABLE AUTO-FOCUS (Silent Mode)
     } else {
         oNhapISBN->setEnabled(false);
     }
@@ -868,62 +881,17 @@ void WidgetMuonTraSach::capNhatBangSachDangMuon() {
     for (int i = 0; i < soSach; i++) {
         bool hienThi = false;
         
-        // 1. Luôn hiển thị sách đang mượn (Status 0)
+        // Use enriched DTO data - no more manual loops!
+        // 1. Always show active loans (Status 0)
         if (dsSach[i].trangThai == 0) {
             hienThi = true;
             activeBorrowCount++;
         }
-        // 2. Với sách đã trả (Status 1), chỉ hiển thị nếu còn Nợ Phạt chưa thanh toán
-        else if (dsSach[i].trangThai == 1) {
-            // Cần tra cứu lại Node MUONTRA để lấy info tài chính (vì DTO thiếu)
-            MUONTRA p = docGiaHienTai->data.dsmt;
-            while (p) {
-                std::string code = (p->data.banSaoSach) ? p->data.banSaoSach->maSach : p->data.maSachCached;
-                if (code == dsSach[i].maSach) {
-                    // Populate info
-                    dsSach[i].tienPhat = p->data.tienPhat;
-                    dsSach[i].daThanhToan = p->data.daThanhToan;
-                    dsSach[i].soLanGiaHan = p->data.soLanGiaHan; // Feature Renewal
-                    
-                    // Chỉ hiện nếu Có Phạt (>0) VÀ Chưa Thanh Toán
-                    if (p->data.tienPhat > 0 && !p->data.daThanhToan) {
-                        hienThi = true;
-                    } 
-                    break;
-                }
-                p = p->next;
-            }
+        // 2. Show others if they need action (Unpaid debt OR Wait for refund)
+        else if ((dsSach[i].tienPhat > 0 || dsSach[i].tienHoanTra > 0) && !dsSach[i].daThanhToan) {
+            hienThi = true;
         }
-        // 3. Với sách báo Mất (Status 2), chỉ hiển thị nếu chưa thanh toán (Nợ)
-        else if (dsSach[i].trangThai == 2) {
-             MUONTRA p = docGiaHienTai->data.dsmt;
-             while (p) {
-                std::string code = (p->data.banSaoSach) ? p->data.banSaoSach->maSach : p->data.maSachCached;
-                if (code == dsSach[i].maSach) {
-                    dsSach[i].tienPhat = p->data.tienPhat;
-                    dsSach[i].daThanhToan = p->data.daThanhToan;
-                    
-                    if (p->data.tienPhat > 0 && !p->data.daThanhToan) {
-                        hienThi = true;
-                    } 
-                    break;
-                }
-                p = p->next;
-             }
-        }
-        else {
-             // For borrowing books, also fetch extension count
-             MUONTRA p = docGiaHienTai->data.dsmt;
-             while (p) {
-                std::string code = (p->data.banSaoSach) ? p->data.banSaoSach->maSach : p->data.maSachCached;
-                if (code == dsSach[i].maSach) {
-                    dsSach[i].soLanGiaHan = p->data.soLanGiaHan;
-                    break;
-                }
-                p = p->next;
-             }
-        }
-        
+
         if (hienThi) {
             danhSachSachDangMuon.push_back(dsSach[i]);
         }
@@ -1012,22 +980,15 @@ void WidgetMuonTraSach::capNhatThongTinDocGia() {
 
 // Helper to extract ISBN from book code (format: ISBN-Sequence)
 // e.g. "978-3-16-148410-0-1" -> "978-3-16-148410-0"
-static std::string TachISBNTuMaSach(const std::string& maSach) {
-    size_t lastDash = maSach.find_last_of('-');
-    if (lastDash != std::string::npos && lastDash > 0) {
-        return maSach.substr(0, lastDash);
-    }
-    return maSach; // If no dash, return as is (fallback)
-}
 
 QList<QPair<PTRDG, QString>> WidgetMuonTraSach::TimDocGiaDangMuonSach(const QString &input) {
     QList<QPair<PTRDG, QString>> matches;
     if (input.isEmpty()) return matches;
     
     QSqlQuery q;
-    q.prepare("SELECT m.ma_the, b.ma_sach FROM muon_tra m JOIN ban_sao b ON m.ban_sao_id = b.id WHERE (b.ma_sach = :ma OR b.ma_sach LIKE :isbn) AND (m.trang_thai = 0 OR m.trang_thai = 2)");
-    q.bindValue(":ma", input.trimmed());
-    q.bindValue(":isbn", input.trimmed() + "-%");
+    q.prepare("SELECT m.ma_the, b.ma_sach FROM muon_tra m JOIN ban_sao b ON m.ban_sao_id = b.id WHERE (b.ma_sach = ? OR b.ma_sach LIKE ?) AND (m.trang_thai = 0 OR m.trang_thai = 2)");
+    q.addBindValue(input.trimmed());
+    q.addBindValue(input.trimmed() + "-%");
     extern PTRDG rootDocGia;
     if (q.exec()) {
         while (q.next()) {
@@ -1361,7 +1322,10 @@ void WidgetMuonTraSach::xuLyNutXacNhanMuon(bool skipConfirm) {
         
         // Dữ liệu đã được đồng bộ SQL bên trong hàm backend
         
-        if (!skipConfirm) QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), QString::fromStdString(ketQua));
+        if (!skipConfirm) {
+            QString successMsg = qKetQua.isEmpty() ? LanguageManager::instance().getText("MSG_BORROW_SUCCESS") : qKetQua;
+            QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), successMsg);
+        }
         // Use Toast for success
         ToastNotification::show(LanguageManager::instance().getText("MSG_BORROW_SUCCESS"), ToastNotification::SUCCESS);
         emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_BORROW_SUCCESS"));
@@ -1387,7 +1351,7 @@ void WidgetMuonTraSach::xuLyNutXacNhanMuon(bool skipConfirm) {
         // FAILURE CASE
         // FIX INFINITE LOOP: Clear input immediately to prevent "Enter" from re-triggering this same error
         oNhapISBN->clear(); 
-        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_ERROR"), QString::fromStdString(ketQua));
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_ERROR"), qKetQua);
     }
 }
 
@@ -1452,8 +1416,12 @@ void WidgetMuonTraSach::xuLyNutXacNhanTra(bool skipConfirm) {
                  
                  if (daThanhToan) {
                      // Gọi backend đánh dấu đã thanh toán
-                     ThanhToanPhat(docGiaHienTai, maSach.toStdString());
-                     ToastNotification::show(LanguageManager::instance().getText("MSG_RETURN_PAY_SUCCESS"), ToastNotification::SUCCESS);
+                     std::string err = ThanhToanPhat(docGiaHienTai, maSach.toStdString());
+                     if (err.empty()) {
+                         ToastNotification::show(LanguageManager::instance().getText("MSG_RETURN_PAY_SUCCESS"), ToastNotification::SUCCESS);
+                     } else {
+                         QMessageBox::critical(this, "Lỗi Database", QString::fromStdString(err));
+                     }
                  } else {
                      ToastNotification::show(LanguageManager::instance().getText("MSG_RETURN_DEBT_RECORDED"), ToastNotification::WARNING);
                  }
@@ -1491,6 +1459,7 @@ void WidgetMuonTraSach::xuLyNutXacNhanTra(bool skipConfirm) {
     }
 }
 
+// Feature 4: Bao Mat Sach
 void WidgetMuonTraSach::xuLyNutBaoMat() {
     if (!docGiaHienTai) {
         QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"), LanguageManager::instance().getText("MSG_SELECT_READER_FIRST"));
@@ -1498,23 +1467,18 @@ void WidgetMuonTraSach::xuLyNutBaoMat() {
     }
     
     int dongChon = bangSachDangMuon->currentIndex().row();
-    if (dongChon < 0) {
-        QMessageBox::warning(this, "Cảnh Báo", "Vui lòng chọn sách cần báo mất!");
-        return;
-    }
     if (dongChon < 0 || dongChon >= (int)danhSachSachDangMuon.size()) {
-        QMessageBox::warning(this, "Cảnh Báo", "Dữ liệu chọn không hợp lệ!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"), LanguageManager::instance().getText("MSG_SELECT_LOST_BOOK"));
         return;
     }
     const ThongTinSachDangMuon_DTO &dto = danhSachSachDangMuon[dongChon];
     QString maSach = QString::fromStdString(dto.maSach);
     QString tenSach = QString::fromStdString(dto.tenSach);
     
-    // Tính toán chi phí đền bù trước khi xác nhận
+    // Tính toán số liệu
     extern PTRDS dsDauSach[];
     extern int soLuongDauSach;
     
-    // Tìm sách để lấy giá
     std::string isbn = TachISBNTuMaSach(maSach.toStdString());
     PTRDS dauSach = nullptr;
     for (int i = 0; i < soLuongDauSach; i++) {
@@ -1528,86 +1492,78 @@ void WidgetMuonTraSach::xuLyNutBaoMat() {
     int phiPhat = SettingsManager::instance().getInt("PHI_MAT_SACH", 20000);
     long long tongDenBu = giaSach + phiPhat;
     
-    QMessageBox::StandardButton xacNhan = QMessageBox::question(this, "⚠️ XÁC NHẬN BÁO MẤT SÁCH",
-        QString("⚠️ BÁO MẤT SÁCH là thao tác NGHIÊM TRỌNG!\n\n"
-                "Mã: %1\nTên: %2\n\n"
-                "CHI PHÍ ĐỀN BÙ:\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "Giá sách: %3 VNĐ\n"
-                "Phí phạt: %4 VNĐ\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "TỔNG CỘNG: %5 VNĐ\n\n"
-                "Học viên sẽ bị ghi nợ số tiền này.\n\n"
-                "Bạn có chắc chắn?")
-            .arg(maSach, tenSach)
+    // BƯỚC 1: XÁC NHẬN BÁO MẤT (Confirmation)
+    // Hỏi người dùng có chắc chắn muốn báo mất không? (Cảnh báo phí)
+    QMessageBox::StandardButton xacNhan = QMessageBox::question(this, LanguageManager::instance().getText("TITLE_REPORT_LOST"),
+        QString("Bạn có chắc muốn báo mất sách <b>%1</b> không?<br><br>"
+                "Giá sách: %2 VNĐ<br>"
+                "Phí phạt: %3 VNĐ<br>"
+                "<b>Tổng tiền đền bù: %4 VNĐ</b>")
+            .arg(tenSach)
             .arg(QLocale(QLocale::Vietnamese).toString((qint64)giaSach))
             .arg(QLocale(QLocale::Vietnamese).toString((qint64)phiPhat))
             .arg(QLocale(QLocale::Vietnamese).toString((qint64)tongDenBu)),
         QMessageBox::Yes | QMessageBox::No);
     
-    if (xacNhan == QMessageBox::Yes) {
-        std::string ketQua = BaoMatSach(docGiaHienTai, maSach.toStdString(), dsDauSach, soLuongDauSach);
+    if (xacNhan != QMessageBox::Yes) return;
+    
+    // BƯỚC 2: THỰC HIỆN BÁO MẤT (Mặc định GHI NỢ trước)
+    // Execute DB update: Status becomes LOST_DEBT (Chờ thanh toán)
+    std::string ketQua = BaoMatSach(docGiaHienTai, maSach.toStdString(), dsDauSach, soLuongDauSach);
+    
+    if (ketQua.empty() || ketQua.find("Thành công") != std::string::npos || ketQua.find("thành công") != std::string::npos) {
         
-        if (ketQua.empty() || ketQua.find("Thành công") != std::string::npos || ketQua.find("thành công") != std::string::npos) {
-            // Tự động lưu file
-            extern PTRDG rootDocGia;
-            saveDocGia(rootDocGia);
-            GhiDanhSachDauSach(FilePathManager::getDauSachPathStd().c_str(), dsDauSach, soLuongDauSach, true);
-            GhiDanhMucSach(FilePathManager::getDanhMucSachPathStd().c_str(), dsDauSach, soLuongDauSach, true);
-            
-            // Hiển thị thông tin đền bù chi tiết
-            QMessageBox::information(this, "✅ Đã Ghi Nhận Mất Sách",
-                QString("Đã ghi nhận mất sách: %1\n\n"
-                        "CHI TIẾT ĐỀN BÙ:\n"
-                        "━━━━━━━━━━━━━━━━━━━━\n"
-                        "Giá sách: %2 VNĐ\n"
-                        "Phí phạt: %3 VNĐ\n"
-                        "━━━━━━━━━━━━━━━━━━━━\n"
-                        "TỔNG CỘNG: %4 VNĐ\n\n"
-                        "Học viên cần thanh toán khoản nợ này.")
-                    .arg(tenSach)
-                    .arg(QLocale(QLocale::Vietnamese).toString((qint64)giaSach))
-                    .arg(QLocale(QLocale::Vietnamese).toString((qint64)phiPhat))
-                    .arg(QLocale(QLocale::Vietnamese).toString((qint64)tongDenBu)));
-            
-            // Mở hộp thoại thanh toán
-            bool daThanhToan = HopThoaiThanhToan::hienThiThanhToan(
-                docGiaHienTai,
-                QString("Đền bù sách mất: %1").arg(tenSach),
-                tongDenBu,
-                this
-            );
-            
-            if (daThanhToan) {
-                // Đánh dấu đã thanh toán
-                ThanhToanPhat(docGiaHienTai, maSach.toStdString());
+        // Save DB
+        extern PTRDG rootDocGia;
+        saveDocGia(rootDocGia);
+        GhiDanhSachDauSach(FilePathManager::getDauSachPathStd().c_str(), dsDauSach, soLuongDauSach, true);
+        GhiDanhMucSach(FilePathManager::getDanhMucSachPathStd().c_str(), dsDauSach, soLuongDauSach, true);
+
+        // BƯỚC 3: MỞ HỘP THOẠI THANH TOÁN (Payment)
+        // Hỏi người dùng có muốn thanh toán luôn không?
+        bool daThanhToan = HopThoaiThanhToan::hienThiThanhToan(
+            docGiaHienTai,
+            QString("Đền bù sách mất: %1").arg(tenSach),
+            tongDenBu,
+            this
+        );
+        
+        if (daThanhToan) {
+            // Case A: Đã thanh toán -> Cập nhật trạng thái thành PAID
+            std::string err = ThanhToanPhat(docGiaHienTai, maSach.toStdString());
+            if (err.empty()) {
                 saveDocGia(rootDocGia);
-                ToastNotification::show("Đã thanh toán đền bù sách mất!", ToastNotification::SUCCESS);
+                ToastNotification::show(LanguageManager::instance().getText("MSG_LOST_PAY_SUCCESS"), ToastNotification::SUCCESS);
             } else {
-                ToastNotification::show("Đã ghi nợ tiền đền bù.", ToastNotification::WARNING);
+                QMessageBox::critical(this, "Lỗi Database", QString::fromStdString(err));
             }
-            
-            emit thongBaoCapNhat("Đã báo mất sách!");
-            emit duLieuThayDoi(); // Realtime update Dashboard
-            
-            // Cập nhật lại
-            capNhatBangSachDangMuon();
-            nutXacNhanTra->setEnabled(false);
-            nutBaoMat->setEnabled(false);
-            nutThanhToan->setEnabled(false);
-            
-            // Refresh table & detail view
-             hienThiDanhSachDocGia(); // Update Status in Left Table
-             
-            int currentRow = bangDocGia->currentIndex().row();
-            if (currentRow >= 0) {
-                bangDocGia->selectRow(currentRow);
-                xuLyChonDocGia(currentRow, 0); // Update Right Panel
-            }
-            
         } else {
-            QMessageBox::warning(this, "Lỗi", QString::fromStdString(ketQua));
+            // Case B: Bấm "Hủy" ở hộp thoại thanh toán -> GIỮ NGUYÊN trạng thái NỢ (DEBT)
+            // User request: hiển thị message "Khoản nợ đã được ghi nhận..."
+            QMessageBox::information(this, LanguageManager::instance().getText("TITLE_DEBT_RECORDED"), 
+                QString("<b>%1</b><br>"
+                        "%2<br><br>"
+                        "%3: <span style='color:red'>%4 VNĐ</span>")
+                        .arg(LanguageManager::instance().getText("MSG_DEBT_RECORDED_HEADER"))
+                        .arg(LanguageManager::instance().getText("MSG_DEBT_RECORDED_BODY"))
+                        .arg(LanguageManager::instance().getText("LBL_TOTAL_DEBT"))
+                        .arg(QLocale(QLocale::Vietnamese).toString((qint64)tongDenBu)));
         }
+        
+        // Cập nhật UI
+        emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_REPORT_LOST_SUCCESS"));
+        emit duLieuThayDoi(); 
+        capNhatBangSachDangMuon();
+        hienThiDanhSachDocGia();
+        
+        int currentRow = bangDocGia->currentIndex().row();
+        if (currentRow >= 0) {
+            bangDocGia->selectRow(currentRow);
+            xuLyChonDocGia(currentRow, 0); 
+        }
+        
+    } else {
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_ERROR"), QString::fromStdString(ketQua));
     }
 }
 
@@ -1620,58 +1576,17 @@ void WidgetMuonTraSach::xuLyNutThanhToan() {
     
     int dongChon = bangSachDangMuon->currentIndex().row();
     if (dongChon < 0 || dongChon >= (int)danhSachSachDangMuon.size()) {
-        QMessageBox::warning(this, "Cảnh Báo", "Vui lòng chọn sách cần thanh toán!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"), LanguageManager::instance().getText("MSG_SELECT_PAY_BOOK"));
         return;
     }
     
+    // Unified Finance Logic
     const ThongTinSachDangMuon_DTO &dto = danhSachSachDangMuon[dongChon];
+    FinanceHelper::PaymentContext ctx = FinanceHelper::getContextFromDto(dto);
     
-    // [FIX] Prioritize stored debt (Status 1: Returned, Status 2: Lost)
-    long long tienPhat = dto.tienPhat;
-    QString lyDo = "";
-
-    // If no stored debt, try calculating overdue fine for current loans
-    if (tienPhat <= 0 && dto.trangThai == 0) {
-        std::stringstream ss;
-        int soNgayQuaHan = ::tinhSoNgayQuaHan(dto.ngayMuon, ss);
-        if (soNgayQuaHan > 0) {
-            int tienPhatMoiNgay = SettingsManager::instance().getInt("TIEN_PHAT_MOI_NGAY", 5000);
-            tienPhat = (long long)soNgayQuaHan * tienPhatMoiNgay;
-            lyDo = QString("Thanh toán tiền phạt quá hạn (%1 ngày)").arg(soNgayQuaHan);
-        }
-    } else {
-        // Construct reason for fixed debts
-        if (dto.trangThai == 2) lyDo = "Thanh toán đền bù sách mất";
-        else lyDo = "Thanh toán nợ tồn đọng";
-    }
-    
-    if (tienPhat <= 0) {
-        QMessageBox::information(this, "Thông Báo", "Sách này không có khoản phạt nào cần thanh toán (hoặc đã trả đúng hạn).");
-        return;
-    }
-
-    bool daThanhToan = HopThoaiThanhToan::hienThiThanhToan(
-        docGiaHienTai, 
-        lyDo, 
-        tienPhat, 
-        this
-    );
-     
-    if (daThanhToan) {
-        // Call backend to clear debt
-        ThanhToanPhat(docGiaHienTai, dto.maSach);
-         
-         // Dữ liệu đã được đồng bộ SQL bên trong backend
-         
-         QMessageBox::information(this, "Thành Công", "Đã thanh toán thành công!");
-         
-         emit thongBaoCapNhat("Đã thanh toán tiền phạt!");
-         emit duLieuThayDoi();
-         
+    if (FinanceHelper::processPaymentFlow(docGiaHienTai, ctx, this)) {
          capNhatBangSachDangMuon();
          hienThiDanhSachDocGia();
-         
-         // Update UI
          nutThanhToan->setEnabled(false);
     }
 }
@@ -1685,15 +1600,15 @@ void WidgetMuonTraSach::xuLyNutGiaHan() {
     
     int dongChon = bangSachDangMuon->currentIndex().row();
     if (dongChon < 0 || dongChon >= (int)danhSachSachDangMuon.size()) {
-        QMessageBox::warning(this, "Cảnh Báo", "Vui lòng chọn sách cần gia hạn!");
+        QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARNING"), LanguageManager::instance().getText("MSG_SELECT_EXTEND_BOOK"));
         return;
     }
     
     const ThongTinSachDangMuon_DTO &dto = danhSachSachDangMuon[dongChon];
     QString maSach = QString::fromStdString(dto.maSach);
     
-    QMessageBox::StandardButton xacNhan = QMessageBox::question(this, "Xác Nhận Gia Hạn",
-        QString("Gia hạn thêm 7 ngày cho sách:\n%1").arg(QString::fromStdString(dto.tenSach)),
+    QMessageBox::StandardButton xacNhan = QMessageBox::question(this, LanguageManager::instance().getText("TITLE_CONFIRM_EXTEND"),
+        LanguageManager::instance().getText("MSG_CONFIRM_EXTEND").arg(QString::fromStdString(dto.tenSach)),
         QMessageBox::Yes | QMessageBox::No);
         
     if (xacNhan == QMessageBox::Yes) {
@@ -1702,14 +1617,14 @@ void WidgetMuonTraSach::xuLyNutGiaHan() {
         if (ketQua.empty()) {
              // Dữ liệu đã được đồng bộ SQL bên trong backend
              
-             QMessageBox::information(this, "Thành Công", "Đã gia hạn thành công!");
-             emit thongBaoCapNhat("Đã gia hạn sách!");
+             QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), LanguageManager::instance().getText("MSG_EXTEND_SUCCESS"));
+             emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_EXTEND_SUCCESS"));
              emit duLieuThayDoi();
              
              capNhatBangSachDangMuon();
              nutGiaHan->setEnabled(false);
         } else {
-             QMessageBox::warning(this, "Lỗi", QString::fromStdString(ketQua));
+             QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_ERROR"), QString::fromStdString(ketQua));
         }
     }
 }
@@ -2010,8 +1925,27 @@ void WidgetMuonTraSach::xuLyQuetMaSach(const QString& maSach) {
             
             auto matches = TimDocGiaDangMuonSach(maSach);
             if (matches.isEmpty()) {
-                 qDebug() << " -> Không thể xác định học viên đang mượn cụ thể.";
-                 QMessageBox::warning(this, "Lỗi", "Sách đang được mượn nhưng không tìm thấy dữ liệu học viên duy nhất!");
+                 qDebug() << " -> [SELF-HEALING] Sách có trạng thái Đang Mượn/Báo Mất nhưng KHÔNG tìm thấy giao dịch nào tương ứng.";
+                 
+                 // TỰ ĐỘNG SỬA LỖI: Reset trạng thái sách về Trong Kho
+                 QSqlQuery qFix;
+                 qFix.prepare("UPDATE ban_sao SET trang_thai = 0 WHERE ma_sach = ?");
+                 qFix.addBindValue(maSach);
+                 if (qFix.exec()) {
+                     ToastNotification::show(QString("Phát hiện lỗi dữ liệu: Sách '%1' không có người mượn. Đã tự động reset về trạng thái 'Trong Kho'.").arg(maSach), ToastNotification::WARNING);
+                     
+                     // Reset trạng thái hiển thị
+                     if (docGiaHienTai) {
+                         capNhatBangSachDangMuon(); 
+                     }
+                     
+                     // Nếu đang ở trạng thái chờ mượn -> Thực hiện mượn lại ngay
+                     if (m_pendingBookCode == maSach) {
+                         xuLyTuDongMuon(maSach);
+                     }
+                 } else {
+                     QMessageBox::warning(this, "Lỗi Nghiêm Trọng", "Dữ liệu sách bị lỗi và không thể tự động sửa. Vui lòng kiểm tra lại CSDL!");
+                 }
                  break;
             }
 
@@ -2104,7 +2038,7 @@ void WidgetMuonTraSach::xuLyTuDongMuon(const QString& maSach) {
     
     // Điền vào ô ISBN
     oNhapISBN->setText(maSach);
-    oNhapISBN->setFocus();
+    // oNhapISBN->setFocus(); // DISABLE AUTO-FOCUS (User Request: Silent Scan)
     
     // ✅ TỰ ĐỘNG TRIGGER MƯỢN (KHÔNG CẦN BẤM NÚT)
     QTimer::singleShot(100, this, [this]() {

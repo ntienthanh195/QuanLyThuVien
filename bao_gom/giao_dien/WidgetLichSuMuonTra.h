@@ -3,8 +3,8 @@
  * @path bao_gom/giao_dien/WidgetLichSuMuonTra.h
  * @description Header cho Widget xem lịch sử mượn trả và báo cáo tài chính.
  */
-#ifndef WIDGETLICH SUMUONTRA_H
-#define WIDGETLICH SUMUONTRA_H
+#ifndef WIDGETLICHSUMUONTRA_H
+#define WIDGETLICHSUMUONTRA_H
 
 #include <QWidget>
 #include <QTableView>
@@ -26,6 +26,9 @@ public:
     ~WidgetLichSuMuonTra();
 
     void lamMoi();
+
+protected:
+    void showEvent(QShowEvent *event) override;
 
 private slots:
     void xuLyTimKiem();

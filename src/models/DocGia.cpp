@@ -28,6 +28,7 @@
 #include <QSqlQuery>
 #include <QVariant>
 #include <QDate>
+#include <QDebug>
 #include <functional>
 #include "utils/AuditLogger.h"
 // Cần thêm thư viện QuanLySach.h nếu sử dụng TimDanhMucSachTuMaSach
@@ -172,13 +173,14 @@ void InsertDocGia(PTRDG &root, PTRDG node, bool syncDB) {
     // --- DB SYNC ---
     if (syncDB && node) {
      QSqlQuery q(DatabaseManager::instance().database());
-        q.prepare("INSERT INTO doc_gia (ma_the, ho, ten, phai, trang_thai, so_dien_thoai, lop, email, ngay_sinh, loai_doc_gia, so_sach_dang_muon) "
-                  "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        q.prepare("INSERT INTO doc_gia (ma_the, ho, ten, phai, trang_thai, co_the_muon, so_dien_thoai, lop, email, ngay_sinh, loai_doc_gia, so_sach_dang_muon, ngay_dang_ky, ngay_het_han) "
+                  "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         q.addBindValue(node->data.MaThe);
         q.addBindValue(QString::fromStdString(node->data.Ho));
         q.addBindValue(QString::fromStdString(node->data.Ten));
         q.addBindValue(node->data.Phai ? 1 : 0);
         q.addBindValue(node->data.TrangThai);
+        q.addBindValue(node->data.coTheMuon ? 1 : 0);
         // Phase 2 New Fields
         q.addBindValue(QString::fromStdString(node->data.SDT));
         q.addBindValue(QString::fromStdString(node->data.Lop));
@@ -186,20 +188,67 @@ void InsertDocGia(PTRDG &root, PTRDG node, bool syncDB) {
         q.addBindValue(QString::fromStdString(node->data.NgaySinh));
         q.addBindValue(node->data.LoaiDocGia);
         q.addBindValue(0); // so_sach_dang_muon default
+        q.addBindValue(QString::fromStdString(node->data.NgayLapThe));
+        q.addBindValue(QString::fromStdString(node->data.NgayHetHan));
         q.exec();
         
         // [AUDIT LOG]
         if (q.lastError().type() == QSqlError::NoError) {
              AuditLogger::log(AuditLogger::ACTION_INSERT, "DOC_GIA", QString::number(node->data.MaThe), 
-                              QString("Them doc gia moi: %1 %2").arg(QString::fromStdString(node->data.Ho)).arg(QString::fromStdString(node->data.Ten)));
+                              QString("%1 %2 (Mã học viên: %3)")
+                              .arg(QString::fromStdString(node->data.Ho))
+                              .arg(QString::fromStdString(node->data.Ten))
+                              .arg(node->data.MaThe));
         }
     }
     // --- END DB SYNC ---
 }
 
+// FEATURE 4/5: Cap nhat quyen muon (Separation of Concerns)
+void CapNhatQuyenMuon(PTRDG docGia) {
+    if (!docGia) return;
+    
+    // 1. Check card status (hard-lock by admin)
+    if (docGia->data.TrangThai == 0) {
+        docGia->data.coTheMuon = false;
+    } else {
+        // 2. [ABSOLUTE OPTIMIZATION] Check Card Expiry
+        time_t hanDùng = ChuyenNgaySangTimeT(docGia->data.NgayHetHan);
+        bool daHetHan = (hanDùng != -1 && time(nullptr) > hanDùng);
+        
+        // 3. [ABSOLUTE OPTIMIZATION] Check Debts with configurable Buffer
+        long long totalDebt = TinhTongNo(docGia);
+        int debtBuffer = SettingsManager::instance().getInt("MAX_DEBT_BUFFER", 10000); // Cho phép nợ lẻ đến 10k
+        bool vuotNguonNo = (totalDebt > debtBuffer);
+        
+        // 4. Check Overdue (Hard lock)
+        bool coSachQuaHan = (TinhSoNgayQuaHanLonNhat(docGia) > 0);
+        
+        // Update permission
+        docGia->data.coTheMuon = (!daHetHan && !vuotNguonNo && !coSachQuaHan);
+
+        if (!docGia->data.coTheMuon) {
+             QString reason = "";
+             if (daHetHan) reason = "The het han (" + QString::fromStdString(docGia->data.NgayHetHan) + ")";
+             else if (vuotNguonNo) reason = QString("Vuot nguong no cho phep (%1/%2)").arg(totalDebt).arg(debtBuffer);
+             else if (coSachQuaHan) reason = "Co sach muon qua han";
+             
+             qDebug() << "[Security] Reader" << docGia->data.MaThe << "is BLOCKED. Reason:" << reason;
+        }
+    }
+    
+    // Update DB
+    QSqlQuery q(DatabaseManager::instance().database());
+    q.prepare("UPDATE doc_gia SET co_the_muon = ? WHERE ma_the = ?");
+    q.addBindValue(docGia->data.coTheMuon ? 1 : 0);
+    q.addBindValue(docGia->data.MaThe);
+    q.exec();
+}
+
 // Feature 4: Thanh Toan Phat
 std::string ThanhToanPhat(PTRDG docGia, const std::string& maSach) {
     if (!docGia) return "Lỗi: Độc giả null";
+    std::string errorMsg;
     
     MUONTRA p = docGia->data.dsmt;
     while (p) {
@@ -207,45 +256,72 @@ std::string ThanhToanPhat(PTRDG docGia, const std::string& maSach) {
         if (currentMa.empty() && p->data.banSaoSach) currentMa = p->data.banSaoSach->maSach;
         
         if (currentMa == maSach) {
-            // Found transaction (assuming latest or matching)
-            // If multiple same books borrowed? (Rare/Impossible due to constraints? Actually possible if returned and borrowed again).
-            // We should pick the one that is !daThanhToan and (TrangThai==1 or HasFine).
-            // Prefer the one with TrangThai == 1 (Returned) first?
-            
             if (!p->data.daThanhToan) {
                 p->data.daThanhToan = true;
                 
-                // Sync DB
-                QSqlQuery q(DatabaseManager::instance().database());
-                q.prepare("UPDATE muon_tra SET da_thanh_toan=1 WHERE ma_the=? AND ma_sach=? AND ngay_muon=?");
+                // [UPGRADE] Financial State Machine Transitions
+                if (p->data.TrangThai == GD_MAT_CHO_THANH_TOAN) {
+                    p->data.TrangThai = GD_MAT_DA_THANH_TOAN; // Đã tất toán nợ mất sách
+                } else if (p->data.TrangThai == GD_MAT_CHO_HOAN_TIEN) {
+                    p->data.TrangThai = GD_MAT_DA_HOAN_TIEN;  // Đã hoàn tiền cho học viên
+                }
+                
+                // Sync DB (TRANSACTIONAL)
+                QSqlDatabase db = DatabaseManager::instance().database();
+                if (!db.transaction()) {
+                    std::cerr << "[DB ERROR] Failed to start transaction in ThanhToanPhat.\n";
+                }
+
+                bool sqlSuccess = true;
+                QSqlQuery q(db);
+                // [FIX] 'ma_sach' column does NOT exist in muon_tra. Must use ban_sao_id.
+                // We match by Reader + Book ID (via subquery) + Unpaid Status.
+                q.prepare("UPDATE muon_tra SET da_thanh_toan=1, trang_thai=? "
+                          "WHERE ma_the=? "
+                          "AND ban_sao_id=(SELECT id FROM ban_sao WHERE ma_sach=?) "
+                          "AND da_thanh_toan=0");
+                q.addBindValue(p->data.TrangThai);
                 q.addBindValue(docGia->data.MaThe);
                 q.addBindValue(QString::fromStdString(currentMa));
-                q.addBindValue(QString::fromStdString(p->data.NgayMuon));
                 
-                if (q.exec()) {
-                    AuditLogger::log(AuditLogger::ACTION_UPDATE, "MUON_TRA", QString::number(docGia->data.MaThe), 
-                                     QString("Thanh toan phat: %1").arg(QString::fromStdString(currentMa)));
+                if (!q.exec()) {
+                    sqlSuccess = false;
+                    std::cerr << "[DB ERROR] Update muon_tra failed in ThanhToanPhat: " << q.lastError().text().toStdString() << "\n";
+                } else if (q.numRowsAffected() == 0) {
+                     // [CRITICAL] Try one more time with exact Date if possible? 
+                     // Or maybe the ma_sach in ban_sao is different?
+                     // Actually, if numRowsAffected is 0, it means it didn't find any UNPAID record for this student/book.
+                     sqlSuccess = false;
+                     std::cerr << "[DB WARNING] ThanhToanPhat matched 0 rows! Reader: " << docGia->data.MaThe << " Book: " << currentMa << "\n";
+                     // Fallback check: maybe it's already paid in DB?
+                }
+                
+                if (sqlSuccess) {
+                    // Centralized Permission Update (Internal DB update)
+                    CapNhatQuyenMuon(docGia);
                     
-                    // [NEW] Feature: Auto-Unlock Reader if All Debts Cleared
-                    // Use helper TinhTongNo (Memory Based) for immediate check
-                    long long totalDebt = TinhTongNo(docGia);
-                    if (totalDebt == 0 && docGia->data.TrangThai == 0) {
-                        // 1. Unlock in Memory
-                        docGia->data.TrangThai = 1; // Hoat dong
+                    if (db.commit()) {
+                        AuditLogger::log(AuditLogger::ACTION_UPDATE, "MUON_TRA", QString::number(docGia->data.MaThe), 
+                                         QString("Thanh toán tiền phạt sách: %1 (Học viên: %2)")
+                                         .arg(QString::fromStdString(currentMa))
+                                         .arg(QString::fromStdString(docGia->data.Ho + " " + docGia->data.Ten)));
                         
-                        // 2. Unlock in DB
-                        QSqlQuery qUnlock(DatabaseManager::instance().database());
-                        qUnlock.prepare("UPDATE doc_gia SET trang_thai=1 WHERE ma_the=?");
-                        qUnlock.addBindValue(docGia->data.MaThe);
-                        if (qUnlock.exec()) {
-                             AuditLogger::log(AuditLogger::ACTION_UPDATE, "DOC_GIA", QString::number(docGia->data.MaThe), 
-                                              "Tu dong MO KHOA the (da thanh toan het no)");
-                        }
-                    }
+                        // Notify UI
+                        try {
+                            EventBus::instance().muonTraUpdated(docGia->data.MaThe, QString::fromStdString(currentMa));
+                            EventBus::instance().docGiaUpdated(docGia->data.MaThe);
+                        } catch(...) {}
 
-                    return "";
-                } else {
-                    return "Lỗi DB: " + q.lastError().text().toStdString();
+                        return "";
+                    } else {
+                        sqlSuccess = false;
+                        errorMsg = "Lỗi DB: Commit thất bại!";
+                    }
+                }
+
+                if (!sqlSuccess) {
+                    db.rollback();
+                    return "Lỗi DB: Không thể lưu giao dịch thanh toán!";
                 }
             }
         }
@@ -260,9 +336,8 @@ long long TinhTongNo(PTRDG docGia) {
     long long tong = 0;
     MUONTRA p = docGia->data.dsmt;
     while (p) {
-        // Chi tinh sach "Da Tra" nhung "Chua Thanh Toan"
-        // Hoac sach dang muon neu muon tinh ca so tien du kien (hien tai ta chi tinh no thuc te)
-        if (p->data.TrangThai == 1 && !p->data.daThanhToan) {
+        // Logic: Chỉ tính nợ nếu Giao dịch là Đã trả (nhưng chưa đóng tiền) HOẶC Báo mất (đang nợ)
+        if ((p->data.TrangThai == GD_DA_TRA || p->data.TrangThai == GD_MAT_CHO_THANH_TOAN) && !p->data.daThanhToan) {
              tong += p->data.tienPhat;
         }
         p = p->next;
@@ -282,21 +357,37 @@ void NapDocGiaTuDB(PTRDG &root, PTRDS dsDauSach[], int soLuongDS) {
     
     // 1. Load Doc Gia
     QSqlQuery q(db);
-    if (q.exec("SELECT ma_the, ho, ten, phai, trang_thai FROM doc_gia")) {
+    if (q.exec("SELECT ma_the, ho, ten, phai, trang_thai, co_the_muon, so_dien_thoai, lop, email, ngay_sinh, loai_doc_gia, ngay_dang_ky, ngay_het_han FROM doc_gia")) {
         while (q.next()) {
             int ma = q.value(0).toInt();
             std::string ho = q.value(1).toString().toStdString();
             std::string ten = q.value(2).toString().toStdString();
             int phai = q.value(3).toInt();
             int tt = q.value(4).toInt();
+            bool coTheMuon = q.value(5).toBool();
             
-            PTRDG node = taoDocGia(ho, ten, phai, tt, ma);
+            PTRDG node = taoDocGia(ho, ten, (phai == 1), tt, ma);
+            node->data.coTheMuon = coTheMuon;
+            
+            // Phase 2 New Fields
+            node->data.SDT = q.value(6).toString().toStdString();
+            node->data.Lop = q.value(7).toString().toStdString();
+            node->data.Email = q.value(8).toString().toStdString();
+            node->data.NgaySinh = q.value(9).toString().toStdString();
+            node->data.LoaiDocGia = q.value(10).toInt();
+            
+            // Dates
+            node->data.NgayLapThe = q.value(11).toString().toStdString();
+            node->data.NgayHetHan = q.value(12).toString().toStdString();
+
             InsertDocGia(root, node, false); // false = no db sync
         }
     }
     
-    // 2. Load Muon Tra
-    if (q.exec("SELECT ma_the, ma_sach, ngay_muon, ngay_tra, trang_thai, so_lan_gia_han, da_thanh_toan, tien_phat FROM muon_tra")) {
+    // 2. Load Muon Tra with Robust Join (resolves ma_sach even if redundant column is empty)
+    if (q.exec("SELECT mt.ma_the, COALESCE(NULLIF(mt.ma_sach, ''), bs.ma_sach), mt.ngay_muon, mt.ngay_tra, mt.trang_thai, "
+               "mt.so_lan_gia_han, mt.da_thanh_toan, mt.tien_phat, mt.tien_hoan_tra "
+               "FROM muon_tra mt LEFT JOIN ban_sao bs ON mt.ban_sao_id = bs.id")) {
         while (q.next()) {
             int maThe = q.value(0).toInt();
             std::string maSach = q.value(1).toString().toStdString();
@@ -305,13 +396,14 @@ void NapDocGiaTuDB(PTRDG &root, PTRDS dsDauSach[], int soLuongDS) {
             int tt = q.value(4).toInt();
             int giaHan = q.value(5).toInt();
             bool thanhToan = q.value(6).toBool();
-            long long tienPhat = q.value(7).toLongLong(); // Load tien_phat
+            long long tienPhat = q.value(7).toLongLong();
+            long long tienHT = q.value(8).toLongLong();
             
             PTRDG dg = timDocGia(root, maThe);
             if (dg) {
                  MuonTra mt;
-                 mt.banSaoSach = nullptr; // Load later or use cached logic
-                 // Try to resolve pointer if we have book list
+                 // ... (resolve pointer logic matches previous viewed)
+                 mt.banSaoSach = nullptr;
                  if (dsDauSach && soLuongDS > 0) {
                       std::string isbn = TachISBNTuMaSach(maSach);
                       PTRDS ds = TimDauSachTheoISBN(dsDauSach, soLuongDS, isbn);
@@ -323,10 +415,10 @@ void NapDocGiaTuDB(PTRDG &root, PTRDS dsDauSach[], int soLuongDS) {
                  mt.NgayTra = ngayTra;
                  mt.TrangThai = tt;
 
-                 // Feature 4
                  mt.soLanGiaHan = giaHan;
                  mt.daThanhToan = thanhToan;
-                 mt.tienPhat = tienPhat; // Assign loaded fine
+                 mt.tienPhat = tienPhat;
+                 mt.tienHoanTra = tienHT;
 
                  themMuonTra(dg, mt);
                  
@@ -360,7 +452,8 @@ PTRDG taoDocGia(std::string ho, std::string ten, bool phai, int trangthai, PTRDG
     // END PHASE 2 INIT
     dg->data.dsmt = nullptr;
     dg->data.soSachDangMuon = 0; 
-    dg->data.soSachDangMuon = 0; 
+    dg->data.coTheMuon = true; // [INIT FIX] Allow borrowing by default
+    dg->data.tongSachDaMuonHistory = 0; // [INIT FIX]
 
     // Auto-set Dates
     std::string today = layNgayHienTai();
@@ -414,7 +507,8 @@ PTRDG taoDocGia(std::string ho, std::string ten, bool phai, int trangthai, int m
     // END PHASE 2 INIT
     dg->data.dsmt = nullptr;
     dg->data.soSachDangMuon = 0; 
-    dg->data.soSachDangMuon = 0; 
+    dg->data.coTheMuon = true; // [INIT FIX]
+    dg->data.tongSachDaMuonHistory = 0; // [INIT FIX]
     
     // Auto-set Dates (Similar logic)
     std::string today = layNgayHienTai();
@@ -542,34 +636,54 @@ static PTRDG xoaDocGiaRec(PTRDG root, int mathe) {
     return root;
 }
 void xoaDocGia(PTRDG& root, int mathe) {
-    // check existence before deletion
+    // 1. Check existence and logic constraints
     PTRDG found = timDocGia(root, mathe);
-    root = xoaDocGiaRec(root, mathe);
-    if (found) {
-        try {
-            EventBus::instance().docGiaRemoved(mathe);
-        } catch(...) {}
-        
-        // --- DB SYNC ---
-        QSqlQuery q(DatabaseManager::instance().database());
-        q.prepare("DELETE FROM doc_gia WHERE ma_the = ?");
-        q.addBindValue(mathe);
-        q.exec();
-        
-        // Also delete transactions? Or keep for history?
-        // Usually keeping history is better, but this app might want clean delete.
-        // Let's delete transactions for now to match memory behavior (memory is gone).
-        QSqlQuery q2(DatabaseManager::instance().database());
-        q2.prepare("DELETE FROM muon_tra WHERE ma_the = ?");
-        q2.addBindValue(mathe);
-        q2.exec();
-        q2.addBindValue(mathe);
-        q2.exec();
-        // --- END DB SYNC ---
-        
-        // [AUDIT LOG]
-        AuditLogger::log(AuditLogger::ACTION_DELETE, "DOC_GIA", QString::number(mathe), "Xoa doc gia");
+    if (!found) return;
+
+    if (found->data.soSachDangMuon > 0) {
+        // We cannot delete a reader currently holding books.
+        // In a headless CLI app we might just skip, but in GUI we should block it.
+        // xoaDocGia is a void function, so we just log and return.
+        // The GUI should have checked this via KiemTraCoTheXoaDocGia.
+        qDebug() << "[DocGia] CANNOT delete reader" << mathe << "because they have" << found->data.soSachDangMuon << "active loans.";
+        return; 
     }
+
+    // 2. Remove from AVL tree
+    root = xoaDocGiaRec(root, mathe);
+    
+    // 3. Emit event
+    try {
+        EventBus::instance().docGiaRemoved(mathe);
+    } catch(...) {}
+    
+    // 4. DB SYNC
+    QSqlDatabase db = DatabaseManager::instance().database();
+    QSqlQuery q(db);
+    q.prepare("DELETE FROM doc_gia WHERE ma_the = ?");
+    q.addBindValue(mathe);
+    if (!q.exec()) {
+        qDebug() << "[DocGia] DB Error deleting reader:" << q.lastError().text();
+    }
+    
+    // 5. Cleanup historical transactions (Optional: only if you want strictly clean delete)
+    // NOTE: Usually it's better to KEEP history but mark as 'Deleted Reader'.
+    // Here we follow existing code's destructive approach but fix the duplicate bind.
+    QSqlQuery q2(db);
+    q2.prepare("DELETE FROM muon_tra WHERE ma_the = ?");
+    q2.addBindValue(mathe);
+    q2.exec();
+    // --- END DB SYNC ---
+        
+    // [AUDIT LOG]
+    QString detailStr = QString("Mã học viên: %1").arg(mathe);
+    if (found) {
+        detailStr = QString("%1 %2 (Mã học viên: %3)")
+                    .arg(QString::fromStdString(found->data.Ho))
+                    .arg(QString::fromStdString(found->data.Ten))
+                    .arg(mathe);
+    }
+    AuditLogger::log(AuditLogger::ACTION_DELETE, "DOC_GIA", QString::number(mathe), detailStr);
 }
 
 // tim doc gia
@@ -612,28 +726,31 @@ void hieuChinhDocGia(PTRDG root, const TheDocGia& new_data) {
     } catch(...) {}
     
     // --- DB SYNC ---
-    // --- DB SYNC ---
     QSqlQuery q(DatabaseManager::instance().database());
-    q.prepare("UPDATE doc_gia SET ho=?, ten=?, phai=?, trang_thai=?, so_dien_thoai=?, lop=?, email=?, ngay_sinh=?, loai_doc_gia=? WHERE ma_the=?");
+    q.prepare("UPDATE doc_gia SET ho=?, ten=?, phai=?, trang_thai=?, co_the_muon=?, so_dien_thoai=?, lop=?, email=?, ngay_sinh=?, loai_doc_gia=?, ngay_dang_ky=?, ngay_het_han=? WHERE ma_the=?");
     q.addBindValue(QString::fromStdString(p->data.Ho));
     q.addBindValue(QString::fromStdString(p->data.Ten));
     q.addBindValue(p->data.Phai ? 1 : 0);
     q.addBindValue(p->data.TrangThai);
-    // Phase 2 updates
-    // Assume p was updated in memory before (Wait, logic above lines 573 only updated basic fields)
-    // We need to update MEMORY p first! See correction below.
+    q.addBindValue(p->data.coTheMuon ? 1 : 0);
     q.addBindValue(QString::fromStdString(p->data.SDT));
     q.addBindValue(QString::fromStdString(p->data.Lop));
     q.addBindValue(QString::fromStdString(p->data.Email));
     q.addBindValue(QString::fromStdString(p->data.NgaySinh));
     q.addBindValue(p->data.LoaiDocGia);
+    q.addBindValue(QString::fromStdString(p->data.NgayLapThe));
+    q.addBindValue(QString::fromStdString(p->data.NgayHetHan));
     
     q.addBindValue(new_data.MaThe);
     q.exec();
     // --- END DB SYNC ---
     
     // [AUDIT LOG]
-    AuditLogger::log(AuditLogger::ACTION_UPDATE, "DOC_GIA", QString::number(new_data.MaThe), "Hieu chinh thong tin doc gia");
+    AuditLogger::log(AuditLogger::ACTION_UPDATE, "DOC_GIA", QString::number(new_data.MaThe), 
+                     QString("%1 %2 (Mã học viên: %3)")
+                     .arg(QString::fromStdString(p->data.Ho))
+                     .arg(QString::fromStdString(p->data.Ten))
+                     .arg(new_data.MaThe));
 }
 
 // hien thi

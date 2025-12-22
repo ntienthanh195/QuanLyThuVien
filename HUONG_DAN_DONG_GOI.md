@@ -46,20 +46,19 @@ copy C:\Qt\Tools\mingw1310_64\bin\libstdc++-6.dll release\
 copy C:\Qt\Tools\mingw1310_64\bin\libwinpthread-1.dll release\
 ```
 
-### Bước 4: Copy Dữ Liệu và Công cụ (Tools)
+### Bước 4: Copy Dữ Liệu
 
-Để ứng dụng chạy đầy đủ tính năng, bạn cần copy thư mục `data/` và thư mục `tools/` (chứa các script Python hỗ trợ Import Excel) vào thư mục release:
+Để ứng dụng có dữ liệu ban đầu, bạn cần copy thư mục `data/` vào thư mục release:
 
 ```powershell
-# Copy thư mục data & tools
+# Copy thư mục data
 xcopy /E /I data release\data
-xcopy /E /I tools release\tools
 ```
 
-> [!IMPORTANT]
-> **Tính năng Di Động (Zero-Configuration Portability):**
-> 1. **Chuẩn hóa Database:** Ứng dụng tự động sửa lỗi mã sách cũ vào lần chạy đầu tiên trên máy mới.
-> 2. **Tự sửa lỗi Python (Self-Healing):** Nếu máy tính người dùng bị khóa quyền cài đặt Python (như trên MSYS2), ứng dụng sẽ tự tạo môi trường ảo (`.venv`) và tự cài thư viện `openpyxl` bên trong. Người dùng không cần thao tác tay.
+> [!NOTE]
+> **Cải tiến trong phiên bản V2:**
+> Ứng dụng hiện sử dụng công nghệ **Native C++ (QXlsx)** để đọc file Excel trực tiếp. 
+> Do đó, bạn **KHÔNG CẦN** cài đặt Python hay copy thư mục `tools` như phiên bản cũ. Ứng dụng hoạt động độc lập hoàn toàn.
 
 ### Bước 5: Tạo Cấu Trúc Thư Mục Cuối Cùng
 
@@ -75,7 +74,6 @@ release/
 ├── libgcc_s_seh-1.dll
 ├── libstdc++-6.dll
 ├── libwinpthread-1.dll
-├── tools/                         (Chứa script Python - RẤT QUAN TRỌNG)
 ├── platforms/
 │   └── qwindows.dll
 ├── styles/

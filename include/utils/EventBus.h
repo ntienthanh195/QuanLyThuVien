@@ -41,8 +41,8 @@ signals:
     void muonTraUpdated(int maThe, const QString& maSach);
     void muonTraRemoved(int maThe, const QString& maSach);
 
-    // System Log
-    void newSystemLog(const QString& action, const QString& details);
+    // System Log (action, table/entity, details)
+    void newSystemLog(const QString& action, const QString& entity, const QString& details);
 
     // General: any data file or DB changed externally
     void dataChanged();

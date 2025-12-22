@@ -12,6 +12,7 @@
 #include "qrcode/Code128.h"
 #include "utils/QrCodeGenerator.h"
 #include "utils/SettingsManager.h"
+#include "utils/XuLyChuoi.h"
 #include "utils/LanguageManager.h"  // Missing
 #include "utils/CustomPrintDialog.h"  // Custom dark-themed print preview
 #include <QPrinter>
@@ -628,114 +629,148 @@ bool PrintHelper::inDanhSachDocGia(PTRDG root, QWidget* parent) {
         if (p->data.soSachDangMuon > 0) totalWithBooks++;
     }
     
-    // 3. Build HTML Content
-    QString noiDungBang = "";
-    
-    // Summary Section (Clean Table Style)
-    noiDungBang += QString(
-        "<div style='margin-bottom: 20px; font-size: 11pt;'>"
-        "<table width='100%' border='0' cellspacing='0' cellpadding='4'>"
-        "<tr>"
-        "  <td><b>Tổng số:</b> %1</td>"
-        "  <td><b>Nam:</b> %2</td>"
-        "  <td><b>Nữ:</b> %3</td>"
-        "</tr>"
-        "<tr>"
-        "  <td><b>Hoạt động:</b> %4</td>"
-        "  <td><b>Bị khóa:</b> %5</td>"
-        "  <td><b>Đang mượn:</b> %6</td>"
-        "</tr>"
-        "</table>"
-        "</div>"
-    ).arg(list.size()).arg(totalMale).arg(totalFemale).arg(totalActive).arg(totalInactive).arg(totalWithBooks);
+    // 3. Load Config for Header
+    PrintConfig cfg = getCauHinh();
 
-    // Data Table (Match Book Report Style)
-    noiDungBang += "<table border='1' cellspacing='0' cellpadding='8' width='100%'>"
-                   "<thead>"
-                   "<tr>"
-                   "<th>STT</th>"
-                   "<th>Mã Thẻ</th>"
-                   "<th>Họ Tên</th>"
-                   "<th>Phái</th>"
-                   "<th>Trạng Thái</th>"
-                   "<th>Đang Mượn</th>"
-                   "</tr>"
-                   "</thead>"
-                   "<tbody>";
+    // 4. Build HTML Content
+    QString html = "<html><head><style>"
+                   "body { font-family: 'Times New Roman', serif; padding: 20px; }"
+                   "h1 { text-align: center; font-size: 24pt; color: #2c3e50; margin-bottom: 5px; }"
+                   "h3 { text-align: center; font-size: 16pt; color: #7f8c8d; margin-top: 0; margin-bottom: 20px; text-transform: uppercase; }"
+                   "table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 11pt; }"
+                   "th, td { border: 1px solid #bdc3c7; padding: 8px; text-align: left; }"
+                   "th { background-color: #ecf0f1; font-weight: bold; color: #2c3e50; text-align: center; }"
+                   ".text-center { text-align: center; }"
+                   ".status-active { color: #27ae60; font-weight: bold; }"
+                   ".status-inactive { color: #e74c3c; font-weight: bold; }"
+                   ".summary-kpi { display: inline-block; width: 30%; background: #f8f9fa; border: 1px solid #ddd; padding: 10px; margin: 1%; text-align: center; }"
+                   ".kpi-val { font-size: 14pt; font-weight: bold; color: #2c3e50; display: block; }"
+                   ".kpi-lbl { font-size: 10pt; color: #7f8c8d; text-transform: uppercase; }"
+                   "</style></head><body>";
+
+    html += QString("<h1>%1</h1>").arg(cfg.tenThuVien);
+    html += "<h3>DANH SÁCH HỌC VIÊN</h3>";
+    
+    html += QString("<div style='text-align: center; margin-bottom: 20px;'>Năm học: %1</div>").arg(QDate::currentDate().year());
+
+    // Summary Dashboard
+    html += "<div style='text-align: center; margin-bottom: 20px;'>";
+    html += QString("<div class='summary-kpi'><span class='kpi-val'>%1</span><span class='kpi-lbl'>Tổng số</span></div>").arg(list.size());
+    html += QString("<div class='summary-kpi'><span class='kpi-val'>%1 Nam / %2 Nữ</span><span class='kpi-lbl'>Giới tính</span></div>").arg(totalMale).arg(totalFemale);
+    html += QString("<div class='summary-kpi'><span class='kpi-val' style='color: #27ae60;'>%1 Hoạt động</span><span class='kpi-lbl'>Tình trạng</span></div>").arg(totalActive);
+    html += "</div>";
+
+    // Data Table
+    html += "<table>"
+            "<thead>"
+            "<tr>"
+            "<th width='5%'>STT</th>"
+            "<th width='15%'>Mã Thẻ</th>"
+            "<th>Họ và Tên</th>"
+            "<th width='10%'>Phái</th>"
+            "<th width='15%'>Trạng Thái</th>"
+            "<th width='15%'>Đang Mượn</th>"
+            "</tr>"
+            "</thead>"
+            "<tbody>";
                         
     for (int i = 0; i < list.size(); i++) {
         PTRDG p = list[i];
         QString hoTen = QString::fromStdString(p->data.Ho + " " + p->data.Ten);
         QString phai = p->data.Phai ? "Nữ" : "Nam";
         QString trangThai = (p->data.TrangThai == 1) ? "Hoạt động" : "Bị khóa";
+        QString statusClass = (p->data.TrangThai == 1) ? "status-active" : "status-inactive";
         
-        noiDungBang += QString("<tr>"
+        html += QString("<tr>"
                                "<td class='text-center'>%1</td>"
-                               "<td class='text-center nowrap'><b>%2</b></td>"
+                               "<td class='text-center'><b>%2</b></td>"
                                "<td>%3</td>"
                                "<td class='text-center'>%4</td>"
-                               "<td class='text-center'>%5</td>"
-                               "<td class='text-center'>%6</td>"
+                               "<td class='text-center %5'>%6</td>"
+                               "<td class='text-center'>%7</td>"
                                "</tr>")
             .arg(i + 1)
             .arg(p->data.MaThe)
             .arg(hoTen)
             .arg(phai)
+            .arg(statusClass)
             .arg(trangThai)
             .arg(p->data.soSachDangMuon > 0 ? QString::number(p->data.soSachDangMuon) + " cuốn" : "-");
     }
-    noiDungBang += "</tbody></table>";
+    html += "</tbody></table>";
     
-    // 4. Wrap with Standard Master Template
-    QString html = taoHTMLDanhSach("DANH SÁCH HỌC VIÊN", noiDungBang);
+    // Footer
+    html += "<div style='margin-top: 30px; text-align: right; font-style: italic;'>"
+            "Xuất ngày " + QDate::currentDate().toString("dd") + " tháng " + QDate::currentDate().toString("MM") + " năm " + QDate::currentDate().toString("yyyy") +
+            "</div>";
+            
+     html += "</body></html>";
     
-    // 5. Build Document and Execute Print
     QTextDocument doc;
     doc.setHtml(html);
     
-    QString statusMsg = QString("In báo cáo: %1 học viên").arg(list.size());
-    return xuLyYeuCauIn(&doc, "BÁO CÁO HỌC VIÊN", statusMsg, taoTenFileBaoCao("DSHocVien"), parent, s_config.printerReport);
+    QString statusMsg = QString("In danh sách: %1 học viên").arg(list.size());
+    return showPrintPreview(&doc, "Danh sách Học viên", parent, "DanhSach_HocVien_" + QDate::currentDate().toString("yyyyMMdd"));
 }
 
-bool PrintHelper::inBienLaiPhat(PTRDG docGia, const QString& lyDo, long long soTien, QWidget* parent) {
+bool PrintHelper::inBienLaiPhat(PTRDG docGia, const QString& lyDo, long long soTien, bool isRefund, QWidget* parent) {
     if (!docGia) return false;
     QString hoTen = QString::fromStdString(docGia->data.Ho + " " + docGia->data.Ten);
     
+    QString tieuDePhieu = isRefund ? "BIÊN LAI HOÀN TIỀN" : "BIÊN LAI THU TIỀN PHẠT";
+    QString nhanLyDo = isRefund ? "Lý do hoàn tiền:" : "Lý do phạt:";
+    QString nhanSoTien = isRefund ? "Số tiền hoàn:" : "Số tiền thu:";
+    QString nhanNguoiNop = isRefund ? "Người nhận tiền" : "Người nộp tiền";
+    QString nhanNguoiThu = isRefund ? "Người chi tiền" : "Người thu tiền";
+
     QString html = QString(
         "<html><head><style>"
-        "body { font-family: 'Siemreap', 'Khmer OS Siemreap', 'Times New Roman', serif; padding: 20px; }"
-        ".header { text-align: center; font-size: 16pt; font-weight: bold; margin-bottom: 20px; }"
-        ".row { display: flex; justify-content: space-between; margin-bottom: 10px; }"
+        "body { font-family: 'Segoe UI', 'Siemreap', sans-serif; padding: 20px; color: #000; }"
+        ".header { text-align: center; font-size: 18pt; font-weight: bold; margin-bottom: 25px; border-bottom: 2px solid #000; padding-bottom: 10px; }"
+        ".info-group { margin-bottom: 15px; font-size: 12pt; }"
+        ".label { font-weight: bold; min-width: 150px; display: inline-block; }"
+        ".value { border-bottom: 1px dotted #666; }"
+        ".amount { font-size: 16pt; font-weight: bold; color: %1; }"
+        ".signature-section { display: table; width: 100%%; margin-top: 50px; }"
+        ".signature-box { display: table-cell; text-align: center; width: 50%%; }"
         "</style></head><body>"
-        "<div class='header'>BIÊN LAI THU TIỀN PHẠT</div>"
-        "<div><b>Họ tên học viên:</b> %1</div>"
-        "<div><b>Mã thẻ:</b> %2</div>"
-        "<div><b>Lý do phạt:</b> %3</div>"
-        "<div><b>Số tiền:</b> %4 VNĐ</div>"
-        "<br><br>"
-        "<div style='text-align: right;'>Ngày %5 tháng %6 năm %7</div>"
-        "<div style='display: flex; justify-content: space-between; margin-top: 30px;'>"
-        "  <div style='text-align: center;'><b>Người nộp tiền</b><br>(Ký tên)</div>"
-        "  <div style='text-align: center;'><b>Người thu tiền</b><br>(Ký tên)</div>"
+        "<div class='header'>%2</div>"
+        
+        "<div class='info-group'><span class='label'>Học viên:</span> <span class='value'>%3 (Mã: %4)</span></div>"
+        "<div class='info-group'><span class='label'>%5</span> <span class='value'>%6</span></div>"
+        "<div class='info-group'><span class='label'>%7</span> <span class='amount'>%8 %9</span></div>"
+        
+        "<div style='text-align: right; margin-top: 30px; font-style: italic;'>"
+        "Cần Thơ, ngày %10 tháng %11 năm %12"
+        "</div>"
+        
+        "<div class='signature-section'>"
+        "  <div class='signature-box'><b>%13</b><br><br><br><br><i>(Ký và ghi rõ họ tên)</i></div>"
+        "  <div class='signature-box'><b>%14</b><br><br><br><br><i>(Ký tên)</i></div>"
         "</div>"
         "</body></html>"
-    ).arg(hoTen)
+    ).arg(isRefund ? "#2E7D32" : "#D32F2F")
+     .arg(tieuDePhieu)
+     .arg(hoTen)
      .arg(docGia->data.MaThe)
+     .arg(nhanLyDo)
      .arg(lyDo)
+     .arg(nhanSoTien)
      .arg(QLocale(QLocale::Vietnamese).toString(soTien))
+     .arg(LanguageManager::instance().getText("CURRENCY_UNIT"))
      .arg(QDate::currentDate().day())
      .arg(QDate::currentDate().month())
-     .arg(QDate::currentDate().year());
+     .arg(QDateTime::currentDateTime().toString("yyyy"))
+     .arg(nhanNguoiNop)
+     .arg(nhanNguoiThu);
      
     QTextDocument doc;
     doc.setHtml(html);
 
-    // Silent Audit Log (Phase 10)
-    logReceiptToPDF(&doc, "BienLaiPhat");
+    logReceiptToPDF(&doc, isRefund ? "BienLaiHoanTien" : "BienLaiPhat");
 
-    QString question = QString("In biên lai phạt cho: %1\nSố tiền: %2").arg(hoTen).arg(soTien);
-    return xuLyYeuCauIn(&doc, "Biên Lai Phạt", question, taoTenFileBaoCao("Phat"), parent, s_config.printerReceipt);
-
+    QString fn = isRefund ? "HoanTien" : "Phat";
+    return xuLyYeuCauIn(&doc, tieuDePhieu, tieuDePhieu, taoTenFileBaoCao(fn), parent, s_config.printerReceipt);
 }
 
 // ===== HELPER FUNCTIONS =====
@@ -1653,8 +1688,13 @@ bool PrintHelper::xuatLichSuMuonTraToPDF(PTRDG docGia, QWidget* parent) {
 
     // 3. Combine
     QString finalHtml = QString(
-        "<html><head><style>body { font-family: 'Times New Roman'; }</style></head><body>"
-        "<h1 style='text-align: center;'>BAO CAO LICH SU MUON TRA</h1>"
+        "<html><head><style>"
+        "body { font-family: 'Times New Roman'; }"
+        "table { border-collapse: collapse; width: 100%; margin-top: 15px; }"
+        "th, td { border: 1px solid #000; padding: 8px; font-size: 13px; text-align: left; }"
+        "th { background-color: #f2f2f2; font-weight: bold; }"
+        "</style></head><body>"
+        "<h1 style='text-align: center; margin-bottom: 20px;'>BÁO CÁO LỊCH SỬ MƯỢN TRẢ</h1>"
         "%1"
         "<hr>"
         "%2"
@@ -1672,8 +1712,8 @@ bool PrintHelper::inBaoCaoTaiChinh(const QString& start, const QString& end, con
     if (!model) return false;
 
     QString html = "<html><head><style>"
-                   "table { border-collapse: collapse; width: 100%; font-size: 11px; }"
-                   "th, td { border: 1px solid #333; padding: 6px; text-align: left; }"
+                   "table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 10px; }"
+                   "th, td { border: 1px solid #333; padding: 8px; text-align: left; }"
                    "th { background-color: #f2f2f2; font-weight: bold; }"
                    "h1 { text-align: center; color: #1a1a1a; }"
                    ".header-info { margin-bottom: 20px; font-size: 12px; }"
@@ -1715,86 +1755,201 @@ bool PrintHelper::inBaoCaoTaiChinh(const QString& start, const QString& end, con
     return showPrintPreview(&doc, tieuDe, parent, "BaoCo_TaiChinh_" + QDate::currentDate().toString("yyyyMMdd"));
 }
 
-bool PrintHelper::inBaoCaoKiemKe(const QStringList& missing, const QStringList& unknown, const QStringList& borrowedAnomalies,
-                               const QStringList& borrowed, const QMap<QString, int>& stats, QWidget* parent) {
-
+// In Lịch Sử Mượn Trả (Refactored Unified)
+bool PrintHelper::inLichSuMuonTra(QAbstractItemModel* model, 
+                                 const QString& timeRange, 
+                                 const QMap<QString, double>& stats, 
+                                 QWidget* parent) {
+    if (!model) return false;
+    
+    PrintConfig cfg = getCauHinh();
+    
     QString html = "<html><head><style>"
-                   "h1 { text-align: center; color: #1a1a1a; margin-top: 0; }"
-                   "h2 { color: #d32f2f; border-bottom: 2px solid #ccc; padding-bottom: 5px; font-size: 16px; margin-top: 25px; }"
-                   ".audit-info { margin-bottom: 25px; font-size: 13px; line-height: 1.6; }"
-                   "table { border-collapse: collapse; width: 100%; margin-bottom: 20px; font-size: 11px; }"
-                   "th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }"
-                   "th { background-color: #f5f6fa; font-weight: bold; color: #333; }"
-                   ".summary-table { width: auto; min-width: 350px; border: 2px solid #333; margin-bottom: 30px; }"
-                   ".summary-table th { background-color: #333; color: white; }"
-                   ".summary-table td { font-weight: bold; font-size: 14px; text-align: center; }"
+                   "body { font-family: 'Times New Roman', serif; padding: 20px; }"
+                   "h1 { text-align: center; font-size: 24pt; color: #2c3e50; margin-bottom: 5px; }"
+                   "h3 { text-align: center; font-size: 14pt; color: #7f8c8d; margin-top: 0; margin-bottom: 20px; }"
+                   "table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11pt; }"
+                   "th, td { border: 1px solid #bdc3c7; padding: 6px; text-align: left; }"
+                   "th { background-color: #ecf0f1; font-weight: bold; color: #2c3e50; }"
+                   ".amount { font-family: 'Consolas', monospace; text-align: right; }"
+                   ".status-ok { color: #27ae60; font-weight: bold; }"
+                   ".status-warn { color: #f39c12; font-weight: bold; }"
+                   ".status-err { color: #c0392b; font-weight: bold; }"
+                   ".summary-kpi { display: inline-block; width: 23%; background: #f8f9fa; border: 1px solid #ddd; padding: 10px; margin: 1%; text-align: center; }"
+                   ".kpi-val { font-size: 16pt; font-weight: bold; color: #2c3e50; display: block; }"
+                   ".kpi-lbl { font-size: 10pt; color: #7f8c8d; text-transform: uppercase; }"
                    "</style></head><body>";
 
-    html += "<h1>BÁO CÁO KIỂM KÊ KHO SÁCH TỔNG QUÁT</h1>";
+    html += QString("<h1>%1</h1>").arg(cfg.tenThuVien);
+    html += "<h3>BÁO CÁO LỊCH SỬ MƯỢN TRẢ</h3>";
+    html += QString("<p style='text-align: center; font-style: italic;'>Thời gian: %1</p>").arg(timeRange);
+
+    // Summary Cards (Finance & Activity matches Dashboard style)
+    html += "<div style='text-align: center; margin-bottom: 20px;'>";
+    html += QString("<div class='summary-kpi'><span class='kpi-val'>%1</span><span class='kpi-lbl'>Lượt Mượn</span></div>")
+             .arg((int)stats.value("total_tx"));
+    html += QString("<div class='summary-kpi'><span class='kpi-val'>%1</span><span class='kpi-lbl'>Sách Đã Trả</span></div>")
+             .arg((int)stats.value("returned"));
+    html += QString("<div class='summary-kpi'><span class='kpi-val'>%1</span><span class='kpi-lbl'>Sách Mất</span></div>")
+             .arg((int)stats.value("lost"));
     
-    html += "<div class='audit-info'>";
-    html += QString("• <b>Ngày kiểm kê:</b> %1<br>").arg(QDateTime::currentDateTime().toString("dd/MM/yyyy HH:mm:ss"));
-    html += QString("• <b>Người kiểm kê:</b> %1<br>").arg(UserManager::instance().currentUser().fullName.isEmpty() ? 
-                                                       UserManager::instance().currentUser().username : 
-                                                       UserManager::instance().currentUser().fullName);
+    QLocale locale(QLocale::Vietnamese, QLocale::Vietnam);
+    QString revenue = locale.toCurrencyString(stats.value("revenue"), "đ");
+    html += QString("<div class='summary-kpi'><span class='kpi-val' style='color: #27ae60;'>%1</span><span class='kpi-lbl'>Doanh Thu Phạt</span></div>")
+             .arg(revenue);
     html += "</div>";
 
-    // --- SUMMARY SECTION ---
-    html += "<h2>1. TÓM TẮT CHỈ SỐ HỆ THỐNG</h2>";
-    html += "<table class='summary-table'>";
-    html += "<tr><th>Chỉ số</th><th>Số lượng</th></tr>";
-    html += QString("<tr><td>Tổng số đầu sách</td><td>%1</td></tr>").arg(stats.value("titles", 0));
-    html += QString("<tr><td>Tổng số cuốn (Bản sao)</td><td>%1</td></tr>").arg(stats.value("copies", 0));
-    html += QString("<tr><td>Sách đang cho mượn (Theo hợp đồng)</td><td>%1</td></tr>").arg(stats.value("borrowed", 0));
-    html += QString("<tr><td>Sách thực tế phải có trên kệ</td><td>%1</td></tr>").arg(stats.value("stock", 0));
-    html += "</table>";
+    // Detailed Table
+    html += "<table><thead><tr>"
+            "<th>Ngày Mượn</th>"
+            "<th>Ngày Trả</th>"
+            "<th>Độc Giả</th>"
+            "<th>Tên Sách</th>"
+            "<th>Trạng Thái</th>"
+            "<th>Tiền Phạt</th>" // Combined column
+            "</tr></thead><tbody>";
 
-    // --- COMPARISON SECTION ---
-    html += "<h2>2. KẾT QUẢ ĐỐI SOÁT THỰC TẾ</h2>";
+    int rows = model->rowCount();
+    for (int i = 0; i < rows; ++i) {
+        QString ngayMuon = model->data(model->index(i, 0)).toString();
+        QString ngayTra = model->data(model->index(i, 1)).toString();
+        QString docGia = model->data(model->index(i, 2)).toString();
+        QString tenSach = model->data(model->index(i, 3)).toString();
+        QString trangThai = model->data(model->index(i, 5)).toString(); // Str
+        QString tienPhat = model->data(model->index(i, 4)).toString();
+        QString thanhToan = model->data(model->index(i, 6)).toString();
+
+        QString statusClass = "status-ok";
+        if (trangThai.contains("Mất")) statusClass = "status-err";
+        else if (trangThai.contains("Quá hạn") || !tienPhat.isEmpty()) statusClass = "status-warn";
+        
+        // Format Fine column: "50.000 (Chưa)"
+        QString fineDisplay = "";
+        if (tienPhat != "0" && !tienPhat.isEmpty()) {
+            double val = tienPhat.toDouble();
+             fineDisplay = locale.toCurrencyString(val, "đ");
+             if (thanhToan.contains("Chưa")) fineDisplay += " <span style='color:red; font-size: 9pt;'>(Nợ)</span>";
+             else fineDisplay += " <span style='color:green; font-size: 9pt;'>(Thu)</span>";
+        }
+
+        html += QString("<tr>"
+                        "<td>%1</td><td>%2</td>"
+                        "<td><b>%3</b></td>"
+                        "<td>%4</td>"
+                        "<td class='%5'>%6</td>"
+                        "<td class='amount'>%7</td>"
+                        "</tr>")
+                .arg(ngayMuon).arg(ngayTra).arg(docGia).arg(tenSach)
+                .arg(statusClass).arg(trangThai).arg(fineDisplay);
+    }
     
-    // Missing (In System but not on shelf)
-    if (!missing.isEmpty()) {
-        html += QString("<p style='color: #d32f2f; font-weight: bold;'>⚠️ DANH SÁCH SÁCH THẤT LẠC - THIẾU (%1 CUỐN)</p>").arg(missing.size());
-        html += "<table><tr><th>STT</th><th>Mã cá biệt</th><th>Vị trí (Lý thuyết)</th><th>Ghi chú</th></tr>";
-        for (int i = 0; i < missing.size(); ++i) {
-            html += QString("<tr><td>%1</td><td>%2</td><td>-</td><td>Có trong DB nhưng không tìm thấy</td></tr>").arg(i+1).arg(missing[i]);
-        }
-        html += "</table>";
-    }
-
-    // Surplus (Scanned but not in System)
-    if (!unknown.isEmpty()) {
-        html += QString("<p style='color: #f39c12; font-weight: bold;'>❔ DANH SÁCH MÃ LẠ - DƯ (%1 CUỐN)</p>").arg(unknown.size());
-        html += "<table><tr><th>STT</th><th>Mã quét được</th><th>Ghi chú</th></tr>";
-        for (int i = 0; i < unknown.size(); ++i) {
-            html += QString("<tr><td>%1</td><td>%2</td><td>Dữ liệu không tồn tại</td></tr>").arg(i+1).arg(unknown[i]);
-        }
-        html += "</table>";
-    }
-
-    // Anomalies (Scanned but DB says Borrowed)
-    if (!borrowedAnomalies.isEmpty()) {
-        html += QString("<p style='color: #a78bfa; font-weight: bold;'>⚡ DANH SÁCH SAI TRẠNG THÁI (%1 CUỐN)</p>").arg(borrowedAnomalies.size());
-        html += "<table><tr><th>STT</th><th>Mã cá biệt</th><th>Trạng thái DB</th><th>Ghi chú</th></tr>";
-        for (int i = 0; i < borrowedAnomalies.size(); ++i) {
-            html += QString("<tr><td>%1</td><td>%2</td><td>Đang mượn</td><td>Có trên kệ nhưng chưa trả trên máy</td></tr>").arg(i+1).arg(borrowedAnomalies[i]);
-        }
-        html += "</table>";
-    }
-
-    if (missing.isEmpty() && unknown.isEmpty() && borrowedAnomalies.isEmpty()) {
-        html += "<p style='text-align: center; font-size: 18px; color: #27ae60; padding: 20px; border: 2px dashed #27ae60;'><b>✓ TẤT CẢ DỮ LIỆU KHỚP TUYỆT ĐỐI!</b></p>";
-    }
-
-    html += "<div style='margin-top: 50px; text-align: right;'>"
-            "<p>......, Ngày .... tháng .... năm ........</p>"
-            "<p style='margin-right: 50px;'><b>Người lập biểu</b></p>"
-            "<br><br><br>"
+    html += "</tbody></table>";
+    
+    // Footer
+    html += "<div style='margin-top: 30px; text-align: right; font-style: italic;'>"
+            "Xuất ngày " + QDate::currentDate().toString("dd") + " tháng " + QDate::currentDate().toString("MM") + " năm " + QDate::currentDate().toString("yyyy") +
             "</div>";
-
     html += "</body></html>";
 
     QTextDocument doc;
     doc.setHtml(html);
-    return showPrintPreview(&doc, "Báo cáo kiểm kê tổng quát", parent, "KiemKe_Audit_" + QDate::currentDate().toString("yyyyMMdd"));
+    
+    // Auto Landscape for History Report
+    QString fn = "BaoCao_LichSu_" + QDate::currentDate().toString("yyyyMMdd");
+    return showPrintPreview(&doc, "Báo cáo Lịch sử Giao dịch", parent, fn);
+}
+
+// In báo cáo kiểm kê
+bool PrintHelper::inBaoCaoKiemKe(const QStringList& missing, const QStringList& unknown, const QStringList& borrowedAnomalies,
+                           const QStringList& /*borrowed*/, const QMap<QString, int>& stats, QWidget* parent) {
+    PrintConfig cfg = getCauHinh();
+    
+    QString html = "<html><head><style>"
+                   "body { font-family: 'Times New Roman', serif; padding: 20px; }"
+                   "h1 { text-align: center; font-size: 26pt; color: #2c3e50; margin-bottom: 10px; text-transform: uppercase; }"
+                   "h2 { font-size: 16pt; color: #2980b9; border-bottom: 2px solid #2980b9; padding-bottom: 5px; margin-top: 30px; }"
+                   ".audit-info { text-align: center; font-size: 12pt; margin-bottom: 30px; color: #555; }"
+                   "table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12pt; }"
+                   "th, td { border: 1px solid #bdc3c7; padding: 8px; text-align: left; }"
+                   "th { background-color: #ecf0f1; font-weight: bold; color: #2c3e50; text-align: center; }"
+                   ".summary-table { width: 60%; margin: 0 auto; }"
+                   ".summary-table td:nth-child(2) { text-align: center; font-weight: bold; }"
+                   ".status-err { color: #c0392b; font-weight: bold; }"
+                   ".status-warn { color: #f39c12; font-weight: bold; }"
+                   "</style></head><body>";
+
+    html += QString("<h1>%1</h1>").arg(cfg.tenThuVien);
+    html += "<h2 style='text-align: center; border: none; font-size: 20pt; color: #333;'>BÁO CÁO KIỂM KÊ KHO SÁCH</h2>";
+    
+    html += "<div class='audit-info'>";
+    html += QString("Ngày kiểm kê: <b>%1</b><br>").arg(QDateTime::currentDateTime().toString("dd/MM/yyyy HH:mm"));
+    html += QString("Người thực hiện: <b>%1</b>").arg(UserManager::instance().currentUser().fullName);
+    html += "</div>";
+
+    // 1. SUMMARY
+    html += "<h2>1. THỐNG KÊ TỔNG QUÁT</h2>";
+    html += "<table class='summary-table'>";
+    html += "<tr><th>Hạng mục</th><th>Số lượng</th></tr>";
+    html += QString("<tr><td>Tổng số đầu sách</td><td>%1</td></tr>").arg(stats.value("titles"));
+    html += QString("<tr><td>Tổng số bản sao (Cuốn)</td><td>%1</td></tr>").arg(stats.value("copies"));
+    html += QString("<tr><td>Sách đang cho mượn</td><td>%1</td></tr>").arg(stats.value("borrowed"));
+    html += QString("<tr><td>Sách thực tế tại kho</td><td>%1</td></tr>").arg(stats.value("stock"));
+    html += "</table>";
+
+    // 2. DISCREPANCIES
+    html += "<h2>2. CHI TIẾT SAI LỆCH</h2>";
+    
+    bool perfect = true;
+
+    // Missing
+    if (!missing.isEmpty()) {
+        perfect = false;
+        html += QString("<p class='status-err'>⚠️ SÁCH THẤT LẠC (Có trong phần mềm, không thấy trong kho, không cho mượn): %1 cuốn</p>").arg(missing.size());
+        html += "<table><tr><th width='10%'>STT</th><th width='20%'>Mã Cá Biệt</th><th>Tên Sách</th></tr>";
+        for (int i = 0; i < missing.size(); ++i) {
+            // Placeholder name lookup would happen here in real app, relying on caller passing better data or lookup
+            // For now just ID
+             html += QString("<tr><td align='center'>%1</td><td align='center'>%2</td><td>%3</td></tr>")
+                    .arg(i+1).arg(missing[i]).arg("Chưa xác định"); 
+        }
+        html += "</table>";
+    }
+
+    // Unknown
+    if (!unknown.isEmpty()) {
+        perfect = false;
+        html += QString("<p class='status-warn'>❔ MÃ LẠ (Quét được nhưng không có trong phần mềm): %1 mã</p>").arg(unknown.size());
+        html += "<table><tr><th width='10%'>STT</th><th>Mã Quét Được</th></tr>";
+        for (int i = 0; i < unknown.size(); ++i) {
+             html += QString("<tr><td align='center'>%1</td><td>%2</td></tr>").arg(i+1).arg(unknown[i]);
+        }
+        html += "</table>";
+    }
+
+    // Found but Borrowed
+    if (!borrowedAnomalies.isEmpty()) {
+        perfect = false;
+        html += QString("<p class='status-warn' style='color: #8e44ad;'>⚡ SAI TRẠNG THÁI (Sách đang báo mượn nhưng lại thấy trong kho): %1 cuốn</p>").arg(borrowedAnomalies.size());
+        html += "<table><tr><th width='10%'>STT</th><th width='20%'>Mã Cá Biệt</th><th>Ghi chú</th></tr>";
+        for (int i = 0; i < borrowedAnomalies.size(); ++i) {
+             html += QString("<tr><td align='center'>%1</td><td align='center'>%2</td><td>Cần thu hồi sách hoăc cập nhật trả sách</td></tr>").arg(i+1).arg(borrowedAnomalies[i]);
+        }
+        html += "</table>";
+    }
+
+    if (perfect) {
+        html += "<div style='text-align: center; border: 2px solid #27ae60; padding: 20px; color: #27ae60; font-size: 16pt; font-weight: bold; margin-top: 20px;'>";
+        html += "✓ DỮ LIỆU KHO KHỚP 100% VỚI PHẦN MỀM";
+        html += "</div>";
+    }
+
+    html += "<div style='margin-top: 50px; text-align: right; font-style: italic;'>"
+            "Ngày ...... tháng ...... năm 20....<br>Người kiểm kê<br><br><br><br>(Ký và ghi rõ họ tên)</div>";
+    
+    html += "</body></html>";
+
+    QTextDocument doc;
+    doc.setHtml(html);
+    QString fn = "BaoCao_KiemKe_" + QDate::currentDate().toString("yyyyMMdd");
+    return showPrintPreview(&doc, "Báo cáo Kiểm kê", parent, fn);
 }

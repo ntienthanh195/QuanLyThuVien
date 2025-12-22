@@ -15,6 +15,7 @@
 #include <QVariant>
 #include <QDebug>
 #include <QUuid>
+#include "utils/EventBus.h"
 
 UserManager& UserManager::instance() {
     static UserManager inst;
@@ -55,7 +56,8 @@ bool UserManager::login(const QString& username, const QString& password) {
             qDebug() << "[UserManager] Login success:" << username;
             
             // Log Login Action
-            AuditLogger::log(AuditLogger::ACTION_LOGIN, "HE_THONG", QString::number(id), "Người dùng " + username + " đã đăng nhập");
+            AuditLogger::log(AuditLogger::ACTION_LOGIN, "HE_THONG", QString::number(id), 
+                             QString("%1 (%2) - Vai trò: %3").arg(fullName).arg(username).arg(role));
             
             emit userChanged(m_currentUser);
             return true;
@@ -71,7 +73,8 @@ bool UserManager::login(const QString& username, const QString& password) {
 
 void UserManager::logout() {
     if (m_loggedIn) {
-        AuditLogger::log(AuditLogger::ACTION_LOGOUT, "HE_THONG", QString::number(m_currentUser.id), "Người dùng " + m_currentUser.username + " đã đăng xuất");
+        AuditLogger::log(AuditLogger::ACTION_LOGOUT, "HE_THONG", QString::number(m_currentUser.id), 
+                         QString("%1 (%2)").arg(m_currentUser.fullName).arg(m_currentUser.username));
     }
     m_loggedIn = false;
     m_currentUser = UserInfo();
@@ -124,7 +127,12 @@ bool UserManager::addUser(const QString& username, const QString& password, cons
     q.bindValue(":n", fullName);
     q.bindValue(":r", roleId);
     
-    return q.exec();
+    bool ok = q.exec();
+    if (ok) {
+        try { EventBus::instance().nguoiDungAdded(username); } catch(...) {}
+        AuditLogger::log(AuditLogger::ACTION_INSERT, "NGUOI_DUNG", username, "Them nguoi dung moi: " + username);
+    }
+    return ok;
 }
 
 bool UserManager::changePassword(int userId, const QString& newPassword) {
@@ -141,7 +149,19 @@ bool UserManager::changePassword(int userId, const QString& newPassword) {
     q.bindValue(":s", salt);
     q.bindValue(":id", userId);
     
-    return q.exec();
+    bool ok = q.exec();
+    if (ok) {
+        // Fetch username for signal
+        QSqlQuery qName(DatabaseManager::instance().database());
+        qName.prepare("SELECT ten_dang_nhap FROM nguoi_dung WHERE id = ?");
+        qName.addBindValue(userId);
+        if (qName.exec() && qName.next()) {
+            QString username = qName.value(0).toString();
+            try { EventBus::instance().nguoiDungUpdated(username); } catch(...) {}
+            AuditLogger::log(AuditLogger::ACTION_UPDATE, "NGUOI_DUNG", username, "Doi mat khau nguoi dung: " + username);
+        }
+    }
+    return ok;
 }
 
 QString UserManager::hashPassword(const QString& password, const QString& salt) {

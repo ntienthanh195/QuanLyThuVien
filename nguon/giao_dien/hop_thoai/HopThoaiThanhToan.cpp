@@ -9,9 +9,9 @@
 #include <QGroupBox>
 #include <QMessageBox>
 
-HopThoaiThanhToan::HopThoaiThanhToan(PTRDG docGia, const QString& lyDo, long long soTien, QWidget *parent)
-    : QDialog(parent), m_docGia(docGia), m_lyDo(lyDo), m_soTien(soTien) {
-    setWindowTitle(LanguageManager::instance().getText("DIALOG_PAYMENT_TITLE"));
+HopThoaiThanhToan::HopThoaiThanhToan(PTRDG docGia, const QString& lyDo, long long soTien, bool isRefund, QWidget *parent)
+    : QDialog(parent), m_docGia(docGia), m_lyDo(lyDo), m_soTien(soTien), m_isRefund(isRefund) {
+    setWindowTitle(m_isRefund ? LanguageManager::instance().getText("DIALOG_REFUND_TITLE") : LanguageManager::instance().getText("DIALOG_PAYMENT_TITLE"));
     setMinimumWidth(400);
     
     // Deep Night Theme
@@ -20,8 +20,8 @@ HopThoaiThanhToan::HopThoaiThanhToan(PTRDG docGia, const QString& lyDo, long lon
     thietLapGiaoDien();
 }
 
-bool HopThoaiThanhToan::hienThiThanhToan(PTRDG docGia, const QString& lyDo, long long soTien, QWidget *parent) {
-    HopThoaiThanhToan dialog(docGia, lyDo, soTien, parent);
+bool HopThoaiThanhToan::hienThiThanhToan(PTRDG docGia, const QString& lyDo, long long soTien, bool isRefund, QWidget *parent) {
+    HopThoaiThanhToan dialog(docGia, lyDo, soTien, isRefund, parent);
     return dialog.exec() == QDialog::Accepted;
 }
 
@@ -30,8 +30,9 @@ void HopThoaiThanhToan::thietLapGiaoDien() {
     mainLayout->setSpacing(15);
     mainLayout->setContentsMargins(20, 20, 20, 20);
     
-    QLabel *title = new QLabel(LanguageManager::instance().getText("HEADER_PAYMENT"));
-    title->setStyleSheet("font-size: 18px; font-weight: bold; color: #FFFFFF; margin-bottom: 10px;");
+    QLabel *title = new QLabel(m_isRefund ? LanguageManager::instance().getText("HEADER_REFUND") : LanguageManager::instance().getText("HEADER_PAYMENT"));
+    title->setStyleSheet(QString("font-size: 18px; font-weight: bold; color: %1; margin-bottom: 10px;")
+                        .arg(m_isRefund ? "#4CAF50" : "#FFFFFF"));
     title->setAlignment(Qt::AlignCenter);
     mainLayout->addWidget(title);
     
@@ -47,7 +48,12 @@ void HopThoaiThanhToan::thietLapGiaoDien() {
         QLabel *lbl = new QLabel(label);
         lbl->setStyleSheet("color: #CCCCCC;");
         QLabel *val = new QLabel(value);
-        val->setStyleSheet(isHighlight ? "color: #FF5252; font-weight: bold; font-size: 16px;" : "color: #FFFFFF; font-weight: 500;");
+        if (isHighlight) {
+            val->setStyleSheet(QString("color: %1; font-weight: bold; font-size: 16px;")
+                              .arg(m_isRefund ? "#4CAF50" : "#FF5252"));
+        } else {
+            val->setStyleSheet("color: #FFFFFF; font-weight: 500;");
+        }
         val->setAlignment(Qt::AlignRight);
         row->addWidget(lbl);
         row->addStretch();
@@ -69,12 +75,15 @@ void HopThoaiThanhToan::thietLapGiaoDien() {
     // Buttons
     QHBoxLayout *btnLayout = new QHBoxLayout();
     
-    nutThanhToan = new QPushButton(LanguageManager::instance().getText("BTN_CONFIRM_PAYMENT"));
+    nutThanhToan = new QPushButton(m_isRefund ? LanguageManager::instance().getText("BTN_CONFIRM_REFUND") 
+                                             : LanguageManager::instance().getText("BTN_CONFIRM_PAYMENT"));
     nutThanhToan->setMinimumHeight(40);
     nutThanhToan->setCursor(Qt::PointingHandCursor);
     nutThanhToan->setStyleSheet(
-        "QPushButton { background-color: #0078D4; color: white; border: none; border-radius: 4px; font-weight: 600; padding: 0 20px; }"
-        "QPushButton:hover { background-color: #106EBE; }"
+        QString("QPushButton { background-color: %1; color: white; border: none; border-radius: 4px; font-weight: 600; padding: 0 20px; }"
+                "QPushButton:hover { background-color: %2; }")
+        .arg(m_isRefund ? "#2E7D32" : "#0078D4")
+        .arg(m_isRefund ? "#1B5E20" : "#106EBE")
     );
     
     nutHuy = new QPushButton(LanguageManager::instance().getText("BTN_CANCEL"));
@@ -98,7 +107,7 @@ void HopThoaiThanhToan::xuLyThanhToan() {
     // Ở đây ta giả lập thanh toán thành công
     
     if (hopInBienLai->isChecked()) {
-        PrintHelper::inBienLaiPhat(m_docGia, m_lyDo, m_soTien, this);
+        PrintHelper::inBienLaiPhat(m_docGia, m_lyDo, m_soTien, m_isRefund, this);
     }
     
     ToastNotification::show(LanguageManager::instance().getText("MSG_PAYMENT_SUCCESS"), ToastNotification::SUCCESS);

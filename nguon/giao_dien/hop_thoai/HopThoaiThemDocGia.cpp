@@ -402,7 +402,8 @@ void HopThoaiThemDocGia::xuLyNutLuu() {
     int trangThai = 1; // 1 = hoạt động
     
     // Gọi hàm backend tạo độc giả với dữ liệu đã chuẩn hóa
-    PTRDG newReader = taoDocGia(hoChuan, tenChuan, phai, trangThai, rootDocGia);
+    // FIX: Pass maDuocTao (UI calculated) to backend instead of rootDocGia (Random generation)
+    PTRDG newReader = taoDocGia(hoChuan, tenChuan, phai, trangThai, maDuocTao);
     if (newReader) {
         // Phase 2: Set additional fields
         newReader->data.LoaiDocGia = hopChonLoaiDocGia->currentIndex();
