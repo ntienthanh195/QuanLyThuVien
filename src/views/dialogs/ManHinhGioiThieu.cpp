@@ -86,7 +86,10 @@ void ManHinhGioiThieu::setupUI() {
                           "<br>" + 
                           LanguageManager::instance().getText("MSG_ABOUT_TECH_HTML") + 
                           "<br>" + 
-                          "<p style='color: #585b68; font-size: 11px; text-align: center; margin-top: 20px;'>" + 
+                          "<p style='color: #F4A460; font-size: 13px; text-align: center; font-weight: bold; margin-top: 10px;'>" + 
+                          "Được phát triển bởi Chăm Rốch Thi" + 
+                          "</p>" +
+                          "<p style='color: #585b68; font-size: 11px; text-align: center; margin-top: 10px;'>" + 
                           LanguageManager::instance().getText("MSG_ABOUT_CREDIT") + 
                           "</p>";
 

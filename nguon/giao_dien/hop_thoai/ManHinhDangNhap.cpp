@@ -303,6 +303,13 @@ void ManHinhDangNhap::setupUI() {
     targetLayout->addWidget(m_btnLogin);
     targetLayout->addSpacing(10);
     targetLayout->addWidget(m_btnExit);
+    
+    // Developed by label
+    QLabel *lblDev = new QLabel("Được phát triển bởi Chăm Rốch Thi");
+    lblDev->setStyleSheet("color: #475569; font-size: 11px; font-style: italic; margin-top: 20px;");
+    lblDev->setAlignment(Qt::AlignCenter);
+    targetLayout->addWidget(lblDev);
+
     targetLayout->addStretch();
     
     // Add panels to split layout
