@@ -119,7 +119,7 @@ void HopThoaiTop10::thieLapGiaoDien() {
 }
 
 void HopThoaiTop10::taiDuLieuTop10() {
-    extern PTRDS dsDauSach[];
+    // extern PTRDS dsDauSach[]; // REMOVED
     extern int soLuongDauSach;
     
     TopSachDTO topSach[10];

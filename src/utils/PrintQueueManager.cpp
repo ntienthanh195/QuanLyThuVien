@@ -106,7 +106,7 @@ QString PrintQueueManager::taoHTMLHangDoi() {
         QString ho = QString::fromStdString(dg->data.Ho).toHtmlEscaped();
         QString ten = QString::fromStdString(dg->data.Ten).toHtmlEscaped();
         QString fullName = ho + " " + ten;
-        QString phai = dg->data.Phai ? "Nữ" : "Nam";
+        QString phai = QString::fromStdString(dg->data.Phai);
         QString trangThai = dg->data.TrangThai == 1 ? "Hoạt động" : "Bị khóa";
 
         html += "<div class=\"card\">";
@@ -123,22 +123,25 @@ QString PrintQueueManager::taoHTMLHangDoi() {
         html += "</table>";
 
         // List borrowed books (if any)
-        if (dg->data.dsmt != nullptr) {
+        if (!dg->data.dsmt.empty()) {
             html += "<div><strong>Giao dịch mượn/trả:</strong>";
             html += "<table><tr><th>Mã sách</th><th>Ngày mượn</th><th>Ngày trả</th><th>Trạng thái</th></tr>";
-            MUONTRA mt = dg->data.dsmt;
+            
+            // Limit rows to avoid huge report
             int row = 0;
-            while (mt && row < 1000) {
-                QString maSach = QString::fromStdString(mt->data.banSaoSach ? mt->data.banSaoSach->maSach : "");
-                QString ngayMuon = QString::fromStdString(mt->data.NgayMuon);
-                QString ngayTra = QString::fromStdString(mt->data.NgayTra);
-                QString tt = (mt->data.TrangThai == 0) ? "Đang mượn" : (mt->data.TrangThai == 1 ? "Đã trả" : "Mất");
+            for (auto it = dg->data.dsmt.rbegin(); it != dg->data.dsmt.rend(); ++it) {
+                if (row >= 1000) break;
+                const auto& mt = *it;
+                
+                QString maSach = QString::fromStdString(mt.banSaoSach ? mt.banSaoSach->maSach : "");
+                QString ngayMuon = QString::fromStdString(mt.NgayMuon);
+                QString ngayTra = QString::fromStdString(mt.NgayTra);
+                QString tt = (mt.TrangThai == 0) ? "Đang mượn" : (mt.TrangThai == 1 ? "Đã trả" : "Mất");
                 html += QString("<tr><td>%1</td><td>%2</td><td>%3</td><td>%4</td></tr>")
                         .arg(maSach.toHtmlEscaped())
                         .arg(ngayMuon.toHtmlEscaped())
                         .arg(ngayTra.toHtmlEscaped())
                         .arg(tt);
-                mt = mt->next;
                 ++row;
             }
             html += "</table></div>";
@@ -195,7 +198,7 @@ bool PrintQueueManager::xuatSamplePdf(ExportLayout layout) {
         for (PTRDG dg : m_danhSach) {
             if (!dg) continue;
             QString hoTen = QString::fromStdString(dg->data.Ho + " " + dg->data.Ten);
-            QString phai = dg->data.Phai ? "Nữ" : "Nam";
+            QString phai = QString::fromStdString(dg->data.Phai);
             QString trangThai = dg->data.TrangThai == 1 ? "Hoạt động" : "Khóa";
             bang += QString("<tr><td>%1</td><td>%2</td><td>%3</td><td>%4</td></tr>")
                     .arg(dg->data.MaThe).arg(hoTen).arg(phai).arg(trangThai);

@@ -834,11 +834,10 @@ QWidget* BangDieuKhien::taoBieuDoCotThongKe() {
     
     for (int i = 0; i < dem; i++) {
         if (!dsDocGia[i]) continue;
-         auto mt = dsDocGia[i]->data.dsmt;
-         while (mt) {
+         for (const auto& mt : dsDocGia[i]->data.dsmt) {
              // Parse date. Format: "yyyy-MM-dd HH:mm:ss" or similar?
              // std::string NgayMuon;
-             QString sDate = QString::fromStdString(mt->data.NgayMuon);
+             QString sDate = QString::fromStdString(mt.NgayMuon);
              // Try parsing
              QDateTime loanDate = QDateTime::fromString(sDate, "yyyy-MM-dd HH:mm:ss");
              if (!loanDate.isValid()) loanDate = QDateTime::fromString(sDate, "dd/MM/yyyy"); // Backup format
@@ -849,7 +848,6 @@ QWidget* BangDieuKhien::taoBieuDoCotThongKe() {
                      dailyCounts[key]++;
                  }
              }
-             mt = mt->next;
          }
     }
     
@@ -1542,7 +1540,7 @@ void BangDieuKhien::xuLyInDanhMucSach() {
         return;
     }
     
-    PrintHelper::inDanhMucSach(dsDauSach, soLuongDauSach, this);
+    PrintHelper::inDanhMucSach(dsDauSach.data(), soLuongDauSach, this);
 }
 
 void BangDieuKhien::xuLyInPhieuMuon() {
@@ -1580,11 +1578,12 @@ void BangDieuKhien::xuLyInPhieuMuon() {
         return;
     }
     
-    // In phiếu mượn cho sách đầu tiên
-    MUONTRA mt = docGia->data.dsmt;
-    if (mt && mt->data.banSaoSach) {
-        QString maSach = QString::fromStdString(mt->data.banSaoSach->maSach);
-        QString ngayMuon = QString::fromStdString(mt->data.NgayMuon);
+    // In phiếu mượn cho sách đầu tiên (Mới nhất)
+    if (!docGia->data.dsmt.empty()) {
+        const auto& mt = docGia->data.dsmt.back();
+        if (mt.banSaoSach) {
+            QString maSach = QString::fromStdString(mt.banSaoSach->maSach);
+            QString ngayMuon = QString::fromStdString(mt.NgayMuon);
         
         // Tìm tên sách từ mã sách
         QString tenSach = "Không rõ";
@@ -1603,6 +1602,7 @@ void BangDieuKhien::xuLyInPhieuMuon() {
         }
         
         PrintHelper::inPhieuMuonTuDong(docGia, maSach, tenSach, ngayMuon, this);
+    }
     }
 }
 

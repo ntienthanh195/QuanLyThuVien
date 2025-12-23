@@ -145,7 +145,7 @@ void HopThoaiThongKe::taiDuLieuThongKe() {
     
     // Lấy thống kê độc giả
     extern PTRDG rootDocGia;
-    extern PTRDS dsDauSach[];
+    // extern PTRDS dsDauSach[]; // REMOVED
     extern int soLuongDauSach;
     
     ThongKeDocGia tkDocGia = LayThongKeDocGia(rootDocGia, dsDauSach, soLuongDauSach);
@@ -192,7 +192,7 @@ QChartView* HopThoaiThongKe::taoBieuDoSach() {
 
 QChartView* HopThoaiThongKe::taoBieuDoDocGia() {
     extern PTRDG rootDocGia;
-    extern PTRDS dsDauSach[];
+    // extern PTRDS dsDauSach[]; // REMOVED
     extern int soLuongDauSach;
     
     ThongKeDocGia tk = LayThongKeDocGia(rootDocGia, dsDauSach, soLuongDauSach);

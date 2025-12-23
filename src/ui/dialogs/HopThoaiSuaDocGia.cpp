@@ -13,7 +13,7 @@
 #include <QScrollArea>
 
 HopThoaiSuaDocGia::HopThoaiSuaDocGia(int maThe, QWidget *cha)
-    : QDialog(cha), maDocGia(maThe), docGiaHienTai(nullptr) {
+    : QDialog(cha), maDocGia(maThe), docGiaHienTai({}) {
     setWindowTitle(LanguageManager::instance().getText("DIALOG_EDIT_READER_TITLE"));
     ResponsiveHelper::ScreenSize screenSize = ResponsiveHelper::detectScreenSize();
     setMinimumWidth(ResponsiveHelper::getScaledWidth(550, screenSize));
@@ -251,7 +251,7 @@ void HopThoaiSuaDocGia::taiDuLieuDocGia() {
     oNhapMaThe->setText(QString::number(docGiaHienTai->data.MaThe));
     oNhapHo->setText(QString::fromStdString(docGiaHienTai->data.Ho));
     oNhapTen->setText(QString::fromStdString(docGiaHienTai->data.Ten));
-    hopChonGioiTinh->setCurrentIndex(docGiaHienTai->data.Phai ? 1 : 0);
+    hopChonGioiTinh->setCurrentIndex(docGiaHienTai->data.Phai == "Nu" ? 1 : 0);
     hopChonTrangThai->setCurrentIndex(docGiaHienTai->data.TrangThai);
     
     // Phase 2 Load
@@ -319,8 +319,8 @@ void HopThoaiSuaDocGia::xuLyNutLuu() {
     TheDocGia duLieuMoi = docGiaHienTai->data;
     duLieuMoi.Ho = hoChuan;
     duLieuMoi.Ten = tenChuan;
-    duLieuMoi.Phai = (hopChonGioiTinh->currentIndex() == 1); // 0=Nam, 1=Nữ
-    duLieuMoi.TrangThai = hopChonTrangThai->currentIndex();
+    duLieuMoi.Phai = (hopChonGioiTinh->currentIndex() == 1 ? "Nu" : "Nam"); // 0=Nam, 1=Nữ
+    duLieuMoi.TrangThai = (TrangThaiTheDocGia)hopChonTrangThai->currentIndex();
     // Phase 2 Save
     // Phase 2 Save
     duLieuMoi.LoaiDocGia = hopChonLoaiDocGia->currentIndex();

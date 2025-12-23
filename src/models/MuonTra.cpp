@@ -134,12 +134,11 @@ void CapNhatNgayHetHanSomNhat(PTRDG docGia) {
      if (docGia->data.soSachDangMuon <= 0) return;
 
      time_t minDate = 0;
-     MUONTRA p = docGia->data.dsmt;
      int count = 0;
-     // Scan until we find all active loans or hit safety limit
-     while (p != nullptr && count < docGia->data.soSachDangMuon + 10) { 
-         if (p->data.TrangThai == 0) { // Active loan
-             time_t borrowTime = ChuyenNgaySangTimeT(p->data.NgayMuon);
+     // Scan all, limit check inside if needed, but vector iteration is fast
+     for (const auto& mt : docGia->data.dsmt) {
+         if (mt.TrangThai == GD_DANG_MUON) { // Active loan
+             time_t borrowTime = ChuyenNgaySangTimeT(mt.NgayMuon);
              // Use same logic as check
              int maxDays = SettingsManager::instance().getInt("SO_NGAY_MUON_TOI_DA", 7);
              time_t dueDate = borrowTime + maxDays * 24 * 3600;
@@ -149,13 +148,12 @@ void CapNhatNgayHetHanSomNhat(PTRDG docGia) {
              }
              count++; 
          }
-         p = p->next;
      }
      docGia->data.ngayHetHanSomNhat = minDate;
 }
 
 // ham backend: muon sach (O(log N) + O(M))
-std::string MuonSach(PTRDG docGia, const std::string& isbnOrMaSach, PTRDS dsDauSach[], int soLuongDauSach) {
+std::string MuonSach(PTRDG docGia, const std::string& isbnOrMaSach, std::vector<PTRDS>& dsDauSach, int soLuongDauSach) {
     if (docGia == nullptr) return "Loi: Doc gia khong hop le!";
     
     // --- BƯỚC 1: CẬP NHẬT TRẠNG THÁI QUYỀN MƯỢN (REALTIME) ---
@@ -349,32 +347,23 @@ std::string MuonSach(PTRDG docGia, const std::string& isbnOrMaSach, PTRDS dsDauS
 }
 
 // ham backend: tra sach (O(log N) + O(L))
-std::string TraSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[], int soLuongDauSach) {
+std::string TraSach(PTRDG docGia, const std::string& maSach, std::vector<PTRDS>& dsDauSach, int soLuongDauSach) {
     if (docGia == nullptr) return "Loi: Doc gia khong hop le!";
     
     // B1: Tim giao dich muon trong lich su
-    MUONTRA curr = docGia->data.dsmt;
-    MUONTRA found = nullptr;
-    int safety = 0;
-    while (curr != nullptr && safety < SO_VONG_LAP_MT_MAX) {
-        if (curr->next == curr) {
-            thongBao(std::cout, "Phat hien node MUONTRA self-loop trong TraSach. Dung duyet.", CANH_BAO);
-            break;
-        }
+    // B1: Tim giao dich muon trong lich su
+    MuonTra* found = nullptr;
+    
+    for (auto& mt : docGia->data.dsmt) {
         // Prefer cached maSach if present
-        std::string currMaSach = !curr->data.maSachCached.empty() ? curr->data.maSachCached : (curr->data.banSaoSach ? curr->data.banSaoSach->maSach : std::string());
+        std::string currMaSach = !mt.maSachCached.empty() ? mt.maSachCached : (mt.banSaoSach ? mt.banSaoSach->maSach : std::string());
         
         // Match exact MaSach AND (Active Loan OR Lost Book awaiting settlement OR Settled Lost Book)
         if (!currMaSach.empty() && currMaSach == maSach && 
-           (curr->data.TrangThai == GD_DANG_MUON || curr->data.TrangThai == GD_MAT_CHO_THANH_TOAN || curr->data.TrangThai == GD_MAT_DA_THANH_TOAN)) {
-            found = curr;
+           (mt.TrangThai == GD_DANG_MUON || mt.TrangThai == GD_MAT_CHO_THANH_TOAN || mt.TrangThai == GD_MAT_DA_THANH_TOAN)) {
+            found = &mt; // Point to the element in vector
             break;
         }
-        curr = curr->next;
-        ++safety;
-    }
-    if (safety >= SO_VONG_LAP_MT_MAX) {
-        thongBao(std::cout, "Phat hien vong lap vo han MUONTRA trong TraSach.", LOI);
     }
     
     if (found == nullptr) {
@@ -394,24 +383,24 @@ std::string TraSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[], 
     
     // Calculate Fine or Adjustment
     long long tienPhat = 0;
-    bool daThanhToanNoCu = found->data.daThanhToan;
+    bool daThanhToanNoCu = found->daThanhToan;
     long long refundAmount = 0;
     QString thongBaoGiaoDich = "";
 
     std::stringstream dummy;
-    int soNgayQuaHan = tinhSoNgayQuaHan(found->data.NgayMuon, dummy);
+    int soNgayQuaHan = tinhSoNgayQuaHan(found->NgayMuon, dummy);
 
-    if (found->data.TrangThai == GD_MAT_CHO_THANH_TOAN || found->data.TrangThai == GD_MAT_DA_THANH_TOAN) {
+    if (found->TrangThai == GD_MAT_CHO_THANH_TOAN || found->TrangThai == GD_MAT_DA_THANH_TOAN) {
         // --- CASE: FOUND LOST BOOK ---
         int phiPhatMat = SettingsManager::instance().getInt("PHI_MAT_SACH", 20000);
         
         if (daThanhToanNoCu) {
             // Student already paid (Price + Fee). Now found: Refund Price, keep Fee.
             // Adjust tienHoanTra
-            long long tongDaDong = found->data.tienPhat; 
+            long long tongDaDong = found->tienPhat; 
             tienPhat = phiPhatMat; 
             refundAmount = tongDaDong - phiPhatMat;
-            found->data.tienHoanTra = refundAmount; // Track refund
+            found->tienHoanTra = refundAmount; // Track refund
             
             thongBaoGiaoDich = QString("Sách báo mất đã tìm thấy! Học viên đã nộp đền bù: %1 VNĐ. \n"
                                      "Hệ thống giữ lại Phí phạt: %2 VNĐ. \n"
@@ -434,15 +423,15 @@ std::string TraSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[], 
         }
     }
     
-    found->data.tienPhat = (daThanhToanNoCu && (found->data.TrangThai == GD_MAT_CHO_THANH_TOAN)) ? found->data.tienPhat : tienPhat; 
+    found->tienPhat = (daThanhToanNoCu && (found->TrangThai == GD_MAT_CHO_THANH_TOAN)) ? found->tienPhat : tienPhat; 
     // If already paid lost book, we keep the 'paid' amount as is in record but notify refund.
-    if (found->data.TrangThai == GD_MAT_CHO_THANH_TOAN || found->data.TrangThai == GD_MAT_DA_THANH_TOAN) found->data.tienPhat = tienPhat;
+    if (found->TrangThai == GD_MAT_CHO_THANH_TOAN || found->TrangThai == GD_MAT_DA_THANH_TOAN) found->tienPhat = tienPhat;
 
     // DB Update muon_tra
     QSqlQuery q(db);
     // [UPGRADE] Transaction Status: 
     // Nếu sách đang mất mà đã đền -> Chờ hoàn tiền. Nếu chưa đền hoặc đang mượn -> Đã trả.
-    int nextStatus = (found->data.TrangThai == GD_MAT_DA_THANH_TOAN) ? GD_MAT_CHO_HOAN_TIEN : GD_DA_TRA;
+    int nextStatus = (found->TrangThai == GD_MAT_DA_THANH_TOAN) ? GD_MAT_CHO_HOAN_TIEN : GD_DA_TRA;
     
     q.prepare("UPDATE muon_tra SET ngay_tra=?, trang_thai=?, tien_phat=?, tien_hoan_tra=? "
               "WHERE ma_the=? AND ban_sao_id=(SELECT id FROM ban_sao WHERE ma_sach=?) "
@@ -450,7 +439,7 @@ std::string TraSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[], 
     q.addBindValue(QString::fromStdString(ngayTra));
     q.addBindValue(nextStatus); 
     q.addBindValue((qint64)tienPhat);
-    q.addBindValue((qint64)found->data.tienHoanTra);
+    q.addBindValue((qint64)found->tienHoanTra);
     q.addBindValue(docGia->data.MaThe);
     q.addBindValue(QString::fromStdString(maSach));
     
@@ -488,8 +477,8 @@ std::string TraSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[], 
     // --- SUCCESS: UPDATE MEMORY ---
 
     // B2: Cap nhat trang thai sách (thông qua con trỏ)
-    if (found->data.banSaoSach != nullptr) {
-        found->data.banSaoSach->trangThai = SACH_TRONG_KHO;
+    if (found->banSaoSach != nullptr) {
+        found->banSaoSach->trangThai = SACH_TRONG_KHO;
     } else {
         // Fallback: tim theo ma sach neu con tro bi null
         std::string isbn = TachISBNTuMaSach(maSach);
@@ -503,9 +492,9 @@ std::string TraSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[], 
     }
     
     // B3: Cap nhat lich su muon tra (Financial State Machine)
-    int oldStatus = found->data.TrangThai;
-    found->data.NgayTra = ngayTra;
-    found->data.TrangThai = (oldStatus == GD_MAT_DA_THANH_TOAN) ? GD_MAT_CHO_HOAN_TIEN : GD_DA_TRA;  
+    int oldStatus = found->TrangThai;
+    found->NgayTra = ngayTra;
+    found->TrangThai = (oldStatus == GD_MAT_DA_THANH_TOAN) ? GD_MAT_CHO_HOAN_TIEN : GD_DA_TRA;  
     
     // Only decrement if it was an active loan. 
     // If it was already marked LOST (GD_MAT_...), soSachDangMuon was decremented in BaoMatSach already.
@@ -531,7 +520,7 @@ std::string TraSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[], 
     
     // [AUDIT LOG]
     QString detailStr = QString("Mã sách: %1").arg(QString::fromStdString(maSach));
-    if (found && found->data.banSaoSach) {
+    if (found && found->banSaoSach) {
         // Find title via ISBN
         std::string isbn = TachISBNTuMaSach(maSach);
         PTRDS ds = TimDauSachTheoISBN(dsDauSach, soLuongDauSach, isbn);
@@ -545,7 +534,7 @@ std::string TraSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[], 
 }
 
 // Ham bao mat sach (TrangThai = 2)
-std::string BaoMatSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[], int soLuongDauSach) {
+std::string BaoMatSach(PTRDG docGia, const std::string& maSach, std::vector<PTRDS>& dsDauSach, int soLuongDauSach) {
     if (!docGia) return "Loi: Doc gia khong ton tai!";
     if (maSach.empty()) return "Loi: Ma sach khong hop le!";
     
@@ -562,17 +551,17 @@ std::string BaoMatSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[
     if (!banSao) return "Loi: Khong tim thay ma sach: " + maSach;
     
     // Tim giao dich muon dang hoat dong
-    MUONTRA p = docGia->data.dsmt;
-    while (p) {
-        if (p->data.banSaoSach == banSao && (p->data.TrangThai == GD_DANG_MUON || (p->data.TrangThai == GD_DA_TRA && !p->data.daThanhToan))) {
+    // Tim giao dich muon dang hoat dong
+    for (auto& mt : docGia->data.dsmt) {
+        if (mt.banSaoSach == banSao && (mt.TrangThai == GD_DANG_MUON || (mt.TrangThai == GD_DA_TRA && !mt.daThanhToan))) {
             // Financial: Chờ thanh toán đền bù (Nợ)
-            p->data.TrangThai = GD_MAT_CHO_THANH_TOAN;
-            p->data.NgayTra = layNgayHienTai();
+            mt.TrangThai = GD_MAT_CHO_THANH_TOAN;
+            mt.NgayTra = layNgayHienTai();
             
             // Tinh tien phat (Gia sach + Phi phat)
             long long giaSach = dauSach->giaTien;
             int phiPhat = SettingsManager::instance().getInt("PHI_MAT_SACH", 20000); // Updated Key
-            p->data.tienPhat = giaSach + phiPhat;
+            mt.tienPhat = giaSach + phiPhat;
             
             // Thanh ly sach
             banSao->trangThai = SACH_MAT;
@@ -590,9 +579,9 @@ std::string BaoMatSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[
             q.prepare("UPDATE muon_tra SET ngay_tra=?, trang_thai=?, tien_phat=? "
                       "WHERE ma_the=? AND ban_sao_id=(SELECT id FROM ban_sao WHERE ma_sach=?)"
                       " AND (trang_thai=0 OR (trang_thai=1 AND da_thanh_toan=0))");
-            q.addBindValue(QString::fromStdString(p->data.NgayTra));
+            q.addBindValue(QString::fromStdString(mt.NgayTra));
             q.addBindValue(GD_MAT_CHO_THANH_TOAN);
-            q.addBindValue((qint64)p->data.tienPhat); // Save calculated fine
+            q.addBindValue((qint64)mt.tienPhat); // Save calculated fine
             q.addBindValue(docGia->data.MaThe);
             q.addBindValue(QString::fromStdString(maSach));
             if (!q.exec()) {
@@ -625,7 +614,7 @@ std::string BaoMatSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[
             QString detailStr = QString("%1 (Mã sách: %2). Phạt: %3")
                                 .arg(QString::fromStdString(dauSach->tenSach))
                                 .arg(QString::fromStdString(maSach))
-                                .arg(p->data.tienPhat);
+                                .arg(mt.tienPhat);
             AuditLogger::log(AuditLogger::ACTION_LOST, "MUON_TRA", QString::number(docGia->data.MaThe), detailStr);
 
             // [EVENT BUS]
@@ -641,7 +630,6 @@ std::string BaoMatSach(PTRDG docGia, const std::string& maSach, PTRDS dsDauSach[
             
             return ""; // Thanh cong
         }
-        p = p->next;
     }
     
     return "Loi: Khong tim thay giao dich muon sach nay!";
@@ -657,35 +645,36 @@ void themMuonTra(PTRDG docgia, PTRDMS banSaoSach) {
         return;
     }
 
-    MUONTRA node = new NodeMT;
+    MuonTra mt;
 
     // 1. Gán con trỏ trực tiếp (Fix lỗi crash)
-    node->data.banSaoSach = banSaoSach; 
-    node->data.maSachCached = (banSaoSach != nullptr) ? banSaoSach->maSach : std::string();
+    mt.banSaoSach = banSaoSach; 
+    mt.maSachCached = (banSaoSach != nullptr) ? banSaoSach->maSach : std::string();
     
     // 2. Gán dữ liệu giao dịch
-    node->data.NgayMuon = layNgayHienTai();
-    node->data.NgayTra = "";
+    mt.NgayMuon = layNgayHienTai();
+    mt.NgayTra = "";
     
-    // 3. Gán trạng thái GIAO DỊCH, không phải trạng thái SÁCH (Fix lỗi logic)
+    // 3. Gán trạng thái GIAO DỊCH, không phải trạng thái SÁCH
     // 0 = Đang mượn
-    node->data.TrangThai = 0; 
+    mt.TrangThai = (int)GD_DANG_MUON; 
+    // Note: MuonTra.TrangThai is int in data struct, using enum value
     
     // Feature 4 Defaults
-    node->data.soLanGiaHan = 0;
-    node->data.daThanhToan = false; 
+    mt.soLanGiaHan = 0;
+    mt.daThanhToan = false; 
 
-    node->next = docgia->data.dsmt;
-    docgia->data.dsmt = node;
+    // Add to vector (End of list)
+    docgia->data.dsmt.push_back(mt);
     
     // Cập nhật số lượng sách đang mượn
     docgia->data.soSachDangMuon++;
     // Phát sự kiện realtime
     try {
-        if (!node->data.maSachCached.empty()) {
-            EventBus::instance().muonTraAdded(docgia->data.MaThe, QString::fromStdString(node->data.maSachCached));
-        } else if (node->data.banSaoSach != nullptr) {
-            EventBus::instance().muonTraAdded(docgia->data.MaThe, QString::fromStdString(node->data.banSaoSach->maSach));
+        if (!mt.maSachCached.empty()) {
+            EventBus::instance().muonTraAdded(docgia->data.MaThe, QString::fromStdString(mt.maSachCached));
+        } else if (mt.banSaoSach != nullptr) {
+            EventBus::instance().muonTraAdded(docgia->data.MaThe, QString::fromStdString(mt.banSaoSach->maSach));
         }
         EventBus::instance().docGiaUpdated(docgia->data.MaThe);
     } catch(...) {}
@@ -695,14 +684,8 @@ void themMuonTra(PTRDG docgia, PTRDMS banSaoSach) {
 //dùng cho (NapGiaoDich)
 void themMuonTra(PTRDG docgia, const MuonTra &mt) {
     if (docgia == nullptr) return;
-
-    MUONTRA node = new NodeMT;
-    node->data = mt;
-    node->next = docgia->data.dsmt;
-    docgia->data.dsmt = node;
+    docgia->data.dsmt.push_back(mt);
     // NOTE: This overload is used when loading existing transactions from storage.
-    // The caller (loader) is responsible for setting `docgia->data.soSachDangMuon`
-    // from the persisted value. Do NOT modify the counter here to avoid double-counting.
 }
 
 // ============================================
@@ -710,66 +693,62 @@ void themMuonTra(PTRDG docgia, const MuonTra &mt) {
 // ============================================
 
 // lay danh sach sach dang muon cua doc gia (O(L) - L: so giao dich)
-int LayDSSachDangMuon(PTRDG docGia, ThongTinSachDangMuon_DTO ketQua[], int maxKetQua, PTRDS dsDauSach[], int soLuongDauSach) {
+int LayDSSachDangMuon(PTRDG docGia, ThongTinSachDangMuon_DTO ketQua[], int maxKetQua, std::vector<PTRDS>& dsDauSach, int soLuongDauSach) {
     if (docGia == nullptr || ketQua == nullptr) return -1;  // loi: khong tim thay doc gia
     if (maxKetQua <= 0) return 0; // nothing to fill
     if (maxKetQua > MAX_DAUSACH) maxKetQua = MAX_DAUSACH;
     if (soLuongDauSach < 0 || soLuongDauSach > MAX_DAUSACH) {
         // invalid catalog array - treat as empty so lookups return nullptr safely
         soLuongDauSach = 0;
-        dsDauSach = nullptr;
+        dsDauSach.clear();
     }
     
-    MUONTRA curr = docGia->data.dsmt;
-    if (curr == nullptr) return 0;  // doc gia chua muon cuon nao
+    if (docGia->data.dsmt.empty()) return 0;  // doc gia chua muon cuon nao
 
     int dem = 0;
-    int safety = 0;
 
-    // duyet toan bo danh sach muon with safety checks
-    while (curr != nullptr && safety < SO_VONG_LAP_MT_MAX) {
-        // detect trivial self-loop to avoid infinite loops / corruption
-        if (curr->next == curr) {
-            thongBao(std::cout, "Phat hien node MUONTRA self-loop. Dung duyet.", CANH_BAO);
-            break;
-        }
+    // Use reverse iterator to show newest first if we used push_back (chronological)
+    // Or just normal iteration. Let's use reverse to mimic LIFO (stack) behavior of original code
+    for (auto it = docGia->data.dsmt.rbegin(); it != docGia->data.dsmt.rend(); ++it) {
+        const auto& mt = *it;
 
-        // Update: Include ALL books that librarian needs to see in "Reader Details"
-        // 0: Borrowing, 1: Returned (with debt), 2: Lost (unpaid), 3: Lost (paid - hide?), 4: Lost (found, refund wait)
-        if (curr->data.TrangThai == 0 || 
-            curr->data.TrangThai == 1 || // Include returned to check for debt
-            curr->data.TrangThai == 2 || 
-            curr->data.TrangThai == 4) {
+        // Update: Include ALL books that librarian needs to see
+        if (mt.TrangThai == GD_DANG_MUON || 
+            mt.TrangThai == GD_DA_TRA || 
+            mt.TrangThai == GD_MAT_CHO_THANH_TOAN || 
+            mt.TrangThai == GD_MAT_DA_THANH_TOAN ||
+            mt.TrangThai == GD_MAT_CHO_HOAN_TIEN ||
+            mt.TrangThai == GD_MAT_DA_HOAN_TIEN) {
             
-            // Determine MaSach: prefer cached, then pointer
-            std::string maSach = curr->data.maSachCached;
-            if (maSach.empty() && curr->data.banSaoSach != nullptr) {
-                maSach = curr->data.banSaoSach->maSach;
+            // Determine MaSach
+            std::string maSach = mt.maSachCached;
+            if (maSach.empty() && mt.banSaoSach != nullptr) {
+                maSach = mt.banSaoSach->maSach;
             }
             
             if (!maSach.empty()) {
                 std::string isbn = TachISBNTuMaSach(maSach);
                 PTRDS dauSach = nullptr;
-                if (dsDauSach != nullptr && soLuongDauSach > 0) {
+                if (dsDauSach.size() > 0 && soLuongDauSach > 0) {
                     dauSach = TimDauSachTheoISBN(dsDauSach, soLuongDauSach, isbn);
                 }
 
                 if (dem < maxKetQua) {
                     ketQua[dem].maSach = maSach;
                     ketQua[dem].tenSach = (dauSach != nullptr) ? dauSach->tenSach : "";
-                    ketQua[dem].ngayMuon = curr->data.NgayMuon;
+                    ketQua[dem].ngayMuon = mt.NgayMuon;
                     
                     // Populate Financials directly
-                    ketQua[dem].tienPhat = curr->data.tienPhat;
-                    ketQua[dem].tienHoanTra = curr->data.tienHoanTra;
-                    ketQua[dem].daThanhToan = curr->data.daThanhToan;
-                    ketQua[dem].soLanGiaHan = curr->data.soLanGiaHan;
-                    ketQua[dem].trangThai = curr->data.TrangThai; 
+                    ketQua[dem].tienPhat = mt.tienPhat;
+                    ketQua[dem].tienHoanTra = mt.tienHoanTra;
+                    ketQua[dem].daThanhToan = mt.daThanhToan;
+                    ketQua[dem].soLanGiaHan = mt.soLanGiaHan;
+                    ketQua[dem].trangThai = mt.TrangThai; 
 
-                    // Calculate soNgayGiu (for current loans only)
-                    if (curr->data.TrangThai == 0) {
+                    // soNgayGiu
+                    if (mt.TrangThai == GD_DANG_MUON) {
                         std::stringstream dummyStream;
-                        int soNgay = tinhSoNgayQuaHan(curr->data.NgayMuon, dummyStream);
+                        int soNgay = tinhSoNgayQuaHan(mt.NgayMuon, dummyStream);
                         ketQua[dem].soNgayGiu = (soNgay >= 0) ? soNgay : 0;
                     } else {
                         ketQua[dem].soNgayGiu = 0;
@@ -779,13 +758,6 @@ int LayDSSachDangMuon(PTRDG docGia, ThongTinSachDangMuon_DTO ketQua[], int maxKe
                 }
             }
         }
-
-        curr = curr->next;
-        ++safety;
-    }
-
-    if (safety >= SO_VONG_LAP_MT_MAX) {
-        thongBao(std::cout, "Phat hien vong lap vo han (MUONTRA).", LOI);
     }
 
     return dem;  // tra ve so luong hien thi
@@ -797,28 +769,18 @@ int TinhSoNgayQuaHanLonNhat(PTRDG docgia) {
     
     int maxQuaHan = 0;
     int quaHan = 0;
-    MUONTRA curr = docgia->data.dsmt;
-    int safety = 0;
-    while (curr != nullptr && safety < SO_VONG_LAP_MT_MAX) {
-        if (curr->next == curr) {
-            thongBao(std::cout, "Phat hien node MUONTRA self-loop trong TinhSoNgayQuaHanLonNhat. Dung duyet.", CANH_BAO);
-            break;
+    
+    // Check all active loans in history
+    for (const auto& mt : docgia->data.dsmt) {
+        if (mt.TrangThai == 0) { // Dang muon
+             std::stringstream dummyStream;
+             quaHan = tinhSoNgayQuaHan(mt.NgayMuon, dummyStream);
+             if (quaHan > maxQuaHan) maxQuaHan = quaHan;
         }
-        if (curr->data.TrangThai == 0) {
-            std::stringstream dummy;  // thay std::cout bang stream ao
-            quaHan = tinhSoNgayQuaHan(curr->data.NgayMuon, dummy);
-
-            if (quaHan > maxQuaHan)
-                maxQuaHan = quaHan;
-        }
-        curr = curr->next;
-        ++safety;
-    }
-    if (safety >= SO_VONG_LAP_MT_MAX) {
-        thongBao(std::cout, "Phat hien vong lap vo han MUONTRA trong TinhSoNgayQuaHanLonNhat.", LOI);
     }
     return maxQuaHan;
 }
+
 
 // ============================================
 // HELPER FUNCTION IMPLEMENTATION

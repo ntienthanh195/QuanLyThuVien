@@ -11,7 +11,7 @@
 #include <QDate>
 
 // Biến toàn cục
-extern PTRDS dsDauSach[MAX_DAUSACH];
+// extern PTRDS dsDauSach[MAX_DAUSACH]; // REMOVED
 extern int soLuongDauSach;
 extern PTRDG rootDocGia;
 
@@ -242,7 +242,7 @@ void HopThoaiQuetMaVach::timKiemVaHienThi(const QString &ma) {
             if (ok) {
                 PTRDG docGia = timDocGia(rootDocGia, maThe);
                 if (docGia) {
-                    extern PTRDS dsDauSach[];
+                    // extern PTRDS dsDauSach[]; // REMOVED
                     extern int soLuongDauSach;
                     
                     std::string ketQua = TraSach(docGia, maSach.toStdString(), dsDauSach, soLuongDauSach);
@@ -252,13 +252,11 @@ void HopThoaiQuetMaVach::timKiemVaHienThi(const QString &ma) {
                         QString tenSach = "";
                         for (int i = 0; i < soLuongDauSach; i++) {
                             if (dsDauSach[i]) {
-                                PTRDMS p = dsDauSach[i]->dms;
-                                while (p != nullptr) {
+                                for (PTRDMS p : dsDauSach[i]->dms_vector) {
                                     if (QString::fromStdString(p->maSach) == maSach) {
                                         tenSach = QString::fromStdString(dsDauSach[i]->tenSach);
                                         break;
                                     }
-                                    p = p->next;
                                 }
                                 if (!tenSach.isEmpty()) break;
                             }
@@ -397,7 +395,7 @@ void HopThoaiQuetMaVach::hienThiThongTinDocGia(const QString &maThe) {
             default: trangThai = LanguageManager::instance().getText("STATUS_UNKNOWN_ICON"); mauTrangThai = "gray"; break;
         }
         
-        QString gioiTinh = (docGia->data.Phai == 0) ? LanguageManager::instance().getText("GENDER_MALE") : LanguageManager::instance().getText("GENDER_FEMALE");
+        QString gioiTinh = (docGia->data.Phai == "Nam") ? LanguageManager::instance().getText("GENDER_MALE") : LanguageManager::instance().getText("GENDER_FEMALE");
         
         QString thongTin = QString(
             "<b>" + LanguageManager::instance().getText("TITLE_READER_INFO") + "</b><br><br>"

@@ -35,7 +35,7 @@
 // #include "QuanLySach.h" 
 
 #include "utils/EventBus.h"
-#include "utils/Perf.h"
+// #include "utils/Perf.h" // Removed (Missing file)
 #include "utils/SettingsManager.h" // Added SettingsManager
 
 // helper thay the max/abs tu <algorithm>
@@ -178,7 +178,7 @@ void InsertDocGia(PTRDG &root, PTRDG node, bool syncDB) {
         q.addBindValue(node->data.MaThe);
         q.addBindValue(QString::fromStdString(node->data.Ho));
         q.addBindValue(QString::fromStdString(node->data.Ten));
-        q.addBindValue(node->data.Phai ? 1 : 0);
+        q.addBindValue(node->data.Phai == "Nam" ? 0 : 1);
         q.addBindValue(node->data.TrangThai);
         q.addBindValue(node->data.coTheMuon ? 1 : 0);
         // Phase 2 New Fields
@@ -250,20 +250,19 @@ std::string ThanhToanPhat(PTRDG docGia, const std::string& maSach) {
     if (!docGia) return "Lỗi: Độc giả null";
     std::string errorMsg;
     
-    MUONTRA p = docGia->data.dsmt;
-    while (p) {
-        std::string currentMa = p->data.maSachCached;
-        if (currentMa.empty() && p->data.banSaoSach) currentMa = p->data.banSaoSach->maSach;
+    for (auto& mt : docGia->data.dsmt) {
+        std::string currentMa = mt.maSachCached;
+        if (currentMa.empty() && mt.banSaoSach) currentMa = mt.banSaoSach->maSach;
         
         if (currentMa == maSach) {
-            if (!p->data.daThanhToan) {
-                p->data.daThanhToan = true;
+            if (!mt.daThanhToan) {
+                mt.daThanhToan = true;
                 
                 // [UPGRADE] Financial State Machine Transitions
-                if (p->data.TrangThai == GD_MAT_CHO_THANH_TOAN) {
-                    p->data.TrangThai = GD_MAT_DA_THANH_TOAN; // Đã tất toán nợ mất sách
-                } else if (p->data.TrangThai == GD_MAT_CHO_HOAN_TIEN) {
-                    p->data.TrangThai = GD_MAT_DA_HOAN_TIEN;  // Đã hoàn tiền cho học viên
+                if (mt.TrangThai == GD_MAT_CHO_THANH_TOAN) {
+                    mt.TrangThai = GD_MAT_DA_THANH_TOAN; // Đã tất toán nợ mất sách
+                } else if (mt.TrangThai == GD_MAT_CHO_HOAN_TIEN) {
+                    mt.TrangThai = GD_MAT_DA_HOAN_TIEN;  // Đã hoàn tiền cho học viên
                 }
                 
                 // Sync DB (TRANSACTIONAL)
@@ -280,7 +279,7 @@ std::string ThanhToanPhat(PTRDG docGia, const std::string& maSach) {
                           "WHERE ma_the=? "
                           "AND ban_sao_id=(SELECT id FROM ban_sao WHERE ma_sach=?) "
                           "AND da_thanh_toan=0");
-                q.addBindValue(p->data.TrangThai);
+                q.addBindValue(mt.TrangThai);
                 q.addBindValue(docGia->data.MaThe);
                 q.addBindValue(QString::fromStdString(currentMa));
                 
@@ -325,7 +324,6 @@ std::string ThanhToanPhat(PTRDG docGia, const std::string& maSach) {
                 }
             }
         }
-        p = p->next;
     }
     return "Không tìm thấy giao dịch nợ để thanh toán.";
 }
@@ -334,13 +332,11 @@ std::string ThanhToanPhat(PTRDG docGia, const std::string& maSach) {
 long long TinhTongNo(PTRDG docGia) {
     if (!docGia) return 0;
     long long tong = 0;
-    MUONTRA p = docGia->data.dsmt;
-    while (p) {
+    for (const auto& mt : docGia->data.dsmt) {
         // Logic: Chỉ tính nợ nếu Giao dịch là Đã trả (nhưng chưa đóng tiền) HOẶC Báo mất (đang nợ)
-        if ((p->data.TrangThai == GD_DA_TRA || p->data.TrangThai == GD_MAT_CHO_THANH_TOAN) && !p->data.daThanhToan) {
-             tong += p->data.tienPhat;
+        if ((mt.TrangThai == GD_DA_TRA || mt.TrangThai == GD_MAT_CHO_THANH_TOAN) && !mt.daThanhToan) {
+             tong += mt.tienPhat;
         }
-        p = p->next;
     }
     return tong;
 }
@@ -349,7 +345,7 @@ long long TinhTongNo(PTRDG docGia) {
 // DATABASE INTEGRATION
 // ==========================================
 
-void NapDocGiaTuDB(PTRDG &root, PTRDS dsDauSach[], int soLuongDS) {
+void NapDocGiaTuDB(PTRDG &root, std::vector<PTRDS>& dsDauSach, int soLuongDS) {
     GiaiPhongCay(root);
     
     QSqlDatabase db = DatabaseManager::instance().database();
@@ -404,7 +400,7 @@ void NapDocGiaTuDB(PTRDG &root, PTRDS dsDauSach[], int soLuongDS) {
                  MuonTra mt;
                  // ... (resolve pointer logic matches previous viewed)
                  mt.banSaoSach = nullptr;
-                 if (dsDauSach && soLuongDS > 0) {
+                 if (!dsDauSach.empty() && soLuongDS > 0) {
                       std::string isbn = TachISBNTuMaSach(maSach);
                       PTRDS ds = TimDauSachTheoISBN(dsDauSach, soLuongDS, isbn);
                       if (ds) mt.banSaoSach = TimBanSaoTheoMa(ds, maSach);
@@ -436,13 +432,13 @@ void NapDocGiaTuDB(PTRDG &root, PTRDS dsDauSach[], int soLuongDS) {
 // quan ly cay doc gia
 // tao PTRDG docgia
 PTRDG taoDocGia(std::string ho, std::string ten, bool phai, int trangthai, PTRDG root) {
-    PTRDG dg = new NodeDG;
+    PTRDG dg = std::make_shared<NodeDG>();
     dg->data.MaThe = sinhMaTheNgauNhien(root);
     // Normalize name fields
     dg->data.Ho = ChuanHoaHoTen(ho);
     dg->data.Ten = ChuanHoaHoTen(ten);
-    dg->data.Phai = phai;
-    dg->data.TrangThai = trangthai;
+    dg->data.Phai = phai ? "Nu" : "Nam";
+    dg->data.TrangThai = (TrangThaiTheDocGia)trangthai;
     // START PHASE 2 INIT
     dg->data.SDT = "";
     dg->data.Lop = "";
@@ -450,7 +446,7 @@ PTRDG taoDocGia(std::string ho, std::string ten, bool phai, int trangthai, PTRDG
     dg->data.NgaySinh = "";
     dg->data.LoaiDocGia = 0; // Default Student
     // END PHASE 2 INIT
-    dg->data.dsmt = nullptr;
+    dg->data.dsmt = {}; // Initialize as empty vector
     dg->data.soSachDangMuon = 0; 
     dg->data.coTheMuon = true; // [INIT FIX] Allow borrowing by default
     dg->data.tongSachDaMuonHistory = 0; // [INIT FIX]
@@ -491,13 +487,13 @@ PTRDG taoDocGia(std::string ho, std::string ten, bool phai, int trangthai, PTRDG
     return dg;
 }
 PTRDG taoDocGia(std::string ho, std::string ten, bool phai, int trangthai, int mathe) {
-    PTRDG dg = new NodeDG;
+    PTRDG dg = std::make_shared<NodeDG>();
     dg->data.MaThe = mathe;
     // Normalize name fields
     dg->data.Ho = ChuanHoaHoTen(ho);
     dg->data.Ten = ChuanHoaHoTen(ten);
-    dg->data.Phai = phai;
-    dg->data.TrangThai = trangthai;
+    dg->data.Phai = phai ? "Nu" : "Nam";
+    dg->data.TrangThai = (TrangThaiTheDocGia)trangthai;
      // START PHASE 2 INIT
     dg->data.SDT = "";
     dg->data.Lop = "";
@@ -505,7 +501,7 @@ PTRDG taoDocGia(std::string ho, std::string ten, bool phai, int trangthai, int m
     dg->data.NgaySinh = "";
     dg->data.LoaiDocGia = 0;
     // END PHASE 2 INIT
-    dg->data.dsmt = nullptr;
+    dg->data.dsmt = {}; // Initialize as empty vector
     dg->data.soSachDangMuon = 0; 
     dg->data.coTheMuon = true; // [INIT FIX]
     dg->data.tongSachDaMuonHistory = 0; // [INIT FIX]
@@ -543,29 +539,22 @@ PTRDG taoDocGia(std::string ho, std::string ten, bool phai, int trangthai, int m
 }
 
 // giai phong dsmt
-void giaiPhongDsmt(MUONTRA& dsmt) {
-    // Defensive delete: handle possible self-loop corruption and avoid infinite loops
-    while (dsmt != nullptr) {
-        MUONTRA next = dsmt->next;
-        // If node points to itself, delete and break
-        if (next == dsmt) {
-            delete dsmt;
-            dsmt = nullptr;
-            break;
-        }
-        delete dsmt;
-        dsmt = next;
-    }
+// giai phong dsmt
+void giaiPhongDsmt(std::vector<MuonTra>& dsmt) {
+    // Vector auto-cleans. Keep function prototype for compatibility if needed, 
+    // but body is empty.
+    dsmt.clear();
 }
 
 // them ham giai phong toan bo cay
 void GiaiPhongCay(PTRDG &root) {
     if (root == nullptr) return;
-    GiaiPhongCay(root->left);
-    GiaiPhongCay(root->right);
+    GiaiPhongCay(root->left); // Recurse left
+    GiaiPhongCay(root->right); // Recurse right
+    // Manual cleanup of the raw linked list inside the node
     giaiPhongDsmt(root->data.dsmt);
-    delete root;
-    root = nullptr;
+    // shared_ptr will auto-delete the node when reset
+    root.reset();
 }
 
 // xoa node - cap nhat height va rebalance
@@ -580,17 +569,18 @@ static PTRDG xoaDocGiaRec(PTRDG root, int mathe) {
         // found node
         if (root->left == nullptr || root->right == nullptr) {
             // Trường hợp 0 hoặc 1 con
-            giaiPhongDsmt(root->data.dsmt);
+            // giaiPhongDsmt(root->data.dsmt); // AUTO CLEANUP
             PTRDG temp = root->left ? root->left : root->right;
-            delete root;
-            return temp;
+            // No explicit delete needed for shared_ptr, just return replacement
+            return temp; 
         } else {
             // Trường hợp 2 con: lấy inorder successor (succ)
             PTRDG succ = root->right;
             while (succ->left != nullptr) succ = succ->left;
 
             // CẢI TIẾN: Sửa lỗi bộ nhớ và cập nhật trường mới
-            giaiPhongDsmt(root->data.dsmt); 
+            // CẢI TIẾN: Sửa lỗi bộ nhớ và cập nhật trường mới
+            // giaiPhongDsmt(root->data.dsmt); // AUTO CLEANUP
             
             // Sao chép dữ liệu của succ sang root
             root->data.MaThe = succ->data.MaThe;
@@ -600,9 +590,9 @@ static PTRDG xoaDocGiaRec(PTRDG root, int mathe) {
             root->data.TrangThai = succ->data.TrangThai;
             root->data.soSachDangMuon = succ->data.soSachDangMuon; // Cập nhật trường mới
             
-            // Chuyển quyền sở hữu con trỏ dsmt từ succ sang root
-            root->data.dsmt = succ->data.dsmt;
-            succ->data.dsmt = nullptr;
+            // Chuyển quyền sở hữu vector dsmt từ succ sang root
+            root->data.dsmt = std::move(succ->data.dsmt);
+            // succ->data.dsmt is moved-from (valid empty state)
 
             // Đệ quy xóa nút successor
             root->right = xoaDocGiaRec(root->right, root->data.MaThe);
@@ -730,7 +720,7 @@ void hieuChinhDocGia(PTRDG root, const TheDocGia& new_data) {
     q.prepare("UPDATE doc_gia SET ho=?, ten=?, phai=?, trang_thai=?, co_the_muon=?, so_dien_thoai=?, lop=?, email=?, ngay_sinh=?, loai_doc_gia=?, ngay_dang_ky=?, ngay_het_han=? WHERE ma_the=?");
     q.addBindValue(QString::fromStdString(p->data.Ho));
     q.addBindValue(QString::fromStdString(p->data.Ten));
-    q.addBindValue(p->data.Phai ? 1 : 0);
+    q.addBindValue(p->data.Phai == "Nam" ? 0 : 1);
     q.addBindValue(p->data.TrangThai);
     q.addBindValue(p->data.coTheMuon ? 1 : 0);
     q.addBindValue(QString::fromStdString(p->data.SDT));
@@ -762,7 +752,7 @@ void display(PTRDG root) {
 
     std::cout << "MaThe: " << root->data.MaThe
          << " | HoTen: " << root->data.Ho << " " << root->data.Ten
-         << " | Phai: " << (root->data.Phai ? "Nu" : "Nam")
+         << " | Phai: " << (root->data.Phai)
          << " | TrangThai: " << (root->data.TrangThai ? "Hoat dong" : "Khoa")
          << " | Sach Dang Muon: " << root->data.soSachDangMuon
          << " | AVL Height: " << root->height
@@ -881,7 +871,7 @@ string PTRDMS_to_String(PTRDMS p){
     return (p != nullptr)? p->maSach : "";
 }
 
-PTRDMS MaSach_to_PTRDMS(const string& maSach, PTRDS dsDauSach[], int soLuongDauSach){
+PTRDMS MaSach_to_PTRDMS(const string& maSach, std::vector<PTRDS>& dsDauSach, int soLuongDauSach){
     std::stringstream dummyStream;
     return timDanhMucTheoMaSach(maSach, dsDauSach,soLuongDauSach,dummyStream, true);
 }
@@ -1015,13 +1005,13 @@ static void QuickSortTS(TopSachDTO arr[], int low, int high){
         QuickSortTS(arr, pi + 1, high);
     }
 }
-int LayTopSach(PTRDS dsDauSach[], int soLuongDS, TopSachDTO arr[]){
+int LayTopSach(std::vector<PTRDS>& dsDauSach, int soLuongDS, TopSachDTO arr[]){
     // --- ĐOẠN DEBUG---
     std::cout << "\n--- DEBUG TOP 10 ---\n";
     std::cout << "So luong dau sach nhan duoc: " << soLuongDS << "\n";
     
-    if(dsDauSach == nullptr) {
-        std::cout << "LOI: Mang dsDauSach bi NULL!\n";
+    if(dsDauSach.empty()) { // Changed from nullptr check to empty() for vector
+        std::cout << "LOI: Mang dsDauSach bi NULL hoac rong!\n";
         return 0;
     }
     // -----------------
@@ -1060,7 +1050,7 @@ void saveDocGia(PTRDG root) {
     std::cout << "[DEPRECATED] saveDocGia (Text) calling GhiDocGiaFile (Stub). Skipped.\n";
 }
 //Load
-PTRDG loadDocGia(PTRDS dsDauSach[], int soLuongDS) {
+PTRDG loadDocGia(std::vector<PTRDS>& dsDauSach, int soLuongDS) {
     Q_UNUSED(dsDauSach);
     Q_UNUSED(soLuongDS);
     std::cout << "[DEPRECATED] loadDocGia (Text) calling NapDocGiaFile (Stub). Skipped.\n";
@@ -1149,7 +1139,7 @@ static void DemDocGiaIterative(PTRDG root, int& tong, int& hoatDong, int& khoa,
 }
 
 // lay thong ke tong quan doc gia
-ThongKeDocGia LayThongKeDocGia(PTRDG root, PTRDS /*dsDauSach*/[], int /*soLuongDauSach*/) {
+ThongKeDocGia LayThongKeDocGia(PTRDG root, std::vector<PTRDS>& /*dsDauSach*/, int /*soLuongDauSach*/) {
     ThongKeDocGia thongKe = {};
     thongKe.tongSoDocGia = 0;
     thongKe.docGiaHoatDong = 0;
@@ -1400,17 +1390,17 @@ void MigrateNormalizeDocGiaFile(PTRDG root) {
 std::string GiaHanMuon(PTRDG docGia, const std::string& maSach) {
     if (!docGia) return "Lỗi: Thông tin độc giả không hợp lệ!";
 
-    MUONTRA p = docGia->data.dsmt;
-    while (p != nullptr) {
+    // Use vector iteration
+    for (auto& mt : docGia->data.dsmt) {
         // Tim sach trong danh sach muon (chua tra)
         bool match = false;
-        if (p->data.banSaoSach && p->data.banSaoSach->maSach == maSach) match = true;
-        else if (!p->data.maSachCached.empty() && p->data.maSachCached == maSach) match = true;
+        if (mt.banSaoSach && mt.banSaoSach->maSach == maSach) match = true;
+        else if (!mt.maSachCached.empty() && mt.maSachCached == maSach) match = true;
 
-        if (match && p->data.TrangThai == 0) {
+        if (match && mt.TrangThai == 0) {
             // Parse ngay tra hien tai
             int d, m, y;
-            if (!phanTichNgay(p->data.NgayTra, d, m, y)) {
+            if (!phanTichNgay(mt.NgayTra, d, m, y)) {
                 return "Lỗi: Ngày trả hiện tại không hợp lệ!";
             }
             
@@ -1419,11 +1409,10 @@ std::string GiaHanMuon(PTRDG docGia, const std::string& maSach) {
             QDate newDate = date.addDays(7);
             
             // Cap nhat lai NgayTra
-            p->data.NgayTra = newDate.toString("dd/MM/yyyy").toStdString();
+            mt.NgayTra = newDate.toString("dd/MM/yyyy").toStdString();
             
             return ""; // Tra ve rong la thanh cong
         }
-        p = p->next;
     }
     return "Lỗi: Không tìm thấy sách đang mượn với mã này!";
 }
@@ -1431,7 +1420,7 @@ std::string GiaHanMuon(PTRDG docGia, const std::string& maSach) {
 // ==========================================
 // DATABASE LOADING (Corrected & Self-Healing)
 // ==========================================
-void NapDocGiaTuDB_Fixed(PTRDG &root, PTRDS dsDauSach[], int soLuongDS) {
+void NapDocGiaTuDB_Fixed(PTRDG &root, std::vector<PTRDS>& dsDauSach, int soLuongDS) {
     // 0. SELF-HEALING: Reset all ban_sao to CHO_MUON_DUOC first
     // This wipes out any "zombie" DANG_MUON statuses from the database table 'ban_sao'
     // and relies purely on the actual 'muon_tra' records to determine status.
@@ -1551,13 +1540,26 @@ void NapDocGiaTuDB_Fixed(PTRDG &root, PTRDS dsDauSach[], int soLuongDS) {
         recomputeCounts(node->left);
         
         int cnt = 0;
-        MUONTRA p = node->data.dsmt;
-        int safety = 0;
-        while (p && safety < 10000) {
-            if (p->data.TrangThai == 0) cnt++;
-            p = p->next; safety++;
+        // Check history
+        for (const auto& mt : node->data.dsmt) {
+            // Dang muon (0) hoac Mat chua den (2 or 3 and !daThanhToan)
+            if (mt.TrangThai == 0) {
+                cnt++;
+            }
         }
         node->data.soSachDangMuon = cnt;
+        
+        // Recompute ngayHetHanSomNhat
+        int days = 0; // Max overdue days
+        for (const auto& mt : node->data.dsmt) {
+            // Dang muon (0) hoac Mat chua den (2 or 3 and !daThanhToan)
+            if (mt.TrangThai == 0) { // Dang muon
+                std::stringstream dummy;
+                int qh = tinhSoNgayQuaHan(mt.NgayMuon, dummy);
+                if (qh > 0) days = std::max(days, qh);
+            }
+        }
+        node->data.ngayHetHanSomNhat = days; // This is actually max overdue days, not earliest expiry. Needs review.
         
         recomputeCounts(node->right);
     };

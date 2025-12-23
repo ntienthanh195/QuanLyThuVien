@@ -1,8 +1,6 @@
 #include "ui/dialogs/HopThoaiSuaSach.h"
 #include "utils/LanguageManager.h"
-#include "utils/FilePathManager.h"
 #include "models/QuanLySach.h"
-#include "models/ThaoTacFile.h"
 #include "utils/ResponsiveHelper.h"
 #include "utils/XuLyChuoi.h"
 #include "utils/EventBus.h"
@@ -17,13 +15,13 @@
 #include <QTimer>
 
 HopThoaiSuaSach::HopThoaiSuaSach(const QString& isbn, QWidget *cha)
-    : QDialog(cha), isbnGoc(isbn), sachHienTai(nullptr) {
+    : QDialog(cha), isbnGoc(isbn), sachHienTai({}) {
     setWindowTitle(LanguageManager::instance().getText("DIALOG_EDIT_BOOK_TITLE"));
     ResponsiveHelper::ScreenSize screenSize = ResponsiveHelper::detectScreenSize();
     setMinimumWidth(ResponsiveHelper::getScaledWidth(600, screenSize));
     
     // Find book
-    extern PTRDS dsDauSach[];
+    // extern PTRDS dsDauSach[]; // REMOVED
     extern int soLuongDauSach;
     for (int i = 0; i < soLuongDauSach; i++) {
         if (dsDauSach[i] && dsDauSach[i]->ISBN == isbn.toStdString()) {

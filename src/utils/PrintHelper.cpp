@@ -625,7 +625,7 @@ bool PrintHelper::inDanhSachDocGia(PTRDG root, QWidget* parent) {
     
     for (PTRDG p : list) {
         if (p->data.TrangThai == 1) totalActive++; else totalInactive++;
-        if (p->data.Phai == 0) totalMale++; else totalFemale++;
+        if (p->data.Phai == "Nam") totalMale++; else totalFemale++;
         if (p->data.soSachDangMuon > 0) totalWithBooks++;
     }
     
@@ -677,7 +677,7 @@ bool PrintHelper::inDanhSachDocGia(PTRDG root, QWidget* parent) {
     for (int i = 0; i < list.size(); i++) {
         PTRDG p = list[i];
         QString hoTen = QString::fromStdString(p->data.Ho + " " + p->data.Ten);
-        QString phai = p->data.Phai ? "Nữ" : "Nam";
+        QString phai = QString::fromStdString(p->data.Phai);
         QString trangThai = (p->data.TrangThai == 1) ? "Hoạt động" : "Bị khóa";
         QString statusClass = (p->data.TrangThai == 1) ? "status-active" : "status-inactive";
         
@@ -1429,7 +1429,7 @@ QString PrintHelper::taoHTMLTheDocGia(PTRDG docGia) {
      .arg(docGia->data.MaThe)
      .arg(QString::fromStdString(docGia->data.Ho))
      .arg(QString::fromStdString(docGia->data.Ten))
-     .arg(docGia->data.Phai ? "Nữ" : "Nam")
+     .arg(QString::fromStdString(docGia->data.Phai))
      .arg(issueDate.toString("dd/MM/yyyy"))
      .arg(expiryDate.toString("dd/MM/yyyy"));
 }
@@ -1647,16 +1647,17 @@ bool PrintHelper::xuatLichSuMuonTraToPDF(PTRDG docGia, QWidget* parent) {
         "<th>Mã Sách</th><th>Ngày Mượn</th><th>Ngày Trả</th><th>Trạng Thái</th><th>Ghi Chú</th>"
         "</tr>";
 
-    MUONTRA p = docGia->data.dsmt;
-    while (p) {
+    // Use reverse iterator for newest first
+    for (auto it = docGia->data.dsmt.rbegin(); it != docGia->data.dsmt.rend(); ++it) {
+        const auto& mt = *it;
         QString statusStr = "";
-        int st = p->data.TrangThai;
+        int st = mt.TrangThai;
         if (st == 0) statusStr = "Dang muon";
         else if (st == 1) statusStr = "Da tra";
         else if (st == 2) statusStr = "Mat";
 
         // Calculate overdue on the fly
-        QDate hanTra = QDate::fromString(QString::fromStdString(p->data.NgayTra), "dd/MM/yyyy");
+        QDate hanTra = QDate::fromString(QString::fromStdString(mt.NgayTra), "dd/MM/yyyy");
         int soNgayQH = 0;
         if (st == 0) {
             QDate today = QDate::currentDate();
@@ -1667,22 +1668,20 @@ bool PrintHelper::xuatLichSuMuonTraToPDF(PTRDG docGia, QWidget* parent) {
 
         QString note = "";
         if (soNgayQH > 0) note = QString("Qua han %1 ngay").arg(soNgayQH);
-        if (p->data.tienPhat > 0) {
+        if (mt.tienPhat > 0) {
             if (!note.isEmpty()) note += " ";
-            note += QString("(Phat: %1)").arg(p->data.tienPhat);
+            note += QString("(Phat: %1)").arg(mt.tienPhat);
         }
 
         tableHtml += QString(
             "<tr>"
             "<td>%1</td><td>%2</td><td>%3</td><td>%4</td><td>%5</td>"
             "</tr>"
-        ).arg(p->data.banSaoSach ? QString::fromStdString(p->data.banSaoSach->maSach) : (p->data.maSachCached.empty() ? "???" : QString::fromStdString(p->data.maSachCached)))
-         .arg(QString::fromStdString(p->data.NgayMuon))
-         .arg(QString::fromStdString(p->data.NgayTra))
+        ).arg(mt.banSaoSach ? QString::fromStdString(mt.banSaoSach->maSach) : (mt.maSachCached.empty() ? "???" : QString::fromStdString(mt.maSachCached)))
+         .arg(QString::fromStdString(mt.NgayMuon))
+         .arg(QString::fromStdString(mt.NgayTra))
          .arg(statusStr)
          .arg(note);
-
-        p = p->next;
     }
     tableHtml += "</table>";
 

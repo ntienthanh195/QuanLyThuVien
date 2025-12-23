@@ -54,7 +54,7 @@ static QPushButton* createActionCard(QString title, QString desc, bool isPrimary
 }
 
 ManHinhQuanLyIn::ManHinhQuanLyIn(PTRDG caNhan, const std::vector<PTRDG>& danhSach, QWidget *parent) 
-    : QDialog(parent), docGiaHienTai(caNhan), m_danhSach(danhSach), sachHienTai(nullptr) {
+    : QDialog(parent), docGiaHienTai(caNhan), m_danhSach(danhSach), sachHienTai({}) {
     setWindowTitle(LanguageManager::instance().getText("DIALOG_PRINT_CENTER_TITLE"));
     resize(900, 600); // Larger size for dashboard
     
@@ -88,9 +88,10 @@ ManHinhQuanLyIn::ManHinhQuanLyIn(PTRDG caNhan, const std::vector<PTRDG>& danhSac
     
     if (!m_danhSach.empty() && readerSearchList) {
         QStringList readerNames;
-        QVariantList readerData;
+        QVariantList itemData;
         
-        for (const auto& dg : m_danhSach) {
+        for (int i = 0; i < (int)m_danhSach.size(); ++i) {
+            const auto& dg = m_danhSach[i];
             if (!dg) continue;
             QString display = QString("%1 %2 (Mã: %3) | Mượn: %4")
                 .arg(QString::fromStdString(dg->data.Ho))
@@ -98,10 +99,10 @@ ManHinhQuanLyIn::ManHinhQuanLyIn(PTRDG caNhan, const std::vector<PTRDG>& danhSac
                 .arg(dg->data.MaThe)
                 .arg(dg->data.soSachDangMuon);
             readerNames << display;
-            readerData << QVariant::fromValue(dg);
+            itemData << i; // Store index in m_danhSach
         }
         
-        readerSearchList->setItems(readerNames, readerData);
+        readerSearchList->setItems(readerNames, itemData);
         
         // Connect signals
         connect(readerSearchList, &SearchableListWidget::itemDoubleClicked,
@@ -109,8 +110,6 @@ ManHinhQuanLyIn::ManHinhQuanLyIn(PTRDG caNhan, const std::vector<PTRDG>& danhSac
     }
 
     // NEW: Populate Book SearchList
-    extern PTRDS dsDauSach[];
-    extern int soLuongDauSach;
     
     if (soLuongDauSach > 0 && bookSearchList) {
         QStringList bookNames;
@@ -129,7 +128,7 @@ ManHinhQuanLyIn::ManHinhQuanLyIn(PTRDG caNhan, const std::vector<PTRDG>& danhSac
             // We need to store PTRDS in QVariant. 
             // Since PTRDS is a pointer, we can use QVariant::fromValue or cast to void*
             // But QVariant needs registered type or void*. Let's use void* wrapper or UserRole logic in widget.
-            bookData << QVariant::fromValue((void*)sach); 
+            bookData << i; // Store index in dsDauSach
         }
         
         bookSearchList->setItems(bookNames, bookData);
@@ -444,8 +443,11 @@ void ManHinhQuanLyIn::xuLyInTheHangLoat() {
     } else {
         // Print only selected
         for (const QVariant& var : selected) {
-            PTRDG dg = var.value<PTRDG>();
-            if (dg) danhSachQList.append(dg);
+            int idx = var.toInt();
+            if (idx >= 0 && idx < (int)m_danhSach.size()) {
+                PTRDG dg = m_danhSach[idx];
+                if (dg) danhSachQList.append(dg);
+            }
         }
     }
     
@@ -467,7 +469,7 @@ void ManHinhQuanLyIn::xuLyInTemHangLoat() {
     
     if (selected.isEmpty()) {
         // NEW LOGIC: Offer to print ALL books
-        extern PTRDS dsDauSach[];
+        // extern PTRDS dsDauSach[]; // REMOVED
         extern int soLuongDauSach;
         
         QMessageBox::StandardButton reply = QMessageBox::question(
@@ -490,9 +492,12 @@ void ManHinhQuanLyIn::xuLyInTemHangLoat() {
     } else {
         // Print only selected
         for (const QVariant& var : selected) {
-            PTRDS sach = static_cast<PTRDS>(var.value<void*>());
-            if (sach) {
-                printList.append({sach, sach->tongBanSao});
+            int idx = var.toInt();
+            if (idx >= 0 && idx < (int)dsDauSach.size()) {
+                PTRDS sach = dsDauSach[idx];
+                if (sach) {
+                    printList.append({sach, sach->tongBanSao});
+                }
             }
         }
     }
@@ -516,8 +521,11 @@ void ManHinhQuanLyIn::xuLyInTheDocGia() {
         if (!selected.isEmpty()) {
             // Priority 1: Selection
             for (const QVariant& var : selected) {
-                PTRDG dg = var.value<PTRDG>();
-                if (dg) listToPrint.append(dg);
+                int idx = var.toInt();
+                if (idx >= 0 && idx < (int)m_danhSach.size()) {
+                    PTRDG dg = m_danhSach[idx];
+                    if (dg) listToPrint.append(dg);
+                }
             }
         } else {
             // Priority 2: No Selection -> Print ALL
@@ -566,13 +574,16 @@ void ManHinhQuanLyIn::xuLyInTemSach() {
         if (!selected.isEmpty()) {
              // Priority 1: Selected Items
              for (const QVariant& var : selected) {
-                PTRDS sach = static_cast<PTRDS>(var.value<void*>());
-                if (sach) listToPrint.append({sach, sach->tongBanSao});
+                int idx = var.toInt();
+                if (idx >= 0 && idx < (int)dsDauSach.size()) {
+                    PTRDS sach = dsDauSach[idx];
+                    if (sach) listToPrint.append({sach, sach->tongBanSao});
+                }
             }
         } else {
             // Priority 2: No Selection -> Print ALL
             isPrintAll = true;
-            extern PTRDS dsDauSach[];
+            // extern PTRDS dsDauSach[]; // REMOVED
             extern int soLuongDauSach;
             for (int i = 0; i < soLuongDauSach; i++) {
                 if (dsDauSach[i]) {
@@ -599,13 +610,11 @@ void ManHinhQuanLyIn::xuLyInTemSach() {
 }
 
 void ManHinhQuanLyIn::xuLyInDanhMucSach() {
-    extern PTRDS dsDauSach[];
-    extern int soLuongDauSach;
     if (soLuongDauSach <= 0) {
         QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARN"), LanguageManager::instance().getText("MSG_EMPTY_LIBRARY"));
         return;
     }
-    PrintHelper::inDanhMucSach(dsDauSach, soLuongDauSach, this);
+    PrintHelper::inDanhMucSach(dsDauSach.data(), soLuongDauSach, this);
 }
 
 void ManHinhQuanLyIn::xuLyInBaoCaoDocGia() {
@@ -613,13 +622,11 @@ void ManHinhQuanLyIn::xuLyInBaoCaoDocGia() {
 }
 
 void ManHinhQuanLyIn::xuLyInBaoCaoSach() {
-    extern PTRDS dsDauSach[];
-    extern int soLuongDauSach;
     if (soLuongDauSach <= 0) {
         QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_WARN"), LanguageManager::instance().getText("MSG_EMPTY_LIBRARY"));
         return;
     }
-    PrintHelper::inDanhSachSach(dsDauSach, soLuongDauSach, this);
+    PrintHelper::inDanhSachSach(dsDauSach.data(), soLuongDauSach, this);
 }
 
 // End of file

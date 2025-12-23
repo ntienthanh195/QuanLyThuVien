@@ -75,12 +75,14 @@ int PhanTichTrangThaiSach(const std::string &s, std::ostream &out) {
 
 
 // them ban sao vao dau danh sach lien ket 
-std::string themDanhMucSach(PTRDMS &dms, const std::string &ma, TrangThaiSach tt, const std::string &vt) {
+std::string themDanhMucSach(PTRDS dauSach, const std::string &ma, TrangThaiSach tt, const std::string &vt) {
+    if (!dauSach) return "Loi: Dau sach khong hop le!";
     if (tt < 0 || tt > 2)                return "Loi: Trang thai khong hop le!";  // kiem tra trang thai
     if (vt.length() > MAX_VI_TRI_KE)     return "Loi: Vi tri qua dai!";           // kiem tra do dai
     
-    PTRDMS node = new DanhMucSach{ma, tt, vt, dms};  // tao node moi
-    dms = node;                                       // chen vao dau
+    PTRDMS node = std::make_shared<DanhMucSach>(ma, tt, vt, dauSach->dms);  // tao node moi
+    dauSach->dms = node;                                       // chen vao dau DSLK
+    dauSach->dms_vector.push_back(node);                       // Thêm vào vector bản sao
     return "";                                        // thanh cong
 }
 
@@ -179,7 +181,7 @@ std::string ThemNhieuBanSao(PTRDS dauSach, int soLuong, const std::string &viTri
         }
         
         // goi backend them ban sao
-        std::string loiThem = themDanhMucSach(dauSach->dms, maSach, CHO_MUON_DUOC, viTriChuan);
+        std::string loiThem = themDanhMucSach(dauSach, maSach, CHO_MUON_DUOC, viTriChuan);
         if (!loiThem.empty()) {
             loiTrongLoop = loiThem;
             break;
@@ -210,8 +212,9 @@ std::string ThemNhieuBanSao(PTRDS dauSach, int soLuong, const std::string &viTri
 bool ChenNodeDMSVaoDauSach(PTRDS d, const std::string &ma, int tt, const std::string &vt) {
     if (!d || tt < 0 || tt > 2) return false;                  // kiem tra hop le
     
-    PTRDMS node = new DanhMucSach{ma, static_cast<TrangThaiSach>(tt), vt, d->dms};
-    d->dms = node;                                              // chen vao dau
+    PTRDMS node = std::make_shared<DanhMucSach>(ma, static_cast<TrangThaiSach>(tt), vt, d->dms);
+    d->dms = node;
+    d->dms_vector.push_back(node); // Sync with vector (Phase 5)
     return true;
 }
 
@@ -228,7 +231,8 @@ bool capNhatTrangThaiSach(PTRDMS dms, const std::string &ma, TrangThaiSach tt) {
 }
 
 // tim node ban sao theo ma sach O(N*M) N dau sach, M ban sao
-PTRDMS timDanhMucTheoMaSach(const std::string &ma, PTRDS ds[], int n, std::ostream &out, bool silent) {
+// tim node ban sao theo ma sach O(N*M) N dau sach, M ban sao
+PTRDMS timDanhMucTheoMaSach(const std::string &ma, std::vector<PTRDS>& ds, int n, std::ostream &out, bool silent) {
     //trich ISBN -> Tim dau sach O(N) -> Tim trong 1 DSLK O(M)
     std::string isbn = TachISBNTuMaSach(ma);                   // lay ISBN tu ma sach
     if (isbn.empty()) {                                         // ma sach khong hop le
@@ -264,13 +268,11 @@ PTRDMS timDanhMucTheoMaSach(const std::string &ma, PTRDS ds[], int n, std::ostre
 
 // them dau sach moi vao mang
 // them dau sach moi vao mang
-bool themDauSach(PTRDS ds[], int &n, const std::string &isbn, const std::string &ten, int trang,
+bool themDauSach(std::vector<PTRDS>& ds, int &n, const std::string &isbn, const std::string &ten, int trang,
                  const std::string &tg, int nam, const std::string &tl, bool anLang, long long giaTien, const std::string& nhaXuatBan) {
     
-    if (n >= MAX_DAUSACH) {                                    // kiem tra gioi han
-        if (!anLang) thongBao(std::cout, "Gioi han dau sach!", LOI);
-        return false;
-    }
+    // Check vector size limit if needed (optional with vector but good for logic)
+    // if (ds.size() >= MAX_DAUSACH) ... 
 
     std::string loi, isbnChuan;
     
@@ -322,22 +324,25 @@ bool themDauSach(PTRDS ds[], int &n, const std::string &isbn, const std::string 
         return false;
     }
 
-    // tao dau sach moi
-    PTRDS node = new DauSach;
+    // tao dau sach moi bang smart pointer
+    PTRDS node = std::make_shared<DauSach>();
     node->ISBN = isbnChuan;                                    // gan ISBN
     node->tenSach = ChuyenThanhTitleCase(ten);                 // gan ten sach
     node->soTrang = trang;                                     // gan so trang
     node->tacGia = ChuyenThanhTitleCase(tg);                   // gan tac gia
     node->namXuatBan = nam;                                    // gan nam XB
     node->theLoai = ChuyenThanhTitleCase(tl);                  // gan the loai
-    node->theLoai = ChuyenThanhTitleCase(tl);                  // gan the loai
+    // node->theLoai redundant line removed
     node->soLuotMuon = 0;                                      // khoi tao so luot muon
     node->giaTien = giaTien;                                   // gan gia tien
     node->NhaXuatBan = nhaXuatBan;                             // gan NXB (Phase 2)
     node->dms = nullptr;                                       // chua co ban sao
     node->tongBanSao = 0;                                      // tong = 0
 
-    ds[n++] = node;                                            // them vao mang
+    // ds[n++] = node; -> Chuyen sang push_back
+    ds.push_back(node);
+    n = ds.size(); // Cap nhat so luong cho bien legacy
+
     sapXepDauSachTheoTen(ds, 0, n - 1);                        // sap xep lai
     duLieuDaThayDoi = true;                                    // danh dau thay doi
     
@@ -354,13 +359,14 @@ bool themDauSach(PTRDS ds[], int &n, const std::string &isbn, const std::string 
 }
 
 // tim dau sach theo ISBN - linear O(N)
-PTRDS TimDauSachTheoISBN(PTRDS ds[], int n, const std::string &isbn) {
+// tim dau sach theo ISBN - linear O(N)
+PTRDS TimDauSachTheoISBN(std::vector<PTRDS>& ds, int n, const std::string &isbn) {
     // Defensive checks
-    if (!ds || n <= 0) return nullptr;
-    if (n > MAX_DAUSACH) n = MAX_DAUSACH;
-    if (isbn.empty()) return nullptr;
+    if (n <= 0 || isbn.empty()) return nullptr;
 
-    for (int i = 0; i < n; ++i) {                              // duyet mang
+    // Use vector access
+    for (int i = 0; i < n; ++i) { 
+        if (i >= ds.size()) break; // Safety check
         PTRDS cur = ds[i];
         if (cur && cur->ISBN == isbn) {                        // tim thay - early return
             return cur;
@@ -375,7 +381,8 @@ PTRDS TimDauSachTheoISBN(PTRDS ds[], int n, const std::string &isbn) {
 
 
 // tim kiem sach theo tu khoa O(N*L) N dau sach, L do dai du lieu
-int timKiemLogic(PTRDS ds[], int n, const std::string &tk, KetQuaTimKiem kq[]) {
+// tim kiem sach theo tu khoa O(N*L) N dau sach, L do dai du lieu
+int timKiemLogic(std::vector<PTRDS>& ds, int n, const std::string &tk, KetQuaTimKiem kq[]) {
     if (tk.empty() || n == 0) return 0;                        // kiem tra rong
     
     std::string tuKhoaChuan = ChuanHoaChuoiTimKiem(tk);        // chuan hoa tu khoa
@@ -471,7 +478,7 @@ ThongTinDauSach LayThongTinDauSach(PTRDS dauSach) {
 
 
 // lay the loai duy nhat O(N + K log K) K la so the loai
-int TimTheLoaiDuyNhat(PTRDS ds[], int n, std::string mangTheLoai[]) {
+int TimTheLoaiDuyNhat(std::vector<PTRDS>& ds, int n, std::string mangTheLoai[]) {
     if (n == 0) return 0;                                      // mang rong
     
     int soTheLoai = 0;                                         // so the loai duy nhat
@@ -497,7 +504,7 @@ int TimTheLoaiDuyNhat(PTRDS ds[], int n, std::string mangTheLoai[]) {
 }
 
 // tim sach theo the loai O(N)
-int TimSachTheoTheLoai(PTRDS ds[], int n, const std::string &theLoaiCanTim, PTRDS mangKetQua[]) {
+int TimSachTheoTheLoai(std::vector<PTRDS>& ds, int n, const std::string &theLoaiCanTim, PTRDS mangKetQua[]) {
     int soKetQua = 0;                                          // dem ket qua
     
     for (int i = 0; i < n; ++i) {                              // duyet dau sach
@@ -509,7 +516,7 @@ int TimSachTheoTheLoai(PTRDS ds[], int n, const std::string &theLoaiCanTim, PTRD
 }
 
 // lay vi tri duy nhat O(N*M + K log K) K la so vi tri
-int TimViTriDuyNhat(PTRDS ds[], int n, std::string mangViTri[]) {
+int TimViTriDuyNhat(std::vector<PTRDS>& ds, int n, std::string mangViTri[]) {
     if (n == 0) return 0;                                      // mang rong
     
     int soViTri = 0;                                           // so vi tri
@@ -551,7 +558,7 @@ void hoanDoi(PTRDS &a, PTRDS &b) {
 }
 
 // Chon median-of-three lam pivot O(1)
-int ChonPivot(PTRDS arr[], int left, int right) {
+int ChonPivot(std::vector<PTRDS>& arr, int left, int right) {
     int mid = left + (right - left) / 2;      // lay chi so giua
 
     if (arr[mid] && arr[left] && arr[mid]->tenSach < arr[left]->tenSach)
@@ -567,10 +574,12 @@ int ChonPivot(PTRDS arr[], int left, int right) {
 }
 
 // Quicksort dau sach theo ten (Su dung std::sort de tranh stack overflow)
-void sapXepDauSachTheoTen(PTRDS arr[], int left, int right) {
+void sapXepDauSachTheoTen(std::vector<PTRDS>& arr, int left, int right) {
     if (left >= right || left < 0 || right >= MAX_DAUSACH) return;
 
-    std::sort(arr + left, arr + right + 1, [](PTRDS a, PTRDS b) {
+    auto begin = arr.begin();
+    if (begin + left >= arr.end() || begin + right >= arr.end()) return;
+    std::sort(begin + left, begin + right + 1, [](const PTRDS& a, const PTRDS& b) {
         if (!a) return false;
         if (!b) return true;
         return a->tenSach < b->tenSach;
@@ -651,39 +660,33 @@ void sapXepKetQuaTimKiem(KetQuaTimKiem arr[], int n) {
 
 // giai phong danh muc sach (danh sach lien ket)
 void GiaiPhongDanhMucSach(PTRDMS &dms) {
-    int dem = 0;                                               // dem de bao ve vong lap
-    while (dms && dem < SO_VONG_LAP_DMS_MAX) {                // duyet het danh sach
-        PTRDMS temp = dms;                                     // luu node hien tai
-        dms = dms->next;                                       // chuyen sang node sau
-        delete temp;                                           // xoa node cu
-        dem++;                                                 // tang dem
-    }
-    
-    if (dms) {                                                 // con node sau SO_VONG_LAP_DMS_MAX
-        thongBao(std::cout, "Phat hien vong lap trong DSLK! Cat chuoi de tranh leak.", LOI);
-        dms = nullptr;                                         // cat chuoi, chap nhan mat vai node thay vi crash
+    while (dms) {
+        PTRDMS temp = dms;
+        dms = dms->next;
+        // shared_ptr handles deletion automatically
+        temp->next = nullptr; // break chain to prevent nested destruction stack overflow
     }
 }
 
 // giai phong mot dau sach
 void GiaiPhongDauSach(PTRDS &d) {
-    if (d) {                                                   // neu ton tai
-        GiaiPhongDanhMucSach(d->dms);                         // xoa danh sach ban sao
-        delete d;                                              // xoa dau sach
-        d = nullptr;                                           // dat null
+    // Smart pointer handles deletion via destructor ~DauSach()
+    // We just reset the shared_ptr to nullptr
+    if (d) {
+        d.reset();
     }
 }
 
 // giai phong toan bo dau sach
-void GiaiPhongToanBoDauSach(PTRDS ds[], int &n) {
-    for (int i = 0; i < n; ++i) {                             // duyet mang
-        GiaiPhongDauSach(ds[i]);                              // xoa tung dau sach
-    }
-    n = 0;                                                     // reset so luong
+void GiaiPhongToanBoDauSach(std::vector<PTRDS>& ds, int &n) {
+    // Smart pointers + vector handle everything
+    ds.clear();
+    n = 0;
 }
 
 // dem tong so ban sao 
-int DemTongSoBanSao(PTRDS ds[], int n) {
+// dem tong so ban sao 
+int DemTongSoBanSao(std::vector<PTRDS>& ds, int n) {
     int tong = 0;                                              // khoi tao tong
     
     for (int i = 0; i < n; ++i) {                             // duyet dau sach
@@ -695,7 +698,7 @@ int DemTongSoBanSao(PTRDS ds[], int n) {
 }
 
 // cap nhat tong ban sao cho tat ca dau sach
-void CapNhatTongBanSao(PTRDS ds[], int n) {
+void CapNhatTongBanSao(std::vector<PTRDS>& ds, int n) {
     for (int i = 0; i < n; ++i) {                             // duyet dau sach
         if (!ds[i]) continue;                                  // bo qua null
         
@@ -728,7 +731,7 @@ void CapNhatTongBanSao(PTRDS ds[], int n) {
 
 
 // xoa dau sach theo ISBN 
-std::string XoaDauSach(PTRDS ds[], int &n, const std::string &isbn) {
+std::string XoaDauSach(std::vector<PTRDS>& ds, int &n, const std::string &isbn) {
     int idx = -1;                                              // vi tri dau sach
     for (int i = 0; i < n; ++i) {                             // duyet mang
         if (ds[i] && ds[i]->ISBN == isbn) {                   // tim thay
@@ -756,7 +759,7 @@ std::string XoaDauSach(PTRDS ds[], int &n, const std::string &isbn) {
 }
 
 // xoa sach theo ma sach
-bool XoaSachTheoMaSach(PTRDS ds[], int n, const std::string &ma, std::ostream &out) {
+bool XoaSachTheoMaSach(std::vector<PTRDS>& ds, int n, const std::string &ma, std::ostream &out) {
     std::string isbn = TachISBNTuMaSach(ma);                  // lay ISBN tu ma sach
     if (isbn.empty()) {                                        // ma khong hop le
         thongBao(out, "Ma sach khong hop le!", LOI);
@@ -784,7 +787,10 @@ bool XoaSachTheoMaSach(PTRDS ds[], int n, const std::string &ma, std::ostream &o
             if (prev)   prev->next = curr->next;              // xoa node giua/cuoi
             else        d->dms = curr->next;                  // xoa node dau
             
-            delete curr;                                       // giai phong bo nho
+            // Sync with vector (Phase 5)
+            d->dms_vector.erase(std::remove(d->dms_vector.begin(), d->dms_vector.end(), curr), d->dms_vector.end());
+
+            // shared_ptr handles cleanup automatically
             d->tongBanSao--;                                   // giam so luong
             duLieuDaThayDoi = true;                            // danh dau thay doi
             
@@ -806,7 +812,7 @@ bool XoaSachTheoMaSach(PTRDS ds[], int n, const std::string &ma, std::ostream &o
 }
 
 // cap nhat dau sach
-std::string CapNhatDauSach(PTRDS ds[], int n, const std::string &isbn, const std::string &ten, 
+std::string CapNhatDauSach(std::vector<PTRDS>& ds, int n, const std::string &isbn, const std::string &ten, 
                           int trang, const std::string &tg, int nam, const std::string &tl, const std::string &viTri, long long giaTien, const std::string& nhaXuatBan) {
     PTRDS d = TimDauSachTheoISBN(ds, n, isbn);                // tim dau sach
     if (!d) return "Loi: Khong tim thay ISBN!";               // khong tim thay
@@ -971,29 +977,33 @@ void NapDanhSachTuDB() {
         qCritical() << "[DB DEBUG] Failed to execute query:" << q.lastError().text();
     }
     
-    // 2. Load Ban Sao
-    if (q.exec("SELECT ma_sach, dau_sach_id, trang_thai, vi_tri FROM ban_sao")) {
+    // 2. Load Ban Sao (Optimized JOIN)
+    QString sqlBanSao = "SELECT bs.ma_sach, bs.trang_thai, bs.vi_tri, ds.isbn "
+                        "FROM ban_sao bs "
+                        "JOIN dau_sach ds ON bs.dau_sach_id = ds.id";
+    
+    if (q.exec(sqlBanSao)) {
         while (q.next()) {
             std::string ma = q.value(0).toString().toStdString();
-            int dauId = q.value(1).toInt();
-            int tt = q.value(2).toInt();
-            std::string vt = q.value(3).toString().toStdString();
+            TrangThaiSach tt = (TrangThaiSach)q.value(1).toInt();
+            std::string vt = q.value(2).toString().toStdString();
+            std::string isbn = q.value(3).toString().toStdString();
             
-            QSqlQuery q2(db);
-            q2.prepare("SELECT isbn FROM dau_sach WHERE id = ?");
-            q2.addBindValue(dauId);
-            if (q2.exec() && q2.next()) {
-                std::string isbn = q2.value(0).toString().toStdString();
-                PTRDS ds = TimDauSachTheoISBN(dsDauSach, soLuongDauSach, isbn);
-                if (ds) {
-                     ChenNodeDMSVaoDauSach(ds, ma, tt, vt);
-                }
+            PTRDS ds = TimDauSachTheoISBN(dsDauSach, soLuongDauSach, isbn);
+            if (ds) {
+                PTRDMS node = std::make_shared<DanhMucSach>(ma, tt, vt, ds->dms);
+                ds->dms = node;
+                ds->dms_vector.push_back(node);
             }
         }
+    } else {
+        qCritical() << "[DB DEBUG] Failed to load copies:" << q.lastError().text();
     }
     
     CapNhatTongBanSao(dsDauSach, soLuongDauSach);
-    sapXepDauSachTheoTen(dsDauSach, 0, soLuongDauSach - 1);
+    if (soLuongDauSach > 0) {
+        sapXepDauSachTheoTen(dsDauSach, 0, soLuongDauSach - 1);
+    }
     qDebug() << "[DB DEBUG] Finished loading. Total books:" << soLuongDauSach;
 }
     
@@ -1005,8 +1015,9 @@ void NapDanhSachTuDB() {
 
 
 // lay con tro mang dau sach (read-only, UI chi doc khong ghi)
+// lay con tro mang dau sach (read-only, UI chi doc khong ghi)
 PTRDS* LayDanhSachDauSach() {
-    return dsDauSach;  // tra ve con tro mang
+    return dsDauSach.data();  // tra ve con tro mang du lieu cua vector
 }
 
 // Define the global mutex declared in the header
@@ -1460,6 +1471,7 @@ std::string XoaBanSaoTheoMa(const std::string& maSach) {
     q.prepare("DELETE FROM ban_sao WHERE ma_sach=?");
     q.addBindValue(QString::fromStdString(maSach));
     q.exec();
+    
     // --- END DB SYNC ---
 
     // [AUDIT LOG]
@@ -1596,8 +1608,8 @@ int DemTongSoBanSaoTheoTrangThai(TrangThaiSach trangThai) {
 //  NHOM 10: TIM KIEM NANG CAO 
 
 // tim sach theo nam xuat ban O(N)
-int TimSachTheoNamXuatBan(PTRDS ds[], int n, int nam, PTRDS kq[]) {
-    if (!ds || !kq || n <= 0) return 0;
+int TimSachTheoNamXuatBan(std::vector<PTRDS>& ds, int n, int nam, PTRDS kq[]) {
+    if (ds.empty() || !kq || n <= 0) return 0;
     
     int count = 0;
     for (int i = 0; i < n && i < MAX_DAUSACH; i++) {
@@ -1610,20 +1622,22 @@ int TimSachTheoNamXuatBan(PTRDS ds[], int n, int nam, PTRDS kq[]) {
     
     // sap xep ket qua theo ten
     if (count > 1) {
-        sapXepDauSachTheoTen(kq, 0, count - 1);
+        std::sort(kq, kq + count, [](const PTRDS& a, const PTRDS& b) {
+            if (!a) return false;
+            if (!b) return true;
+            return a->tenSach < b->tenSach;
+        });
     }
     
     return count;
 }
 
 // tim sach trong khoang nam O(N)
-int TimSachTheoKhoangNam(PTRDS ds[], int n, int namBatDau, int namKetThuc, PTRDS kq[]) {
-    if (!ds || !kq || n <= 0) return 0;
+int TimSachTheoKhoangNam(std::vector<PTRDS>& ds, int n, int namBatDau, int namKetThuc, PTRDS kq[]) {
+    if (ds.empty() || !kq || n <= 0) return 0;
     if (namBatDau > namKetThuc) {
         // swap neu sai thu tu
-        int temp = namBatDau;
-        namBatDau = namKetThuc;
-        namKetThuc = temp;
+        std::swap(namBatDau, namKetThuc);
     }
     
     int count = 0;
@@ -1636,35 +1650,29 @@ int TimSachTheoKhoangNam(PTRDS ds[], int n, int namBatDau, int namKetThuc, PTRDS
     }
     
     // sap xep ket qua theo nam giam dan (moi nhat truoc)
-    for (int i = 0; i < count - 1; i++) {
-        for (int j = i + 1; j < count; j++) {
-            if (kq[i]->namXuatBan < kq[j]->namXuatBan) {
-                hoanDoi(kq[i], kq[j]);
-            }
-        }
-    }
+    // sap xep ket qua theo nam giam dan (moi nhat truoc)
+    std::sort(kq, kq + count, [](const PTRDS& a, const PTRDS& b) {
+        return a->namXuatBan > b->namXuatBan; // Giam dan
+    });
     
     return count;
 }
 
 // loc sach co ban sao voi trang thai cu the O(N*M)
-int LocSachTheoTrangThai(PTRDS ds[], int n, TrangThaiSach trangThai, PTRDS kq[]) {
-    if (!ds || !kq || n <= 0) return 0;
+int LocSachTheoTrangThai(std::vector<PTRDS>& ds, int n, TrangThaiSach trangThai, PTRDS kq[]) {
+    if (ds.empty() || !kq || n <= 0) return 0;
     
     int count = 0;
     for (int i = 0; i < n && i < MAX_DAUSACH; i++) {
         if (!ds[i]) continue;
         
         // kiem tra dau sach co ban sao voi trang thai nay khong
-        PTRDMS pTemp = ds[i]->dms;
         bool coTrangThai = false;
-        
-        while (pTemp) {
-            if (pTemp->trangThai == trangThai) {
+        for (PTRDMS pCopy : ds[i]->dms_vector) {
+            if (pCopy->trangThai == trangThai) {
                 coTrangThai = true;
                 break;
             }
-            pTemp = pTemp->next;
         }
         
         if (coTrangThai) {
@@ -1674,15 +1682,17 @@ int LocSachTheoTrangThai(PTRDS ds[], int n, TrangThaiSach trangThai, PTRDS kq[])
     
     // sap xep ket qua theo ten
     if (count > 1) {
-        sapXepDauSachTheoTen(kq, 0, count - 1);
+        std::sort(kq, kq + count, [](const PTRDS& a, const PTRDS& b) {
+            return a->tenSach < b->tenSach;
+        });
     }
     
     return count;
 }
 
 // tim sach theo tac gia (bo dau, khong phan biet hoa/thuong) O(N)
-int TimSachTheoTacGia(PTRDS ds[], int n, const std::string &tacGia, PTRDS kq[]) {
-    if (!ds || !kq || n <= 0 || tacGia.empty()) return 0;
+int TimSachTheoTacGia(std::vector<PTRDS>& ds, int n, const std::string &tacGia, PTRDS kq[]) {
+    if (ds.empty() || !kq || n <= 0 || tacGia.empty()) return 0;
     
     // Bo dau va chuyen thuong cho tu khoa tim kiem
     std::string tacGiaBoDau = BoDauVaThuong(tacGia);
@@ -1702,7 +1712,9 @@ int TimSachTheoTacGia(PTRDS ds[], int n, const std::string &tacGia, PTRDS kq[]) 
     
     // sap xep ket qua theo ten
     if (count > 1) {
-        sapXepDauSachTheoTen(kq, 0, count - 1);
+        std::sort(kq, kq + count, [](const PTRDS& a, const PTRDS& b) {
+            return a->tenSach < b->tenSach;
+        });
     }
     
     return count;

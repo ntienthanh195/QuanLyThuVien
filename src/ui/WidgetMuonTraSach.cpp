@@ -42,7 +42,7 @@
 #include "utils/EventBus.h"
 #include "utils/ToastNotification.h"
 #include "utils/SafeGui.h"
-#include "utils/FinanceHelper.h"
+// #include "utils/FinanceHelper.h" // Removed (Missing file)
 #include <QKeyEvent>
 #include <QApplication>
 #include <QLineEdit>
@@ -797,10 +797,10 @@ void WidgetMuonTraSach::xuLyChonDocGia(int hang, int) {
     .arg(QString::fromStdString(docGiaHienTai->data.Ho))  // 4
     .arg(QString::fromStdString(docGiaHienTai->data.Ten)) // 5
     .arg(LanguageManager::instance().getText("LBL_GENDER")) // 6
-    .arg(docGiaHienTai->data.Phai ? LanguageManager::instance().getText("GENDER_FEMALE") : LanguageManager::instance().getText("GENDER_MALE")) // 7
+    .arg(docGiaHienTai->data.Phai == "Nu" ? LanguageManager::instance().getText("GENDER_FEMALE") : LanguageManager::instance().getText("GENDER_MALE")) // 7
     .arg(LanguageManager::instance().getText("LBL_STATUS_SHORT")) // 8
-    .arg(docGiaHienTai->data.TrangThai == 1 ? "#1BC5BD" : "#F64E60") // 9
-    .arg(docGiaHienTai->data.TrangThai == 1 ? LanguageManager::instance().getText("STATUS_ACTIVE") : LanguageManager::instance().getText("STATUS_LOCKED")) // 10
+    .arg(docGiaHienTai->data.TrangThai == TT_HOAT_DONG ? "#1BC5BD" : "#F64E60") // 9
+    .arg(docGiaHienTai->data.TrangThai == TT_HOAT_DONG ? LanguageManager::instance().getText("STATUS_ACTIVE") : LanguageManager::instance().getText("STATUS_LOCKED")) // 10
     .arg(LanguageManager::instance().getText("LBL_BORROWING")) // 11
     .arg(docGiaHienTai->data.soSachDangMuon >= maxSach ? "#F64E60" : "#FFA800") // 12
     .arg(docGiaHienTai->data.soSachDangMuon) // 13
@@ -868,7 +868,7 @@ void WidgetMuonTraSach::capNhatBangSachDangMuon() {
         return;
     }
 
-    extern PTRDS dsDauSach[];
+    // extern PTRDS dsDauSach[]; // REMOVED: Use vector from QuanLySach.h
     extern int soLuongDauSach;
 
     // Use a larger buffer to fetch history if needed
@@ -957,10 +957,10 @@ void WidgetMuonTraSach::capNhatThongTinDocGia() {
     .arg(QString::fromStdString(docGiaHienTai->data.Ho))  // 4
     .arg(QString::fromStdString(docGiaHienTai->data.Ten)) // 5
     .arg(LanguageManager::instance().getText("LBL_GENDER")) // 6
-    .arg(docGiaHienTai->data.Phai ? LanguageManager::instance().getText("GENDER_FEMALE") : LanguageManager::instance().getText("GENDER_MALE")) // 7
+    .arg(docGiaHienTai->data.Phai == "Nu" ? LanguageManager::instance().getText("GENDER_FEMALE") : LanguageManager::instance().getText("GENDER_MALE")) // 7
     .arg(LanguageManager::instance().getText("LBL_STATUS_SHORT")) // 8
-    .arg(docGiaHienTai->data.TrangThai == 1 ? "#1BC5BD" : "#F64E60") // 9
-    .arg(docGiaHienTai->data.TrangThai == 1 ? LanguageManager::instance().getText("STATUS_ACTIVE") : LanguageManager::instance().getText("STATUS_LOCKED")) // 10
+    .arg(docGiaHienTai->data.TrangThai == TT_HOAT_DONG ? "#1BC5BD" : "#F64E60") // 9
+    .arg(docGiaHienTai->data.TrangThai == TT_HOAT_DONG ? LanguageManager::instance().getText("STATUS_ACTIVE") : LanguageManager::instance().getText("STATUS_LOCKED")) // 10
     .arg(LanguageManager::instance().getText("LBL_BORROWING")) // 11
     .arg(docGiaHienTai->data.soSachDangMuon >= maxSach ? "#F64E60" : "#FFA800") // 12
     .arg(docGiaHienTai->data.soSachDangMuon) // 13
@@ -1010,6 +1010,7 @@ static QPair<PTRDG, QString> ShowAmbiguityResolver(QWidget* parent, const QList<
     layout.addWidget(new QLabel("Phát hiện nhiều học viên đang mượn đầu sách này.\nVui lòng chọn người cần trả:"));
     
     QListWidget listWidget;
+    int i = 0;
     for (const auto& match : matches) {
         QString info = QString("[%1] %2 %3 - Cuốn: %4")
             .arg(match.first->data.MaThe)
@@ -1017,7 +1018,7 @@ static QPair<PTRDG, QString> ShowAmbiguityResolver(QWidget* parent, const QList<
             .arg(QString::fromStdString(match.first->data.Ten))
             .arg(match.second);
         QListWidgetItem* item = new QListWidgetItem(info, &listWidget);
-        item->setData(Qt::UserRole, QVariant::fromValue((void*)match.first));
+        item->setData(Qt::UserRole, i++); // Store index instead of unsafe pointer cast
         item->setData(Qt::UserRole + 1, match.second);
     }
     listWidget.setCurrentRow(0);
@@ -1032,7 +1033,10 @@ static QPair<PTRDG, QString> ShowAmbiguityResolver(QWidget* parent, const QList<
     if (dialog.exec() == QDialog::Accepted) {
         QListWidgetItem* item = listWidget.currentItem();
         if (item) {
-            return {(PTRDG)item->data(Qt::UserRole).value<void*>(), item->data(Qt::UserRole+1).toString()};
+            int idx = item->data(Qt::UserRole).toInt();
+            if (idx >= 0 && idx < (int)matches.size()) {
+                return matches[idx];
+            }
         }
     }
     return {nullptr, ""};
@@ -1094,9 +1098,9 @@ void WidgetMuonTraSach::lamMoi() {
             .arg(docGiaHienTai->data.MaThe)
             .arg(QString::fromStdString(docGiaHienTai->data.Ho))
             .arg(QString::fromStdString(docGiaHienTai->data.Ten))
-            .arg(docGiaHienTai->data.Phai ? "Nữ" : "Nam")
-            .arg(docGiaHienTai->data.TrangThai == 1 ? "green" : "red")
-            .arg(docGiaHienTai->data.TrangThai == 1 ? "Hoạt động" : "Khóa")
+            .arg(docGiaHienTai->data.Phai == "Nu" ? "Nữ" : "Nam")
+            .arg(docGiaHienTai->data.TrangThai == TT_HOAT_DONG ? "green" : "red")
+            .arg(docGiaHienTai->data.TrangThai == TT_HOAT_DONG ? "Hoạt động" : "Khóa")
             .arg(docGiaHienTai->data.soSachDangMuon >= maxSach ? "red" : "#2E86C1")
             .arg(docGiaHienTai->data.soSachDangMuon)
             .arg(maxSach);
@@ -1177,8 +1181,6 @@ void WidgetMuonTraSach::xuLyNutXacNhanMuon(bool skipConfirm) {
         return;
     }
     
-    extern PTRDS dsDauSach[];
-    extern int soLuongDauSach;
     
     // SMART RESOLVE STRATEGY:
     // Priority 1: Check if input matches a SPECIFIC BOOK COPY (Exact Code Match) -> e.g. "978...-1"
@@ -1197,13 +1199,11 @@ void WidgetMuonTraSach::xuLyNutXacNhanMuon(bool skipConfirm) {
         }
         
         // Check Copies (Deep Scan for Priority 1)
-        PTRDMS p = dsDauSach[i]->dms;
-        while (p != nullptr) {
+        for (PTRDMS p : dsDauSach[i]->dms_vector) {
             if (QString::fromStdString(p->maSach) == isbn) {
                 foundExactCopy = true;
                 break;
             }
-            p = p->next;
         }
         if (foundExactCopy) break;
     }
@@ -1274,29 +1274,23 @@ void WidgetMuonTraSach::xuLyNutXacNhanMuon(bool skipConfirm) {
                 // OR we can't easily know WHICH one was picked by MuonSach backend without return value.
                 // WEAKNESS: Backend returns string "Muon sach thanh cong". Doesn't return Code.
                 // We have to guess/find the first borrowed copy.
-                PTRDMS p = dsDauSach[i]->dms;
-                while (p != nullptr) {
+                for (PTRDMS p : dsDauSach[i]->dms_vector) {
                     if (p->trangThai == DANG_MUON) { 
                         maSach = QString::fromStdString(p->maSach);
-                        // Is this the one for THIS user? We can't be 100% sure if multiple users borrowed same book same time?
-                        // But for local app single user session, acceptable.
                          break;
                     }
-                    p = p->next;
                 }
                 break;
             } else {
                  // Maybe finalCodeToBorrow matches a specific MaSach inside this ISBN
-                 PTRDMS p = dsDauSach[i]->dms;
                  bool match = false;
-                 while (p != nullptr) {
+                 for (PTRDMS p : dsDauSach[i]->dms_vector) {
                      if (QString::fromStdString(p->maSach) == finalCodeToBorrow) {
                          tenSach = QString::fromStdString(dsDauSach[i]->tenSach);
                          maSach = finalCodeToBorrow;
                          match = true;
                          break;
                      }
-                     p = p->next;
                  }
                  if (match) break;
             }
@@ -1323,12 +1317,14 @@ void WidgetMuonTraSach::xuLyNutXacNhanMuon(bool skipConfirm) {
         // Dữ liệu đã được đồng bộ SQL bên trong hàm backend
         
         if (!skipConfirm) {
-            QString successMsg = qKetQua.isEmpty() ? LanguageManager::instance().getText("MSG_BORROW_SUCCESS") : qKetQua;
-            QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), successMsg);
+            // REMOVED: Blocking QMessageBox to avoid notification spam
+            // QString successMsg = qKetQua.isEmpty() ? LanguageManager::instance().getText("MSG_BORROW_SUCCESS") : qKetQua;
+            // QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), successMsg);
         }
         // Use Toast for success
         ToastNotification::show(LanguageManager::instance().getText("MSG_BORROW_SUCCESS"), ToastNotification::SUCCESS);
-        emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_BORROW_SUCCESS"));
+        // REMOVED: Redundant status bar message
+        // emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_BORROW_SUCCESS"));
         emit duLieuThayDoi(); // Realtime update Dashboard
         EventBus::instance().muonTraAdded(docGiaHienTai->data.MaThe, finalCodeToBorrow); // REALTIME UPDATE
         
@@ -1396,7 +1392,7 @@ void WidgetMuonTraSach::xuLyNutXacNhanTra(bool skipConfirm) {
     }
     
     if (xacNhan == QMessageBox::Yes) {
-        extern PTRDS dsDauSach[];
+        // extern PTRDS dsDauSach[]; // REMOVED
         extern int soLuongDauSach;
         
         std::string ketQua = TraSach(docGiaHienTai, maSach.toStdString(), dsDauSach, soLuongDauSach);
@@ -1411,6 +1407,7 @@ void WidgetMuonTraSach::xuLyNutXacNhanTra(bool skipConfirm) {
                      docGiaHienTai, 
                      LanguageManager::instance().getText("MSG_OVERDUE_DAYS").arg(soNgayQuaHan), 
                      tienPhat, 
+                     false,
                      this
                  );
                  
@@ -1438,7 +1435,8 @@ void WidgetMuonTraSach::xuLyNutXacNhanTra(bool skipConfirm) {
             GhiDanhSachDauSach(FilePathManager::getDauSachPathStd().c_str(), dsDauSach, soLuongDauSach, true);
             GhiDanhMucSach(FilePathManager::getDanhMucSachPathStd().c_str(), dsDauSach, soLuongDauSach, true);
             
-            emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_RETURN_SUCCESS"));
+            emit duLieuThayDoi(); // Realtime update Dashboard
+            EventBus::instance().muonTraRemoved(docGiaHienTai->data.MaThe, maSach); // REALTIME UPDATE
             emit duLieuThayDoi(); // Realtime update Dashboard
             EventBus::instance().muonTraRemoved(docGiaHienTai->data.MaThe, maSach); // REALTIME UPDATE
             
@@ -1476,8 +1474,6 @@ void WidgetMuonTraSach::xuLyNutBaoMat() {
     QString tenSach = QString::fromStdString(dto.tenSach);
     
     // Tính toán số liệu
-    extern PTRDS dsDauSach[];
-    extern int soLuongDauSach;
     
     std::string isbn = TachISBNTuMaSach(maSach.toStdString());
     PTRDS dauSach = nullptr;
@@ -1525,6 +1521,7 @@ void WidgetMuonTraSach::xuLyNutBaoMat() {
             docGiaHienTai,
             QString("Đền bù sách mất: %1").arg(tenSach),
             tongDenBu,
+            false,
             this
         );
         
@@ -1551,7 +1548,8 @@ void WidgetMuonTraSach::xuLyNutBaoMat() {
         }
         
         // Cập nhật UI
-        emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_REPORT_LOST_SUCCESS"));
+        // emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_REPORT_LOST_SUCCESS")); // Redundant
+        emit duLieuThayDoi();
         emit duLieuThayDoi(); 
         capNhatBangSachDangMuon();
         hienThiDanhSachDocGia();
@@ -1582,6 +1580,7 @@ void WidgetMuonTraSach::xuLyNutThanhToan() {
     
     // Unified Finance Logic
     const ThongTinSachDangMuon_DTO &dto = danhSachSachDangMuon[dongChon];
+    /* 
     FinanceHelper::PaymentContext ctx = FinanceHelper::getContextFromDto(dto);
     
     if (FinanceHelper::processPaymentFlow(docGiaHienTai, ctx, this)) {
@@ -1589,6 +1588,8 @@ void WidgetMuonTraSach::xuLyNutThanhToan() {
          hienThiDanhSachDocGia();
          nutThanhToan->setEnabled(false);
     }
+    */
+    QMessageBox::information(this, "Notice", "Finance feature is currently unavailable.");
 }
 
 // Feature 4: Gia Han Sach

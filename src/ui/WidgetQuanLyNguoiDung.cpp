@@ -6,6 +6,7 @@
  * @project Library Management System (QuanLyThuVien)
  */
 #include "ui/WidgetQuanLyNguoiDung.h"
+#include "utils/ToastNotification.h"
 
 #include "models/UserManager.h"
 #include "utils/DatabaseManager.h"
@@ -178,7 +179,7 @@ void WidgetQuanLyNguoiDung::xuLyThem() {
     }
 
     if (UserManager::instance().addUser(username, password, fullName, roleId)) {
-        QMessageBox::information(this, "Thành công", "Đã thêm người dùng mới!");
+        ToastNotification::show("Đã thêm người dùng mới!", ToastNotification::SUCCESS);
         taiDuLieu();
     } else {
         // Show actual SQL error if possible, or generic message
@@ -216,7 +217,7 @@ void WidgetQuanLyNguoiDung::xuLySua() {
     q.bindValue(":id", id);
     
     if (q.exec()) {
-        QMessageBox::information(this, "Thành công", "Đã cập nhật thông tin!");
+        ToastNotification::show("Đã cập nhật thông tin!", ToastNotification::SUCCESS);
         emit EventBus::instance().nguoiDungUpdated(moHinh->item(idx.row(), 1)->text());
         taiDuLieu();
     } else {
@@ -258,7 +259,7 @@ void WidgetQuanLyNguoiDung::xuLyDatLaiMatKhau() {
     QString newPass = QInputDialog::getText(this, "Đặt Lại Mật Khẩu", "Nhập mật khẩu mới:", QLineEdit::Password, "", &ok);
     if (ok && !newPass.isEmpty()) {
         if (UserManager::instance().changePassword(id.toInt(), newPass)) {
-            QMessageBox::information(this, "Thành công", "Đã đổi mật khẩu!");
+            ToastNotification::show("Đã đổi mật khẩu!", ToastNotification::SUCCESS);
         }
     }
 }

@@ -29,7 +29,7 @@ public:
         QString trangThai;
         int status;
         int soNgayQuaHan;
-        MUONTRA nodeMuonTra;
+        MuonTra* nodeMuonTra;
         long long tienPhat;
         bool daThanhToan;
     };

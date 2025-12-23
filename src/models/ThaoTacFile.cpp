@@ -22,7 +22,7 @@
 #include "utils/EventBus.h"
 #include <QSqlQuery>
 #include <QVariant>
-#include "utils/Perf.h"
+// #include "utils/Perf.h"
 
 using namespace std;
 
@@ -36,7 +36,7 @@ using namespace std;
 }
 */
 
-void NapDanhSachDauSach(const char *path, PTRDS dsDauSach[], int &soLuongDauSach, std::ostream &out) {
+void NapDanhSachDauSach(const char *path, std::vector<PTRDS>& dsDauSach, int &soLuongDauSach, std::ostream &out) {
     // LEGACY FUNCTION DEPRECATED
     // We now load exclusively from library.db via QuanLySach::NapDanhSachTuDB
     Q_UNUSED(dsDauSach);
@@ -46,7 +46,7 @@ void NapDanhSachDauSach(const char *path, PTRDS dsDauSach[], int &soLuongDauSach
 }
 
 
-void NapDanhMucSach(const char *path, PTRDS dsDauSach[], int soLuongDauSach, std::ostream &out) {
+void NapDanhMucSach(const char *path, std::vector<PTRDS>& dsDauSach, int soLuongDauSach, std::ostream &out) {
    // LEGACY FUNCTION DEPRECATED
    // We now load exclusively from library.db via QuanLySach::NapDanhSachTuDB
    Q_UNUSED(dsDauSach);
@@ -57,7 +57,7 @@ void NapDanhMucSach(const char *path, PTRDS dsDauSach[], int soLuongDauSach, std
 
 
 
-bool GhiDanhSachDauSach(const char *path, PTRDS dsDauSach[], int soLuongDauSach, bool silent, std::ostream &out) {
+bool GhiDanhSachDauSach(const char *path, std::vector<PTRDS>& dsDauSach, int soLuongDauSach, bool silent, std::ostream &out) {
     // LEGACY FUNCTION DEPRECATED - DB handles persistence
     Q_UNUSED(path);
     Q_UNUSED(dsDauSach);
@@ -69,7 +69,7 @@ bool GhiDanhSachDauSach(const char *path, PTRDS dsDauSach[], int soLuongDauSach,
 
 
 
-bool GhiDanhMucSach(const char *path, PTRDS dsDauSach[], int soLuongDauSach, bool silent, std::ostream &out) {
+bool GhiDanhMucSach(const char *path, std::vector<PTRDS>& dsDauSach, int soLuongDauSach, bool silent, std::ostream &out) {
    // LEGACY FUNCTION DEPRECATED - DB handles persistence
    Q_UNUSED(path);
    Q_UNUSED(dsDauSach);
@@ -86,20 +86,18 @@ void InTongKet(const std::string &hanhDong, int thanhCong, int tongSo, int boQua
 }
 
 // ----- DocGia legacy text I/O helpers moved here -----
-void ThaoTacFile_LuuGiaoDich(MUONTRA dsmt, std::ofstream& file){
-    MUONTRA p = dsmt;
-    while(p != nullptr){
-        std::string maSach = PTRDMS_to_String(p->data.banSaoSach);
+void ThaoTacFile_LuuGiaoDich(const MUONTRA& dsmt, std::ofstream& file){
+    for (const auto& mt : dsmt) {
+        std::string maSach = PTRDMS_to_String(mt.banSaoSach);
         file << "MT|"
              << maSach << "|"
-             << p->data.NgayMuon << "|"
-             << p->data.NgayTra << "|"
-             << p->data.TrangThai << "\n";
-        p = p->next;
+             << mt.NgayMuon << "|"
+             << mt.NgayTra << "|"
+             << mt.TrangThai << "\n";
     }
 }
 
-void ThaoTacFile_NapGiaoDich(PTRDG docGia, std::ifstream& file, PTRDS dsDauSach[], int n){
+void ThaoTacFile_NapGiaoDich(PTRDG docGia, std::ifstream& file, std::vector<PTRDS>& dsDauSach, int n){
     if (docGia == nullptr) return;
     std::string line;
     while (true) {
@@ -187,7 +185,7 @@ bool GhiDocGiaFile(const char* path, PTRDG root, bool silent, std::ostream &out)
     return true;
 }
 
-PTRDG NapDocGiaFile(const char* path, PTRDS dsDauSach[], int soLuongDS, std::ostream &out){
+PTRDG NapDocGiaFile(const char* path, std::vector<PTRDS>& dsDauSach, int soLuongDS, std::ostream &out){
     // LEGACY FUNCTION DEPRECATED - We load from DB explicitly
     Q_UNUSED(dsDauSach);
     Q_UNUSED(soLuongDS);

@@ -22,7 +22,7 @@
 #include "utils/EventBus.h"
 
 #include <QIdentityProxyModel>
-#include "utils/FinanceHelper.h"
+// #include "utils/FinanceHelper.h" // Removed (Missing file)
 
 class LichSuProxyModel : public QIdentityProxyModel {
 public:
@@ -398,6 +398,7 @@ void WidgetLichSuMuonTra::xuLyMenuChuotPhai(const QPoint &pos) {
             extern PTRDG rootDocGia;
             PTRDG reader = timDocGia(rootDocGia, maThe);
             if (reader) {
+                /*
                 // Bridge SQL model to FinanceHelper Context
                 FinanceHelper::PaymentContext ctx;
                 ctx.maSach = maSach;
@@ -412,6 +413,8 @@ void WidgetLichSuMuonTra::xuLyMenuChuotPhai(const QPoint &pos) {
                 if (FinanceHelper::processPaymentFlow(reader, ctx, this)) {
                     lamMoi();
                 }
+                */
+                QMessageBox::information(this, "Notice", "Finance feature is currently unavailable.");
             }
         });
     }

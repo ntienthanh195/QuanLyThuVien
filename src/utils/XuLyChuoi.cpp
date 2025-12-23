@@ -372,7 +372,8 @@ bool KiemTraHoTenHopLe(const std::string& hoTen, std::string& thongBaoLoi) {
     }
     
     // Kiem tra cac ky tu hop le: chu cai, khoang trang, dau + - .
-    QRegularExpression regex("^[\\p{L}\\s.'-]+$", QRegularExpression::UseUnicodePropertiesOption);
+    // UPDATED: Added \p{M} for Khmer support
+    QRegularExpression regex("^[\\p{L}\\p{M}\\s.'-]+$", QRegularExpression::UseUnicodePropertiesOption);
     if (!regex.match(qstr).hasMatch()) {
         thongBaoLoi = "Ho ten chua ky tu khong hop le! Chi cho phep chu cai, khoang trang, dau . - '";
         return false;
@@ -423,7 +424,8 @@ std::string ChuanHoaTenHienDai(const std::string& ten, size_t doDaiToiThieu,
     }
     
     // Kiem tra ky tu hop le (chu cai, so, khoang trang, cac ky tu dac biet co ban)
-    QRegularExpression regex("^[\\p{L}\\d\\s.,'#:+()\\-]+$", 
+    // AND Combining Marks (\p{M}) for Khmer/Vietnamese/etc support
+    QRegularExpression regex("^[\\p{L}\\p{M}\\d\\s.,'#:+()\\-]+$", 
                             QRegularExpression::UseUnicodePropertiesOption);
     if (!regex.match(qstr).hasMatch()) {
         thongBaoLoi = "Ten chua ky tu khong hop le!";

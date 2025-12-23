@@ -423,7 +423,7 @@ void ManHinhChiTietDocGia::taiThongTinDocGia() {
     
     lblLop->setText(QString::fromStdString(docGiaDuocChon->data.Lop));
     
-    QString gender = (docGiaDuocChon->data.Phai) ? LanguageManager::instance().getText("GENDER_FEMALE") : LanguageManager::instance().getText("GENDER_MALE");
+    QString gender = (docGiaDuocChon->data.Phai == "Nu") ? LanguageManager::instance().getText("GENDER_FEMALE") : LanguageManager::instance().getText("GENDER_MALE");
     lblGioiTinh->setText(gender);
     
     QString status = (docGiaDuocChon->data.TrangThai == 1) ? LanguageManager::instance().getText("STATUS_ACTIVE") : LanguageManager::instance().getText("STATUS_LOCKED");
@@ -440,30 +440,31 @@ void ManHinhChiTietDocGia::taiDanhSachSachMuon() {
     if (!docGiaDuocChon) return;
     
     // Traverse linked list of borrowed books
-    MUONTRA p = docGiaDuocChon->data.dsmt;
-    while (p) {
-        ThongTinMuon item; // Restored declaration
-        if (p->data.banSaoSach) {
-             item.maSach = QString::fromStdString(p->data.banSaoSach->maSach);
-        } else if (!p->data.maSachCached.empty()) {
-             item.maSach = QString::fromStdString(p->data.maSachCached);
+    // Traverse vector of borrowed books (Reverse iterator for Newest First)
+    for (auto it = docGiaDuocChon->data.dsmt.rbegin(); it != docGiaDuocChon->data.dsmt.rend(); ++it) {
+        auto& mt = *it;
+        ThongTinMuon item; 
+        if (mt.banSaoSach) {
+             item.maSach = QString::fromStdString(mt.banSaoSach->maSach);
+        } else if (!mt.maSachCached.empty()) {
+             item.maSach = QString::fromStdString(mt.maSachCached);
         } else {
              item.maSach = "???";
         }
 
         // Parse date strings "dd/MM/yyyy"
-        item.ngayMuon = QDate::fromString(QString::fromStdString(p->data.NgayMuon), "dd/MM/yyyy");
-        item.hanTra = QDate::fromString(QString::fromStdString(p->data.NgayTra), "dd/MM/yyyy");
+        item.ngayMuon = QDate::fromString(QString::fromStdString(mt.NgayMuon), "dd/MM/yyyy");
+        item.hanTra = QDate::fromString(QString::fromStdString(mt.NgayTra), "dd/MM/yyyy");
         
         // Determine status
-        item.status = p->data.TrangThai;
-        if (p->data.TrangThai == 0) item.trangThai = LanguageManager::instance().getText("LBL_BORROWING");
-        else if (p->data.TrangThai == 1) item.trangThai = LanguageManager::instance().getText("STATUS_RETURNED");
-        else if (p->data.TrangThai == 2) item.trangThai = LanguageManager::instance().getText("STATUS_LOST");
+        item.status = mt.TrangThai;
+        if (mt.TrangThai == 0) item.trangThai = LanguageManager::instance().getText("LBL_BORROWING");
+        else if (mt.TrangThai == 1) item.trangThai = LanguageManager::instance().getText("STATUS_RETURNED");
+        else if (mt.TrangThai == 2) item.trangThai = LanguageManager::instance().getText("STATUS_LOST");
         
         // Calculate overdue
         item.soNgayQuaHan = 0;
-        if (p->data.TrangThai == 0) {
+        if (mt.TrangThai == 0) {
             QDate today = QDate::currentDate();
             if (today > item.hanTra) {
                 item.soNgayQuaHan = item.hanTra.daysTo(today);
@@ -471,22 +472,21 @@ void ManHinhChiTietDocGia::taiDanhSachSachMuon() {
         }
         
         // Populate Debt Info
-        item.tienPhat = p->data.tienPhat;
-        item.daThanhToan = p->data.daThanhToan;
+        item.tienPhat = mt.tienPhat;
+        item.daThanhToan = mt.daThanhToan;
 
         // FILTER LOGIC:
         // Hide if (Returned OR Lost) AND Paid/NoDebt
         bool hide = false;
-        if (p->data.TrangThai != 0) { // Not borrowing
-             if (p->data.daThanhToan) hide = true; // Paid -> Hide (Clean History)
-             else if (p->data.tienPhat == 0) hide = true; // No fine -> Hide (Clean Return)
+        if (mt.TrangThai != 0) { // Not borrowing
+             if (mt.daThanhToan) hide = true; // Paid -> Hide (Clean History)
+             else if (mt.tienPhat == 0) hide = true; // No fine -> Hide (Clean Return)
         }
         
         if (!hide) {
+            item.nodeMuonTra = &mt; // Store pointer to vector element
             danhSachMuonVec.push_back(item);
         }
-        item.nodeMuonTra = p;
-        p = p->next;
     }
     
     if (modelSachMuon) { if (auto m = dynamic_cast<SachMuonTableModel*>(modelSachMuon)) m->refresh(); }
@@ -524,8 +524,8 @@ void ManHinhChiTietDocGia::khiChonSachMuon(const QModelIndex &index) {
     dongSachDuocChon = row;
     ThongTinMuon item = danhSachMuonVec[row];
     
-    // Check status int from node instead of string
-    bool isBorrowing = (item.nodeMuonTra && item.nodeMuonTra->data.TrangThai == 0);
+    // Check status int from pointer
+    bool isBorrowing = (item.nodeMuonTra && item.nodeMuonTra->TrangThai == 0);
     nutThuHoi->setEnabled(isBorrowing);
     nutBaoMat->setEnabled(isBorrowing);
     
@@ -535,7 +535,7 @@ void ManHinhChiTietDocGia::khiChonSachMuon(const QModelIndex &index) {
 }
 
 // Externs for global data access required by MuonTra functions
-extern PTRDS dsDauSach[];
+// extern PTRDS dsDauSach[]; // REMOVED
 extern int soLuongDauSach;
 
 #include "models/MuonTra.h"
@@ -545,7 +545,7 @@ void ManHinhChiTietDocGia::khiNhanThuHoi() {
     
     ThongTinMuon item = danhSachMuonVec[dongSachDuocChon];
     // Check status int
-    if (!item.nodeMuonTra || item.nodeMuonTra->data.TrangThai != 0) {
+    if (!item.nodeMuonTra || item.nodeMuonTra->TrangThai != 0) {
         ToastNotification::show(LanguageManager::instance().getText("MSG_WARN_RETURN_NOT_BORROWED"), ToastNotification::WARNING);
         return;
     }
@@ -576,7 +576,7 @@ void ManHinhChiTietDocGia::khiNhanBaoMat() {
     
     ThongTinMuon item = danhSachMuonVec[dongSachDuocChon];
     // Check status int
-    if (!item.nodeMuonTra || item.nodeMuonTra->data.TrangThai != 0) {
+    if (!item.nodeMuonTra || item.nodeMuonTra->TrangThai != 0) {
         ToastNotification::show(LanguageManager::instance().getText("MSG_WARN_LOST_NOT_BORROWED"), ToastNotification::WARNING);
         return;
     }

@@ -4,9 +4,8 @@
    Inspired by: VS Code, Windows 11, MISA, KiotViet
    ============================================================ */
 
-/* ============ COLOR PALETTE (Midnight Professional - Harmonized) ============
-    Sidebar (Darkest):  #1a1f2e (midnight blue anchor)
-    Background Main:    #232938 (mid-tone neutral)
+/* ============ COLOR PALETTE (Unified Dark Navy) ============
+    Unified Background: #1E1E2D (consistent dark navy)
     Table Body:         #2d3748 (lightest - content focus)
     Table Alt:          #262e3d (darker alternating)
     Table Header:       #1e2633 (darkest in table)
@@ -105,7 +104,7 @@ QPushButton {
     padding: 6px 12px;
     color: #f0f4f8;
     font-weight: 500;
-    font-size: 13px;
+    font-size: 12px;
 }
 
 QPushButton:hover {
@@ -244,8 +243,9 @@ QComboBox QAbstractItemView {
 }
 
 /* ============ TABLES ============ */
+/* Unified table style - use main background */
 QTableView, QTableWidget {
-    background-color: #1a1f2e; /* match sidebar darkness */
+    background-color: #232938; /* match main background */
     alternate-background-color: #1e2633; /* slightly lighter alternating */
     border: 1px solid #141920;
     border-radius: 6px;
@@ -254,6 +254,7 @@ QTableView, QTableWidget {
     selection-color: #FFFFFF;
     outline: 0;
     color: #e8eef5;
+    font-size: 15px; /* LARGER table text */
 }
 
 QTableView::item, QTableWidget::item {
@@ -272,19 +273,19 @@ QTableView::item:selected, QTableWidget::item:selected {
 }
 
 QHeaderView {
-    background-color: #141b26;
+    background-color: #1e2633;
     border: none;
 }
 
 QHeaderView::section {
-    background-color: #141b26;
+    background-color: #1e2633;
     color: #a0aec0;
     padding: 10px 8px;
     border: none;
     border-bottom: 1px solid #0f1419;
     border-right: 1px solid #141920;
     font-weight: 600;
-    font-size: 12px;
+    font-size: 14px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -302,6 +303,9 @@ QHeaderView::section:last {
     border-top-right-radius: 6px;
     border-right: none;
 }
+
+/* ============ WIDGET-SPECIFIC TABLE OVERRIDES ============ */
+/* All tables now use unified background #232938 */
 
 /* ============ LABELS ============ */
 QLabel {

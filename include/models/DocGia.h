@@ -8,10 +8,12 @@
 
 #define DOCGIA_H
 #include <string>
-#include <fstream>
+#include <iostream>
+#include <memory>
 #include <vector>
 #include <ctime>
 #include "DauSach.h"
+// #include "models/MuonTra.h" // Removed to prevent circular dependency
 using std::string;
 using std::vector;
 
@@ -22,6 +24,11 @@ enum TrangThaiGiaoDich {
     GD_MAT_DA_THANH_TOAN = 3,   // Đã đền bù (Xong trách nhiệm)
     GD_MAT_CHO_HOAN_TIEN = 4,   // Tìm thấy sách sau khi đền - Chờ hoàn tiền
     GD_MAT_DA_HOAN_TIEN = 5     // Đã hoàn tiền cho học viên (Kết thúc luồng tiền)
+};
+
+enum TrangThaiTheDocGia {
+    TT_KHOA = 0, // Thẻ bị khóa (vô hiệu hóa)
+    TT_HOAT_DONG = 1 // Thẻ đang hoạt động
 };
 
 //danh sach muon tra
@@ -38,34 +45,33 @@ struct MuonTra{
     // Cache the ma_sach value at the time of transaction to avoid dangling pointer derefs
     string maSachCached;
 };
-struct NodeMT{
-    MuonTra data;
-    NodeMT* next;
-};
-typedef NodeMT* MUONTRA;
+// STRUCT MuonTra remains same, but NODE is gone
+typedef std::vector<MuonTra> MUONTRA;
 
 //PTRDGdoc gia
 //PTRDGdoc gia
 //PTRDGdoc gia
 
-struct TheDocGia{
+struct NodeDG; // Forward declaration for shared_ptr
+// Sử dụng shared_ptr để quản lý bộ nhớ tự động, tránh leak
+typedef std::shared_ptr<NodeDG> PTRDG;
+
+struct TheDocGia {
     int MaThe;
-    string Ho;
-    string Ten;
-    bool Phai;//0 nam 1 nu
-    int TrangThai = 1;//0 = khoa (vô hiệu hóa thẻ), 1=hoat dong
-    bool coTheMuon = true; // Quyền mượn sách (Phụ thuộc vào nợ/quá hạn)
+    std::string Ho;
+    std::string Ten;
+    std::string Phai; // Changed from bool to string (e.g., "Nam", "Nu")
+    TrangThaiTheDocGia TrangThai; // Using new enum
+    MUONTRA dsmt; // Danh sach muon tra (vector)
     
-    // Feature 5 Details
-    string NgayLapThe; 
-    string NgayHetHan;
-
-    // CẢI TIẾN: Thêm trường đếm sách để kiểm tra giới hạn O(1)
-    int soSachDangMuon = 0; 
-    
-    // OPTIMIZATION: Cached fields for O(1) stats
-    time_t ngayHetHanSomNhat = 0; // 0 = khong co sach hoac chua den han (stored as epoch)
-    int tongSachDaMuonHistory = 0; // Tong so sach da muon trong qua khu (tinh ca da tra)
+    // Cached stats for performance
+    int soSachDangMuon;
+    long long tongNo; // New field for total outstanding debt
+    std::string NgayLapThe; // YYYY-MM-DD
+    std::string NgayHetHan; // YYYY-MM-DD
+    time_t ngayHetHanSomNhat; // Cache for optimized queries (epoch time)
+    int tongSachDaMuonHistory; // Historical count
+    bool coTheMuon; // Realtime boolean flag
 
     // NEW FIELDS (PHASE 2)
     string SDT;
@@ -73,20 +79,47 @@ struct TheDocGia{
     string Email;
     string NgaySinh;
     int LoaiDocGia = 0; // 0: HocSinh (Student), 1: GiaoVien (Teacher)
-
-    MUONTRA dsmt;//danh sach muon tra linked list
 };
 
-//binary search tree (AVL)
-struct NodeDG{
+struct NodeDG {
     TheDocGia data;
     int bf;
     int height;
-    NodeDG *left, *right;
+    PTRDG left;
+    PTRDG right;
+    
+    // Constructor for easy make_shared
+    NodeDG() : bf(0), height(1), left(nullptr), right(nullptr) {
+        data = {};
+        data.dsmt = {};
+        // Initialize other data members of TheDocGia to default values
+        data.MaThe = 0;
+        data.Ho = "";
+        data.Ten = "";
+        data.Phai = "";
+        data.TrangThai = TT_HOAT_DONG;
+        data.soSachDangMuon = 0;
+        data.tongNo = 0;
+        data.NgayLapThe = "";
+        data.NgayHetHan = "";
+        data.ngayHetHanSomNhat = 0;
+        data.tongSachDaMuonHistory = 0;
+        data.coTheMuon = true;
+        data.SDT = "";
+        data.Lop = "";
+        data.Email = "";
+        data.NgaySinh = "";
+        data.LoaiDocGia = 0;
+    }
+    
+    // Destructor to clean up raw pointers if any (dsmt is raw linked list currently)
+    ~NodeDG() {
+       // Vector cleans itself automatically. No special cleanup needed.
+    }
 };
-typedef NodeDG* PTRDG;
 
 extern PTRDG rootDocGia;
+extern bool duLieuDocGiaThayDoi; // Flag to track changes
 
 struct ThongTinQuaHan{
     PTRDG docGia;
@@ -122,7 +155,7 @@ PTRDG RotateRight(PTRDG root);
 void InsertDocGia(PTRDG& root, PTRDG node, bool syncDB = true);
 
 // DATABASE LOADING
-void NapDocGiaTuDB_Fixed(PTRDG &root, PTRDS dsDauSach[], int soLuongDS);
+void NapDocGiaTuDB_Fixed(PTRDG &root, std::vector<PTRDS>& dsDauSach, int soLuongDS);
 
 // Prototype Chức năng chính (a)
 PTRDG taoDocGia(std::string ho, std::string ten, bool phai, int trangthai, PTRDG root);
@@ -143,7 +176,7 @@ void InDocGiaTheoTenHo(PTRDG root); // In ra danh sách sắp xếp theo Tên+H�
 
 // Prototype Giải phóng bộ nhớ
 void GiaiPhongCay(PTRDG& root);
-void giaiPhongDsmt(MUONTRA& dsmt);
+// void giaiPhongDsmt(MUONTRA& dsmt); // REMOVED: vector auto-cleans
 
 // Prototype File I/O - Legacy helpers can stay in ThaoTacFile
 // MuonTra functions are now in models/MuonTra.h
@@ -161,15 +194,15 @@ void CapNhatQuyenMuon(PTRDG docGia); // [NEW] Realtime Permission Check
 // TinhSoNgayQuaHanLonNhat moved to MuonTra.h
 
 int LayDSDocGiaQuaHan(PTRDG root, DocGiaQuaHanDTO arr[], int maxKetQua);
-int LayTopSach(PTRDS dsDauSach[], int soLuongDS, TopSachDTO arr[]);
+int LayTopSach(std::vector<PTRDS>& dsDauSach, int soLuongDS, TopSachDTO arr[]);
 
 // Prototype File I/O
 string PTRDMS_to_String(PTRDMS p);
-PTRDMS MaSach_to_PTRDMS(const string& maSach, PTRDS dsDauSach[], int soLuongDauSach);
+PTRDMS MaSach_to_PTRDMS(const string& maSach, std::vector<PTRDS>& dsDauSach, int soLuongDauSach);
 // Legacy low-level file helpers for docgia/muontra moved to ThaoTacFile
 
 void saveDocGia(PTRDG root);
-PTRDG loadDocGia(PTRDS dsDauSach[], int soLuongDS);
+PTRDG loadDocGia(std::vector<PTRDS>& dsDauSach, int soLuongDS);
 // One-off migration: normalize saved names by loading and re-saving file (creates backup)
 void MigrateNormalizeDocGiaFile(PTRDG root);
 
@@ -196,7 +229,7 @@ struct ThongKeDocGia {
     int docGiaSapHetHan;
 };
 
-ThongKeDocGia LayThongKeDocGia(PTRDG root, PTRDS dsDauSach[], int soLuongDauSach);
+ThongKeDocGia LayThongKeDocGia(PTRDG root, std::vector<PTRDS>& dsDauSach, int soLuongDauSach);
 int DemDocGiaTheoTrangThai(PTRDG root, int trangThai);
 int DemDocGiaDangMuonSach(PTRDG root);
 

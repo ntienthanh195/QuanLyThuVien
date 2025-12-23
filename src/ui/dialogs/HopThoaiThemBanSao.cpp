@@ -13,12 +13,12 @@
 #include <QTimer>
 
 HopThoaiThemBanSao::HopThoaiThemBanSao(const QString& isbn, QWidget *cha)
-    : QDialog(cha), maISBN(isbn), sachHienTai(nullptr) {
+    : QDialog(cha), maISBN(isbn), sachHienTai({}) {
     setWindowTitle(LanguageManager::instance().getText("DIALOG_ADD_COPY_TITLE"));
     ResponsiveHelper::ScreenSize screenSize = ResponsiveHelper::detectScreenSize();
     setMinimumWidth(ResponsiveHelper::getScaledWidth(500, screenSize));
     
-    extern PTRDS dsDauSach[];
+    // extern PTRDS dsDauSach[]; // REMOVED
     extern int soLuongDauSach;
     for (int i = 0; i < soLuongDauSach; i++) {
         if (dsDauSach[i] && dsDauSach[i]->ISBN == isbn.toStdString()) {

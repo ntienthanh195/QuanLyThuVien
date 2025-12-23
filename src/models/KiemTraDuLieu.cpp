@@ -14,7 +14,11 @@
 #include "models/DauSach.h"
 #include "Constants.h"
 
-extern PTRDS dsDauSach[];
+#include <vector>
+#include <memory>
+// Forward allow for global vector if needed, or better, include DauSach.h
+#include "models/DauSach.h"
+extern std::vector<PTRDS> dsDauSach;
 extern int soLuongDauSach;
 
 std::string KiemTraChuoiRong(const std::string& chuoi, const std::string& tenTruong){

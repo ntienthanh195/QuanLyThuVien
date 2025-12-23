@@ -410,7 +410,7 @@ void HopThoaiThemSach::kiemTraISBN() {
     }
     
     // Check duplicate
-    extern PTRDS dsDauSach[];
+    // extern PTRDS dsDauSach[]; // REMOVED
     extern int soLuongDauSach;
     for (int i=0; i < soLuongDauSach; i++) {
         if (dsDauSach[i] && dsDauSach[i]->ISBN == isbn.toStdString()) {

@@ -569,15 +569,30 @@ void CuaSoChinh::thieLapKetNoi() {
 }
 
 void CuaSoChinh::apDungKieuMau() {
-    // Áp dụng Enterprise Theme - Professional, Data-First
-    QFile tep(":/enterprise-theme.qss");
-    if (tep.open(QFile::ReadOnly | QFile::Text)) {
+    // Attempt to load external premium theme first
+    QString stylePath = QCoreApplication::applicationDirPath() + "/assets/styles/style_dark.qss";
+    if (!QFile::exists(stylePath)) {
+        stylePath = QDir::currentPath() + "/assets/styles/style_dark.qss";
+    }
+
+    QFile tep(stylePath);
+    if (tep.exists() && tep.open(QFile::ReadOnly | QFile::Text)) {
         QString kieuMau = QString::fromUtf8(tep.readAll());
         qApp->setStyleSheet(kieuMau);
         tep.close();
-        qDebug() << "✅ Đã tải Enterprise Theme thành công";
+        qDebug() << "✅ Loaded Premium External Dark Theme:" << stylePath;
+        return;
+    }
+
+    // Fallback to internal resource theme
+    QFile resTep(":/enterprise-theme.qss");
+    if (resTep.open(QFile::ReadOnly | QFile::Text)) {
+        QString kieuMau = QString::fromUtf8(resTep.readAll());
+        qApp->setStyleSheet(kieuMau);
+        resTep.close();
+        qDebug() << "✅ Fallback to Enterprise Resource Theme";
     } else {
-        qWarning() << "⚠️ Không tải được Enterprise Theme";
+        qWarning() << "⚠️ No stylesheet found!";
     }
 }
 

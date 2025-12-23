@@ -6,6 +6,7 @@
  * @project Library Management System (QuanLyThuVien)
  */
 #include "ui/WidgetQuanLyDocGia.h"
+#include "utils/ToastNotification.h"
 
 #include <vector>
 #include "utils/LanguageManager.h"
@@ -291,7 +292,7 @@ void WidgetQuanLyDocGia::thieLapTimKiem() {
     oNhapTimKiem->setFixedHeight(36);
     oNhapTimKiem->setStyleSheet(
         "QLineEdit {"
-        "    background-color: #1a1d23;"
+        "    background-color: #1E1E2D;"
         "    color: #E0E0E0;"
         "    border: 1px solid #151820;"
         "    border-radius: 5px;"
@@ -300,7 +301,7 @@ void WidgetQuanLyDocGia::thieLapTimKiem() {
         "}"
         "QLineEdit:focus {"
         "    border: 1px solid #4A90E2;"
-        "    background-color: #1a1d23;"
+        "    background-color: #1E1E2D;"
         "}"
     );
 
@@ -469,7 +470,8 @@ void WidgetQuanLyDocGia::xuLyNutThemDocGia() {
     connect(hopThoai, &HopThoaiThemDocGia::docGiaDaThem, this, [this]() {
         // Dữ liệu đã được đồng bộ SQL bên trong backend
         taiLaiDanhSach();
-        emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_ADD_READER_SUCCESS"));
+        ToastNotification::show(LanguageManager::instance().getText("MSG_ADD_READER_SUCCESS"), ToastNotification::SUCCESS);
+        // emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_ADD_READER_SUCCESS"));
         emit duLieuThayDoi();
     });
 
@@ -488,7 +490,8 @@ void WidgetQuanLyDocGia::xuLyNutSuaDocGia() {
     connect(hopThoai, &HopThoaiSuaDocGia::docGiaDaSua, this, [this]() {
         // Dữ liệu đã được đồng bộ SQL bên trong backend
         taiLaiDanhSach();
-        emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_UPDATE_READER_SUCCESS"));
+        ToastNotification::show(LanguageManager::instance().getText("MSG_UPDATE_READER_SUCCESS"), ToastNotification::SUCCESS);
+        // emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_UPDATE_READER_SUCCESS"));
         emit duLieuThayDoi();
     });
 
@@ -521,7 +524,7 @@ void WidgetQuanLyDocGia::xuLyNutXoaDocGia() {
     .arg(QString::fromStdString(docGiaDangChon->data.Ten))
     .arg(docGiaDangChon->data.MaThe)
     .arg(docGiaDangChon->data.TrangThai == 1 ? "Đang hoạt động" : "Bị khóa")
-    .arg(docGiaDangChon->data.Phai ? "Nữ" : "Nam")
+    .arg(QString::fromStdString(docGiaDangChon->data.Phai))
     .arg(docGiaDangChon->data.soSachDangMuon);
     
     bool xacNhan = ConfirmationDialog::confirmDelete(
@@ -535,7 +538,7 @@ void WidgetQuanLyDocGia::xuLyNutXoaDocGia() {
             .arg(QString::fromStdString(docGiaDangChon->data.Ten))
             .arg(docGiaDangChon->data.MaThe)
             .arg(docGiaDangChon->data.TrangThai == 1 ? LanguageManager::instance().getText("LBL_STATUS_ACTIVE_LONG") : LanguageManager::instance().getText("STATUS_LOCKED"))
-            .arg(docGiaDangChon->data.Phai ? LanguageManager::instance().getText("GENDER_FEMALE") : LanguageManager::instance().getText("GENDER_MALE"))
+            .arg(docGiaDangChon->data.Phai == "Nu" ? LanguageManager::instance().getText("GENDER_FEMALE") : LanguageManager::instance().getText("GENDER_MALE"))
             .arg(docGiaDangChon->data.soSachDangMuon)
     );
     
@@ -556,11 +559,12 @@ void WidgetQuanLyDocGia::xuLyNutXoaDocGia() {
         // Dữ liệu đã được đồng bộ SQL bên trong backend
         emit duLieuThayDoi();
         
-        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), LanguageManager::instance().getText("MSG_DELETE_SUCCESS"));
+        // QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), LanguageManager::instance().getText("MSG_DELETE_SUCCESS"));
         docGiaDangChon = nullptr;
         maTheDangChon = -1;
         taiLaiDanhSach();
-        emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_DELETE_SUCCESS"));
+        ToastNotification::show(LanguageManager::instance().getText("MSG_DELETE_SUCCESS"), ToastNotification::SUCCESS);
+        // emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_DELETE_SUCCESS"));
     }
 }
 
@@ -587,15 +591,16 @@ void WidgetQuanLyDocGia::xuLyNutKhoaThe() {
         
         // Tạo struct mới với trạng thái khóa
         TheDocGia dataCapNhat = docGiaDangChon->data;
-        dataCapNhat.TrangThai = 0;
+        dataCapNhat.TrangThai = (TrangThaiTheDocGia)0;
         
         hieuChinhDocGia(rootDocGia, dataCapNhat);
         
         // Dữ liệu đã được đồng bộ SQL bên trong backend
         
-        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), LanguageManager::instance().getText("MSG_LOCK_SUCCESS"));
+        // QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), LanguageManager::instance().getText("MSG_LOCK_SUCCESS"));
         taiLaiDanhSach();
-        emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_LOCK_SUCCESS"));
+        ToastNotification::show(LanguageManager::instance().getText("MSG_LOCK_SUCCESS"), ToastNotification::SUCCESS);
+        // emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_LOCK_SUCCESS"));
     }
 }
 
@@ -622,15 +627,16 @@ void WidgetQuanLyDocGia::xuLyNutMoKhoaThe() {
         
         // Tạo struct mới với trạng thái hoạt động
         TheDocGia dataCapNhat = docGiaDangChon->data;
-        dataCapNhat.TrangThai = 1;
+        dataCapNhat.TrangThai = (TrangThaiTheDocGia)1;
         
         hieuChinhDocGia(rootDocGia, dataCapNhat);
         
         // Dữ liệu đã được đồng bộ SQL bên trong backend
         
-        QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), LanguageManager::instance().getText("MSG_UNLOCK_SUCCESS"));
+        // QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), LanguageManager::instance().getText("MSG_UNLOCK_SUCCESS"));
         taiLaiDanhSach();
-        emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_UNLOCK_SUCCESS"));
+        ToastNotification::show(LanguageManager::instance().getText("MSG_UNLOCK_SUCCESS"), ToastNotification::SUCCESS);
+        // emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_UNLOCK_SUCCESS"));
     }
 }
 
@@ -783,8 +789,8 @@ void WidgetQuanLyDocGia::xuLyLocKetHopToanBo() {
         bool hienThi = true;
         if (trangThaiLoc == 1 && p->data.TrangThai != 1) hienThi = false;
         if (trangThaiLoc == 2 && p->data.TrangThai != 0) hienThi = false;
-        if (gioiTinhLoc == 1 && p->data.Phai != false) hienThi = false;
-        if (gioiTinhLoc == 2 && p->data.Phai != true) hienThi = false;
+        if (gioiTinhLoc == 1 && p->data.Phai != "Nam") hienThi = false;
+        if (gioiTinhLoc == 2 && p->data.Phai != "Nu") hienThi = false;
         if (hienThi) danhSachDocGia.push_back(p);
     }
 
@@ -803,8 +809,8 @@ void WidgetQuanLyDocGia::hienThiKetQuaTimKiem(PTRDG ketQua[], int soKetQua) {
         bool hienThi = true;
         if (trangThaiLoc == 1 && p->data.TrangThai != 1) hienThi = false;
         if (trangThaiLoc == 2 && p->data.TrangThai != 0) hienThi = false;
-        if (gioiTinhLoc == 1 && p->data.Phai != false) hienThi = false;
-        if (gioiTinhLoc == 2 && p->data.Phai != true) hienThi = false;
+        if (gioiTinhLoc == 1 && p->data.Phai != "Nam") hienThi = false;
+        if (gioiTinhLoc == 2 && p->data.Phai != "Nu") hienThi = false;
         if (hienThi) danhSachDocGia.push_back(p);
     }
     if (modelDocGia) { if (auto m = dynamic_cast<DocGiaTableModel*>(modelDocGia)) m->refresh(); }
@@ -835,7 +841,7 @@ void WidgetQuanLyDocGia::xuLyNhapDuLieuTu() {
     if (dlg.exec() == QDialog::Accepted) {
         // Success - RELOAD FROM DB to RAM
         extern PTRDG rootDocGia;
-        extern PTRDS dsDauSach[];
+        // extern PTRDS dsDauSach[]; // REMOVED
         extern int soLuongDauSach;
         NapDocGiaTuDB_Fixed(rootDocGia, dsDauSach, soLuongDauSach);
         

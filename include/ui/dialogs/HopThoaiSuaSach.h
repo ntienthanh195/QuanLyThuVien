@@ -28,7 +28,7 @@ private:
     void taiDuLieuSach();
     
     QString isbnGoc;
-    DauSach *sachHienTai;
+    PTRDS sachHienTai;
     
     QLineEdit *oNhapISBN;
     QLineEdit *oNhapTenSach;

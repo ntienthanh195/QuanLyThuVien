@@ -48,6 +48,7 @@ private:
     Language m_currentLang;
 
     void loadDictionary();
+    bool loadFromJson(Language lang, const QString& filePath);
 };
 
 #endif // LANGUAGEMANAGER_H

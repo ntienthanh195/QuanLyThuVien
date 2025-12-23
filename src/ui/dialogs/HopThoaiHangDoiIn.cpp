@@ -117,7 +117,7 @@ void HopThoaiHangDoiIn::xuLyThemDocGia() {
         return;
     }
     
-    if (docGia->data.TrangThai != 1) {
+    if (docGia->data.TrangThai != TT_HOAT_DONG) {
         QMessageBox::warning(this, LanguageManager::instance().getText("TITLE_ERROR"), LanguageManager::instance().getText("MSG_READER_LOCKED"));
         return;
     }
@@ -145,7 +145,7 @@ void HopThoaiHangDoiIn::xuLyThemNhieuDocGia() {
     std::function<void(PTRDG)> duyetCay = [&](PTRDG p) {
         if (!p) return;
         duyetCay(p->left);
-        if (p->data.TrangThai == 1 && !PrintQueueManager::instance()->daTonTai(p->data.MaThe)) {
+        if (p->data.TrangThai == TT_HOAT_DONG && !PrintQueueManager::instance()->daTonTai(p->data.MaThe)) {
             danhSach.append(p);
         }
         duyetCay(p->right);
@@ -254,7 +254,7 @@ void HopThoaiHangDoiIn::capNhatDanhSach() {
                            .arg(i + 1)
                            .arg(dg->data.MaThe)
                            .arg(hoTen)
-                           .arg(dg->data.Phai ? "Nữ" : "Nam");
+                           .arg(dg->data.Phai == "Nu" ? "Nữ" : "Nam");
         danhSachDocGia->addItem(item);
     }
     

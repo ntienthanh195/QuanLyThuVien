@@ -24,7 +24,7 @@ private:
     void thieLapGiaoDien();
     
     QString maISBN;
-    DauSach *sachHienTai;
+    PTRDS sachHienTai;
     
     QLineEdit *oNhapISBN;
     QLineEdit *oNhapTenSach;

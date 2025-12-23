@@ -6,6 +6,7 @@
  * @project Library Management System (QuanLyThuVien)
  */
 #include "ui/WidgetQuanLySach.h"
+#include "utils/ToastNotification.h"
 
 #include "utils/LanguageManager.h"
 #include "utils/FilePathManager.h"
@@ -92,8 +93,10 @@ public:
                 case 7: {
                     int tong = d->tongBanSao;
                     int daMuon = 0, thanhLy = 0;
-                    PTRDMS p = d->dms; int dem = 0;
-                    while (p && dem < 10000) { if (p->trangThai == DANG_MUON) daMuon++; else if (p->trangThai == THANH_LY) thanhLy++; p = p->next; dem++; }
+                    for (PTRDMS p : d->dms_vector) {
+                        if (p->trangThai == DANG_MUON) daMuon++;
+                        else if (p->trangThai == THANH_LY) thanhLy++;
+                    }
                     int conLai = tong - daMuon - thanhLy;
                     return QString("%1/%2").arg(conLai).arg(tong);
                 }
@@ -346,7 +349,7 @@ void WidgetQuanLySach::thieLapTimKiem() {
     oNhapTimKiem->setFixedHeight(36);
     oNhapTimKiem->setStyleSheet(
         "QLineEdit {"
-        "    background-color: #1a1d23;"
+        "    background-color: #1E1E2D;"
         "    color: #E0E0E0;"
         "    border: 1px solid #151820;"
         "    border-radius: 5px;"
@@ -355,7 +358,7 @@ void WidgetQuanLySach::thieLapTimKiem() {
         "}"
         "QLineEdit:focus {"
         "    border: 1px solid #4A90E2;"
-        "    background-color: #1a1d23;"
+        "    background-color: #1E1E2D;"
         "}"
     );
     
@@ -365,7 +368,7 @@ void WidgetQuanLySach::thieLapTimKiem() {
     hopChonTheLoai->setFixedHeight(36);
     hopChonTheLoai->setStyleSheet(
         "QComboBox {"
-        "    background-color: #1a1d23;"
+        "    background-color: #1E1E2D;"
         "    color: #E0E0E0;"
         "    border: 1px solid #151820;"
         "    border-radius: 5px;"
@@ -608,7 +611,8 @@ void WidgetQuanLySach::xuLyNutThemSach() {
     
     connect(hopThoai, &HopThoaiThemSach::sachDaThem, this, [this]() {
         taiLaiDanhSach();
-        emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_ADD_COPY_SUCCESS")); // Actually Book success, reusing similar success msg or adding MSG_ADD_BOOK_SUCCESS
+        // Toast for success
+        ToastNotification::show(LanguageManager::instance().getText("MSG_ADD_COPY_SUCCESS"), ToastNotification::SUCCESS);
     });
     
     hopThoai->exec();
@@ -666,11 +670,15 @@ void WidgetQuanLySach::xuLyNutXoaSach() {
         
         if (ketQua.empty()) {
             // Thành công - SQL Sync is handled inside XoaDauSachTheoISBN
-            QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), LanguageManager::instance().getText("MSG_DELETE_BOOK_SUCCESS"));
+            // REMOVED: Blocking QMessageBox
+            // QMessageBox::information(this, LanguageManager::instance().getText("TITLE_SUCCESS"), LanguageManager::instance().getText("MSG_DELETE_BOOK_SUCCESS"));
+            
             EventBus::instance().dauSachRemoved(QString::fromStdString(dauSachDangChon->ISBN));
             dauSachDangChon = nullptr;
             taiLaiDanhSach();
-            emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_DELETE_BOOK_NOTIFICATION"));
+            
+            // Toast Success
+            ToastNotification::show(LanguageManager::instance().getText("MSG_DELETE_BOOK_SUCCESS"), ToastNotification::SUCCESS);
             emit duLieuThayDoi();
         } else {
             // Thất bại - hiển thị lỗi
@@ -689,7 +697,7 @@ void WidgetQuanLySach::xuLyNutSuaSach() {
     HopThoaiSuaSach *hopThoai = new HopThoaiSuaSach(QString::fromStdString(dauSachDangChon->ISBN), this);
     connect(hopThoai, &HopThoaiSuaSach::sachDaSua, this, [this]() {
         taiLaiDanhSach();
-        emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_UPDATE_BOOK_SUCCESS"));
+        ToastNotification::show(LanguageManager::instance().getText("MSG_UPDATE_BOOK_SUCCESS"), ToastNotification::SUCCESS);
     });
     hopThoai->exec();
     delete hopThoai;
@@ -705,7 +713,7 @@ void WidgetQuanLySach::xuLyNutThemBanSao() {
     
     connect(hopThoai, &HopThoaiThemBanSao::banSaoDaThem, this, [this]() {
         taiLaiDanhSach();
-        emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_ADD_COPY_SUCCESS"));
+        ToastNotification::show(LanguageManager::instance().getText("MSG_ADD_COPY_SUCCESS"), ToastNotification::SUCCESS);
     });
     
     hopThoai->exec();
@@ -724,7 +732,7 @@ void WidgetQuanLySach::xuLyNutXemChiTiet() {
     
     connect(dialog, &ManHinhChiTietSach::sachDaCapNhat, this, [this]() {
         taiLaiDanhSach();
-        emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_UPDATE_COPY_SUCCESS"));
+        ToastNotification::show(LanguageManager::instance().getText("MSG_UPDATE_COPY_SUCCESS"), ToastNotification::SUCCESS);
     });
     
     dialog->exec();

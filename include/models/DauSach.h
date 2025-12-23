@@ -3,6 +3,8 @@
 
 #include <string>
 #include <iostream>
+#include <vector>
+#include <memory>
 #include "Constants.h"
 
 enum TrangThaiSach {
@@ -22,10 +24,13 @@ struct DanhMucSach {
     std::string maSach;         // Ma duy nhat cho tung cuon (ISBN-SoThuTu)
     TrangThaiSach trangThai;    // 0, 1, 2 theo enum TrangThaiSach
     std::string viTri;          // vi tri cu the tren ke sach (vd: "Ke A1")
-    DanhMucSach* next = NULL;   //con tro toi node ban sao tiep theo
+    std::shared_ptr<DanhMucSach> next = nullptr;   //con tro toi node ban sao tiep theo
+
+    DanhMucSach(std::string ma, TrangThaiSach tt, std::string vt, std::shared_ptr<DanhMucSach> n = nullptr)
+        : maSach(ma), trangThai(tt), viTri(vt), next(n) {}
 };
 
-typedef DanhMucSach* PTRDMS;    // con tro toi mot anhMucSach
+typedef std::shared_ptr<DanhMucSach> PTRDMS;    // con tro thong minh toi mot DanhMucSach
 
 // Cau truc Dau Sach (thong tin chung cua mot tua sach)
 struct DauSach {
@@ -35,8 +40,9 @@ struct DauSach {
     std::string tacGia;
     int namXuatBan;
     std::string theLoai;
-    PTRDMS dms = NULL;          // con tro toi dau danh sach lien ket cac ban sao (DanhMucSach)
-    int tongBanSao;             // Tong so luong ban sao hien co
+    PTRDMS dms = nullptr;          // con tro toi dau danh sach lien ket cac ban sao (DanhMucSach)
+    std::vector<PTRDMS> dms_vector; // Vector chứa bản sao để duyệt nhanh (Phase 5 Modernization)
+    int tongBanSao;             // Tổng số lượng bản sao hiện có
     int soLuotMuon;             // them de de tim top 10 sach
     
     // Feature: Book Price (VNĐ)
@@ -46,11 +52,15 @@ struct DauSach {
     std::string NhaXuatBan;
 };
 
-typedef DauSach* PTRDS;         // Con tro toi mot DauSach
+// typedef DauSach* PTRDS;         // Con tro toi mot DauSach
+typedef std::shared_ptr<DauSach> PTRDS; // Smart Pointer toi mot DauSach
+
+// Moved imports to top 
 
 // Bien toan cuc (khai bao extern de cac file khac co the truy cap)
-extern PTRDS dsDauSach[MAX_DAUSACH]; // Mang con tro luu tru cac Dau Sach
-extern int soLuongDauSach;           // So luong Dau Sach hien co trong mang
+// Phase 5: Modernized to use std::vector and std::shared_ptr
+extern std::vector<PTRDS> dsDauSach; // Vector luu tru cac Dau Sach (Smart Pointer)
+extern int soLuongDauSach;           // So luong Dau Sach (deprecated usage, use dsDauSach.size())
 extern bool duLieuDaThayDoi;         // de kiem tra viec luu file khi thoat
 
 #endif // DAUSACH_H

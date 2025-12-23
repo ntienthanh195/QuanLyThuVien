@@ -25,10 +25,11 @@
 #include "ui/dialogs/ManHinhDangNhap.h"
 #include "models/UserManager.h"
 #include "utils/GlobalScannerFilter.h"
-
 // Biến toàn cục cho dữ liệu sách (từ backend cũ)
-PTRDS dsDauSach[MAX_DAUSACH] = {nullptr};
-int soLuongDauSach = 0;
+// Biến toàn cục cho dữ liệu sách (từ backend cũ)
+// Phase 5: Modernized to use std::vector
+std::vector<std::shared_ptr<DauSach>> dsDauSach;
+int soLuongDauSach = 0; // Keeping for compatibility, but should sync with vector.size()
 bool duLieuDaThayDoi = false;
 
 // Biến toàn cục cho độc giả
@@ -131,40 +132,21 @@ int main(int argc, char *argv[]) {
         UserInfo user = UserManager::instance().currentUser();
         std::cout << "[LOGIN] Welcome " << user.fullName.toStdString() << " (" << user.role.toStdString() << ")\n";
 
-        // Nạp dữ liệu sách từ Database (AFTER connection)
-        // CHECK if data is already loaded to avoid duplication on re-login?
-        // simple way: Global vars so data persists.
-        // But if user changes, maybe we should reload? 
-        // For V2, let's assume one library per instance. Reloading might be safer but potentially slow.
-        // Existing logic: NapDanhSachTuDB clears if array is full? 
-        // NapDanhSachTuDB uses `MAX_DAUSACH`.
-        // Let's just Reload to be safe (in case different user sees different data?)
-        // Currently data is global, not per-user. So actually no need to reload if already loaded.
-        if (soLuongDauSach == 0) {
-            std::cout << "\n[NẠP DỮ LIỆU] Đang nạp dữ liệu sách từ Database...\n";
+        // Nạp dữ liệu sách từ Database (nếu chưa có)
+        if (dsDauSach.empty()) {
+            std::cout << "\n[NẠP DỮ LIỆU] Đang nạp dữ liệu từ Database...\n";
             try {
+                std::cout << " -> Đang nạp Sách...\n";
                 NapDanhSachTuDB();
                 if (soLuongDauSach > 0) {
-                    std::cout << "[✓] Nạp thành công: " << soLuongDauSach << " đầu sách.\n";
                     sapXepDauSachTheoTen(dsDauSach, 0, soLuongDauSach - 1);
-                } else {
-                    std::cout << "[!] Cảnh báo: Database sách rỗng.\n";
                 }
-            } catch (...) {}
-        }
-        
-        // Nạp dữ liệu độc giả (phải nạp sau sách)
-        if (rootDocGia == nullptr) {
-            std::cout << "\n[NẠP DỮ LIỆU] Đang nạp dữ liệu độc giả...\n";
-            try {
+                
+                std::cout << " -> Đang nạp Độc giả...\n";
                 NapDocGiaTuDB_Fixed(rootDocGia, dsDauSach, soLuongDauSach);
-                if (rootDocGia != nullptr) {
-                    std::cout << "[✓] Nạp dữ liệu độc giả hoàn tất.\n";
-                } else {
-                    std::cout << "[INFO] Danh sách độc giả rỗng.\n";
-                }
-            } catch (...) {
-                rootDocGia = nullptr;
+                std::cout << "[✓] Nạp dữ liệu hoàn tất.\n";
+            } catch (const std::exception& e) {
+                std::cerr << "[LỖI NẠP DỮ LIỆU] " << e.what() << "\n";
             }
         }
         
@@ -222,8 +204,12 @@ int main(int argc, char *argv[]) {
     
     // Giải phóng bộ nhớ
     std::cout << "\n[DỌN DẸP] Đang giải phóng bộ nhớ...\n";
-    GiaiPhongToanBoDauSach(dsDauSach, soLuongDauSach);
-    std::cout << "[✓] Đã giải phóng bộ nhớ sách.\n";
+    // GiaiPhongToanBoDauSach is no longer needed for vector<shared_ptr>
+    // but we might need to clean up the internal linked list 'dms' if we haven't modernized it yet.
+    // However, shared_ptr will delete DauSach, so we should add a destructor to DauSach to clean its dms.
+    // For now, let's just clear the vector.
+    dsDauSach.clear(); 
+    std::cout << "[✓] Đã giải phóng bộ nhớ sách (Smart Pointers cleanup).\n";
     
     GiaiPhongCay(rootDocGia);
     std::cout << "[✓] Đã giải phóng cây AVL độc giả.\n";
