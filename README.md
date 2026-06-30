@@ -102,8 +102,7 @@ QuanLyThuVien/
 ## Tác giả
 
 *   **Chăm Rốch Thi**
-*   **Email:** [your-email@example.com]
-*   **GitHub:** [@yourusername](https://github.com/yourusername)
+*   **Email:** rochthi59@gmail.com
 
 ---
 
