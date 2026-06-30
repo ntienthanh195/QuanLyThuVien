@@ -139,6 +139,12 @@ void HopThoaiThemSach::thieLapGiaoDien() {
         "   min-height: %2px;"
         "   selection-background-color: #5D9CEC;"
         "}"
+        "QComboBox QAbstractItemView {"
+        "   background-color: #1b1b29;"
+        "   color: #ffffff;"
+        "   selection-background-color: #3e3e5e;"
+        "   border: 1px solid #323248;"
+        "}"
         "QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {"
         "   border: 1px solid #5D9CEC;"
         "   background-color: #1b1b29;"
@@ -170,22 +176,44 @@ void HopThoaiThemSach::thieLapGiaoDien() {
     oNhapNhaXuatBan->setPlaceholderText(LanguageManager::instance().getText("TABLE_HEADER_PUBLISHER"));
     oNhapNhaXuatBan->setStyleSheet(kieuTruong);
     
-    oNhapTheLoai = new QLineEdit();
+    // ✨ IMPROVED: QComboBox editable - vừa chọn dropdown, vừa nhập tay
+    oNhapTheLoai = new QComboBox();
+    oNhapTheLoai->setEditable(true); // ← Cho phép gõ tự do
     oNhapTheLoai->setPlaceholderText(LanguageManager::instance().getText("PLACEHOLDER_CATEGORY"));
     oNhapTheLoai->setStyleSheet(kieuTruong);
-    // Auto-complete - Tối ưu cho Học viện Phật giáo Nam tông Khmer
+    
+    // Danh sách thể loại chuẩn cho Học viện Phật giáo Nam tông Khmer
     QStringList goiYTheLoai = {
-        "Luật Tạng (Vinaya)", "Kinh Tạng (Sutta)", "Vi Diệu Pháp (Abhidhamma)",
-        "Chú giải (Atthakatha)", "Phụ chú giải (Tika)",
-        "Kinh Pali", "Kinh Khmer", "Văn hóa Khmer", "Ngữ pháp Pali",
-        "Triết học Phật giáo", "Lịch sử Phật giáo", "Tôn giáo học", 
-        "Việt học", "Nghệ thuật Phật giáo", "Kinh lá buông"
+        "294.3821 - Luật Tạng (Vinaya)",
+        "294.3822 - Kinh Tạng (Sutta)",
+        "294.3823 - Vi Diệu Pháp (Abhidhamma)",
+        "294.385 - Chú giải (Atthakatha)",
+        "294.385.2 - Phụ chú giải (Tika)",
+        "294.381 - Ngữ pháp Pali",
+        "294.38T.1 - Giáo trình Sơ cấp",
+        "294.38T.2 - Giáo trình Trung cấp",
+        "294.38T.3 - Giáo trình Cao cấp",
+        "294.3R.1 - Lịch sử Phật giáo",
+        "294.3R.2 - Văn hóa Phật giáo Khmer",
+        "294.3R.3 - Thiền định",
+        "294.3R.4 - Nghi lễ Phật giáo",
+        "Kinh Pali", 
+        "Kinh Khmer", 
+        "Triết học Phật giáo",
+        "Nghệ thuật Phật giáo",
+        "Kinh lá buông"
     };
+    oNhapTheLoai->addItems(goiYTheLoai);
+    oNhapTheLoai->setCurrentIndex(-1); // Không chọn mặc định
+    
+    // AutoComplete khi gõ trong ComboBox
     QCompleter *completer = new QCompleter(goiYTheLoai, this);
     completer->setCaseSensitivity(Qt::CaseInsensitive);
     completer->setFilterMode(Qt::MatchContains);
     oNhapTheLoai->setCompleter(completer);
-    connect(oNhapTheLoai, &QLineEdit::textChanged, this, &HopThoaiThemSach::kiemTraTatCaTruong); // Validate
+    
+    // Validation khi thay đổi (dùng signal của ComboBox)
+    connect(oNhapTheLoai->lineEdit(), &QLineEdit::textChanged, this, &HopThoaiThemSach::kiemTraTatCaTruong);
     
     oNhapNamXB = new QSpinBox();
     oNhapNamXB->setRange(1000, 3000);
@@ -440,7 +468,7 @@ bool HopThoaiThemSach::kiemTraCacTruong() {
     
     if (oNhapTenSach->text().trimmed().isEmpty()) return false;
     if (oNhapTacGia->text().trimmed().isEmpty()) return false;
-    if (oNhapTheLoai->text().trimmed().isEmpty()) return false;
+    if (oNhapTheLoai->currentText().trimmed().isEmpty()) return false;
     
     return true;
 }
@@ -470,7 +498,7 @@ void HopThoaiThemSach::xuLyNutLuu() {
     std::string isbn = oNhapISBN->text().trimmed().toStdString();
     std::string ten = oNhapTenSach->text().trimmed().toStdString();
     std::string tacGia = oNhapTacGia->text().trimmed().toStdString();
-    std::string theLoai = oNhapTheLoai->text().trimmed().toStdString();
+    std::string theLoai = oNhapTheLoai->currentText().trimmed().toStdString();
     int nam = oNhapNamXB->value();
     int trang = oNhapSoTrang->value();
     int soBanSao = oNhapSoBanSao->value();

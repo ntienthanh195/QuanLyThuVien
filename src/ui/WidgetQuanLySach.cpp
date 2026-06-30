@@ -818,7 +818,12 @@ void WidgetQuanLySach::taiDanhSachTheLoai() {
     }
 }
 void WidgetQuanLySach::xuLyNhapDuLieuTu() {
-    QString file = QFileDialog::getOpenFileName(this, LanguageManager::instance().getText("TITLE_SELECT_EXCEL"), QDir::currentPath(), LanguageManager::instance().getText("FILTER_EXCEL_FILES"));
+    QString file = QFileDialog::getOpenFileName(this, 
+                                                LanguageManager::instance().getText("TITLE_SELECT_EXCEL"), 
+                                                QDir::currentPath(), 
+                                                LanguageManager::instance().getText("FILTER_EXCEL_FILES"),
+                                                nullptr,
+                                                QFileDialog::DontUseNativeDialog); // 🛡️ Fix crash on Windows
     if (file.isEmpty()) return;
 
     ImportManager importer(this);

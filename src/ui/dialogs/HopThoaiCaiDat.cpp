@@ -219,7 +219,7 @@ void HopThoaiCaiDat::luuCauHinh() {
 
 void HopThoaiCaiDat::macDinh() {
     oTenThuVien->setText("PHÁT TRIỂN: CHĂM RỐCH THI");
-    oDiaChi->setText("AN GIANG");
+    oDiaChi->setText("email: rochthi59@gmail.com");
     oTienPhatMoiNgay->setValue(5000);
     oSoNgayMuonToiDa->setValue(7);
     oSoLanGiaHanToiDa->setValue(1);

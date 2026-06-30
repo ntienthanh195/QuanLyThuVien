@@ -160,15 +160,17 @@ static PTRDG InsertDocGiaRec(PTRDG pavltree, PTRDG node) {
     return pavltree;
 }
 
-void InsertDocGia(PTRDG &root, PTRDG node, bool syncDB) {
+void InsertDocGia(PTRDG &root, PTRDG node, bool syncDB, bool emitSignal) {
     // ensure new node has height = 1
     if (node != nullptr) node->height = 1;
     root = InsertDocGiaRec(root, node);
     
     // Emit event that a new reader was added
-    try {
-        if (node) EventBus::instance().docGiaAdded(node->data.MaThe);
-    } catch(...) {}
+    if (emitSignal) {
+        try {
+            if (node) EventBus::instance().docGiaAdded(node->data.MaThe);
+        } catch(...) {}
+    }
     
     // --- DB SYNC ---
     if (syncDB && node) {
@@ -365,11 +367,26 @@ void NapDocGiaTuDB(PTRDG &root, std::vector<PTRDS>& dsDauSach, int soLuongDS) {
             PTRDG node = taoDocGia(ho, ten, (phai == 1), tt, ma);
             node->data.coTheMuon = coTheMuon;
             
-            // Phase 2 New Fields
-            node->data.SDT = q.value(6).toString().toStdString();
-            node->data.Lop = q.value(7).toString().toStdString();
-            node->data.Email = q.value(8).toString().toStdString();
-            node->data.NgaySinh = q.value(9).toString().toStdString();
+            // Phase 2 New Fields [STANDARDIZED]
+            std::string sdt = q.value(6).toString().toStdString();
+            std::string lop = q.value(7).toString().toStdString();
+            std::string email = q.value(8).toString().toStdString();
+            std::string nSinh = q.value(9).toString().toStdString();
+            
+            // AUTO-FIX: Clean Phone
+            QString sdtClean = QString::fromStdString(sdt);
+            sdtClean.remove(" ").remove(".").remove("-").remove("(").remove(")");
+            node->data.SDT = sdtClean.toStdString();
+            
+            // AUTO-FIX: Upper Class (e.g. 12a1 -> 12A1)
+            node->data.Lop = QString::fromStdString(lop).toUpper().toStdString();
+            
+            // AUTO-FIX: Lower Email
+            node->data.Email = QString::fromStdString(email).toLower().trimmed().toStdString();
+            
+            // AUTO-FIX: Birthday (assume stored cleanly or check?)
+            node->data.NgaySinh = nSinh; 
+            
             node->data.LoaiDocGia = q.value(10).toInt();
             
             // Dates
@@ -434,9 +451,13 @@ void NapDocGiaTuDB(PTRDG &root, std::vector<PTRDS>& dsDauSach, int soLuongDS) {
 PTRDG taoDocGia(std::string ho, std::string ten, bool phai, int trangthai, PTRDG root) {
     PTRDG dg = std::make_shared<NodeDG>();
     dg->data.MaThe = sinhMaTheNgauNhien(root);
-    // Normalize name fields
-    dg->data.Ho = ChuanHoaHoTen(ho);
-    dg->data.Ten = ChuanHoaHoTen(ten);
+    // Normalize name fields using Robust Unicode
+    std::string stdHo, stdTen;
+    ChuanHoaTenUnicode(ho, 1, 50, stdHo);
+    ChuanHoaTenUnicode(ten, 1, 50, stdTen);
+    dg->data.Ho = stdHo.empty() ? ChuanHoaHoTen(ho) : stdHo;
+    dg->data.Ten = stdTen.empty() ? ChuanHoaHoTen(ten) : stdTen;
+    
     dg->data.Phai = phai ? "Nu" : "Nam";
     dg->data.TrangThai = (TrangThaiTheDocGia)trangthai;
     // START PHASE 2 INIT
@@ -489,9 +510,13 @@ PTRDG taoDocGia(std::string ho, std::string ten, bool phai, int trangthai, PTRDG
 PTRDG taoDocGia(std::string ho, std::string ten, bool phai, int trangthai, int mathe) {
     PTRDG dg = std::make_shared<NodeDG>();
     dg->data.MaThe = mathe;
-    // Normalize name fields
-    dg->data.Ho = ChuanHoaHoTen(ho);
-    dg->data.Ten = ChuanHoaHoTen(ten);
+    // Normalize name fields using Robust Unicode
+    std::string stdHo, stdTen;
+    ChuanHoaTenUnicode(ho, 1, 50, stdHo);
+    ChuanHoaTenUnicode(ten, 1, 50, stdTen);
+    dg->data.Ho = stdHo.empty() ? ChuanHoaHoTen(ho) : stdHo;
+    dg->data.Ten = stdTen.empty() ? ChuanHoaHoTen(ten) : stdTen;
+    
     dg->data.Phai = phai ? "Nu" : "Nam";
     dg->data.TrangThai = (TrangThaiTheDocGia)trangthai;
      // START PHASE 2 INIT

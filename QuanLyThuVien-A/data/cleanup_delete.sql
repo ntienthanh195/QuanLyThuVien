@@ -1,1 +1,0 @@
--- SQL statements to clean the DB. Review before running.

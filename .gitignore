@@ -1,8 +1,9 @@
-# Compiled Object files
+# Compiled Object Files
 *.o
 *.obj
 *.res
 *.qm
+*.o.d
 
 # Libraries and Executables
 *.so
@@ -19,8 +20,10 @@ build/
 bin/
 dist/
 generated/
+QuanLyThuVien_Portable/
+installer/
 
-# Qt Creator & IDE Config
+# Qt Creator & IDE Configuration
 *.pro.user
 *.pro.user.*
 CMakeLists.txt.user
@@ -30,17 +33,25 @@ object_script.*
 moc_*.cpp
 qrc_*.cpp
 ui_*.h
+.qtcreator/
+.qtc_clangd/
 
 # IDE Folders (VS Code, VS, etc)
 .vscode/
 .idea/
-.qtc_clangd/
 .vs/
 *.sln
 *.vcxproj*
 
-# Logs and Temporary files
+# Python Virtual Environments
+.venv/
+venv/
+ENV/
+
+# Logs, Error Reports and Temporary Files
 *.log
+*.err
+*error*
 *_log.txt
 build_*.txt
 compile_error*.txt
@@ -48,28 +59,48 @@ make_dump.txt
 *.tmp
 *.swp
 *.~*
+*.bak
+*.bak_*
 
-# Database (Local data)
+# Database (Local data & SQLite temp files)
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 library.db
 
-# Generated Assets (Do not commit)
+# Generated Assets & User Data (Do not commit to Git)
+backups/
 data/PDF/
 data/qrcodes/
 data/backup/
 data/backup_archives/
+data/logs/
+data/*.csv
+data/*.xlsx
+data/*.sql
+data/*.txt
+tools/*.csv
+tools/*.txt
 
-# Project Specific
-tools/*.exe
-tools/release/
-backups/
-QuanLyThuVien_Portable/
-installer/
+# Copilot and AI Assistant temps
+**/*Copilot*
+**/*Chat.md
 
+# Temporary Test/Scratch Files
+tests/debug_parse.cpp
+tests/importmanager_internal.*
+tests/target_wrapper.bat
+tests/test_importmanager.cpp
+tests/test_inline.cpp
 
-# Force Keep Documentation
+# Force Keep Critical Project Assets
 !docs/
 !files/
 !resources/
 !deploy.ps1
+!Mau_Nhap_Doc_Gia.csv
+!Mau_Nhap_Sach.csv
+!create_sample_excel.py
+!fix_encoding.py
+!Ảnh chụp màn hình *.png

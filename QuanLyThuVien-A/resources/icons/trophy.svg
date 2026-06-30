@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M8 21H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-    <path d="M12 17V21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-    <path d="M6 9C6 9 5 9 5 8C5 7 6 3 6 3H18C18 3 19 7 19 8C19 9 18 9 18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M6 9C6 11.1217 6.84285 13.1566 8.34315 14.6569C9.84344 16.1571 11.8783 17 14 17H10C12.1217 17 14.1566 16.1571 15.6569 14.6569C17.1571 13.1566 18 11.1217 18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>

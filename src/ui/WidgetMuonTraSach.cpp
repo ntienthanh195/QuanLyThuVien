@@ -9,6 +9,7 @@
 
 #include <vector>
 #include <algorithm>
+#include <functional> // For std::function in search logic
 #include "utils/LanguageManager.h"
 #include "ui/dialogs/HopThoaiQuetMaVach.h"
 #include "ui/dialogs/HopThoaiThanhToan.h" // Added Logic
@@ -436,6 +437,8 @@ void WidgetMuonTraSach::thieLapTabMuonSach() {
     bangDocGia = new QTableView();
     modelDocGia = new DocGiaTableModel(&danhSachDocGia, this);
     bangDocGia->setModel(modelDocGia);
+    bangDocGia->setSelectionBehavior(QAbstractItemView::SelectRows); // ✨ FIX: Select full row
+    bangDocGia->setSelectionMode(QAbstractItemView::SingleSelection);
     
     // Configure table columns - All visible
     bangDocGia->setColumnWidth(0, 50);   // STT
@@ -683,57 +686,47 @@ void WidgetMuonTraSach::xuLyTimKiem() {
     
 
     
-    // extern removed
-    
-    // Sanitize Input: Extract first sequence of digits
-    QRegularExpression re("(\\d+)");
-    QRegularExpressionMatch match = re.match(tuKhoa);
-    if (match.hasMatch()) {
-        tuKhoa = match.captured(1);
-    }
+    danhSachDocGia.clear(); // Reset kết quả
 
-    // Kiểm tra xem là mã thẻ không (số nguyên)
-    bool laMaThe = false;
-    tuKhoa.toInt(&laMaThe);
-    
-    danhSachDocGia.clear();
-    
-    if (laMaThe) {
-        int ma = tuKhoa.toInt();
-        PTRDG docGia = timDocGia(rootDocGia, ma);
-        if (docGia) danhSachDocGia.push_back(docGia);
-    } else {
-        // ⚡ OPTIMIZED: Use SQL for fuzzy name search (O(log N) indexed)
-        // vs O(N) memory tree scan.
-        QSqlQuery q;
-        q.prepare("SELECT ma_the FROM doc_gia WHERE (ho || ' ' || ten) LIKE :search OR ten LIKE :search ORDER BY ten ASC");
-        q.bindValue(":search", "%" + tuKhoa + "%");
+    // ⚡ REALTIME RAM SEARCH (In-Memory Traversal)
+    // Duyệt cây AVL để tìm kiếm mã thẻ HOẶC tên (không dấu)
+    std::function<void(PTRDG)> traverse = [&](PTRDG node) {
+        if (!node) return;
+        traverse(node->left);
         
-        if (q.exec()) {
-            while (q.next()) {
-                PTRDG dg = timDocGia(rootDocGia, q.value(0).toInt());
-                if (dg) danhSachDocGia.push_back(dg);
-            }
-        }
-    }
-    
-    // Cập nhật phân trang
-    trangHienTai = 1;
-    tongSoTrang = (danhSachDocGia.size() + soDocGiaTrenTrang - 1) / soDocGiaTrenTrang;
-    if (tongSoTrang < 1) tongSoTrang = 1;
-    
-    hienThiTrang();
+        bool matched = false;
+        QString strMa = QString::number(node->data.MaThe);
+        
+        // Use std::string for existing utility functions
+        std::string hoTenStd = node->data.Ho + " " + node->data.Ten;
+        std::string tuKhoaStd = tuKhoa.toStdString();
 
-    // AUTO-SELECT Logic (UX Optimization)
-    // Nếu chỉ tìm thấy 1 kết quả (thường là quét mã thẻ chính xác), tự động chọn luôn.
+        // 1. Tìm theo Mã Thẻ (partial match, e.g. "10" -> "101", "102")
+        if (strMa.contains(tuKhoa)) matched = true;
+        // 2. Tìm theo Tên (Fuzzy Search - Tiếng Việt không dấu)
+        else {
+            std::string s1 = BoDauVaThuong(hoTenStd);
+            std::string s2 = BoDauVaThuong(tuKhoaStd);
+            if (s1.find(s2) != std::string::npos) matched = true;
+        }
+
+        if (matched) danhSachDocGia.push_back(node);
+        
+        traverse(node->right);
+    };
+
+    if (rootDocGia) traverse(rootDocGia);
+    
+    // Reset về trang 1
+    trangHienTai = 1;
+    tongSoTrang = std::max(1, (int)(danhSachDocGia.size() + soDocGiaTrenTrang - 1) / soDocGiaTrenTrang);
+    
+    hienThiTrang(); // Render lại UI
+    
+    // UX: Tự động chọn nếu chỉ có 1 kết quả duy nhất (tiện cho quét mã vạch)
     if (danhSachDocGia.size() == 1) {
         bangDocGia->selectRow(0); // Highlight visually
         xuLyChonDocGia(0, 0);     // Trigger logic
-        
-        // Focus ngay vào ô nhập sách để mượn luôn
-        if (oNhapISBN->isEnabled()) {
-            // oNhapISBN->setFocus(); // DISABLE AUTO-FOCUS (Silent Mode)
-        }
     }
 }
 
@@ -1376,19 +1369,52 @@ void WidgetMuonTraSach::xuLyNutXacNhanTra(bool skipConfirm) {
     long long tienPhat = 0;
     QString canhBaoPhat = "";
     
+    // Format HTML cho cảnh báo quá hạn
     if (soNgayQuaHan > 0) {
-        tienPhat = tinhTienPhat(soNgayQuaHan); // Use class member
-        canhBaoPhat = LanguageManager::instance().getText("MSG_OVERDUE_WARNING")
+        tienPhat = tinhTienPhat(soNgayQuaHan); 
+        // ⚠️ QUÁ HẠN (Đỏ/Đậm + Separator)
+        canhBaoPhat = QString("<hr>"
+                              "<span style='color:#D32F2F; font-size: 13px;'>⚠️ SÁCH ĐÃ QUÁ HẠN <b>%1 NGÀY</b></span><br>"
+                              "Số tiền phạt cần thanh toán: <b style='color:#D32F2F; font-size: 14px;'>%2</b>")
                         .arg(soNgayQuaHan)
-                        .arg(QLocale(QLocale::Vietnamese).toString(tienPhat));
+                        .arg(QLocale(QLocale::Vietnamese).toString(tienPhat) + " đ");
     }
 
     QMessageBox::StandardButton xacNhan = QMessageBox::Yes;
     if (!skipConfirm) {
-        xacNhan = QMessageBox::question(this, LanguageManager::instance().getText("TITLE_CONFIRM_RETURN"),
-            LanguageManager::instance().getText("MSG_CONFIRM_RETURN_BODY")
-                .arg(maSach, tenSach, canhBaoPhat),
-            QMessageBox::Yes | QMessageBox::No);
+        // Sử dụng QMessageBox object để tùy biến nút bấm và Rich Text
+        QMessageBox msgBox(this);
+        msgBox.setWindowTitle(LanguageManager::instance().getText("TITLE_CONFIRM_RETURN"));
+        msgBox.setTextFormat(Qt::RichText);
+        msgBox.setIcon(QMessageBox::Question);
+        
+        // Nội dung chính
+        QString noiDung = QString("Xác nhận trả sách:<br>"
+                                  "Mã: <b>%1</b><br>"
+                                  "Tên: <b>%2</b>"
+                                  "%3") 
+                                  .arg(maSach)
+                                  .arg(tenSach) // Có thể thêm (Phiên bản...) nếu cần
+                                  .arg(canhBaoPhat);
+                                  
+        msgBox.setText(noiDung);
+        
+        // Custom Buttons (Tiếng Việt)
+        QPushButton *btnCo = msgBox.addButton("Có", QMessageBox::YesRole);
+        QPushButton *btnKhong = msgBox.addButton("Không", QMessageBox::NoRole);
+        
+        // Style cho nút (tùy chọn, để đồng bộ với theme)
+        btnCo->setCursor(Qt::PointingHandCursor);
+        btnCo->setProperty("class", "Primary"); // Blue button
+        btnKhong->setCursor(Qt::PointingHandCursor);
+        
+        msgBox.exec();
+        
+        if (msgBox.clickedButton() == btnCo) {
+            xacNhan = QMessageBox::Yes;
+        } else {
+            xacNhan = QMessageBox::No;
+        }
     }
     
     if (xacNhan == QMessageBox::Yes) {

@@ -128,7 +128,7 @@ ThongTinDauSach LayThongTinDauSach(const std::string& isbn);                    
 // Command - Thao tac du lieu (Create, Update, Delete)
 std::string ThemDauSachMoi(const std::string& isbn, const std::string& ten, int trang,
                            const std::string& tg, int nam, const std::string& tl, 
-                           int soLuongBanSao, const std::string& viTri = "", long long giaTien = 0, const std::string& nhaXuatBan = "");                  // them dau sach + ban sao (all-in-one)
+                           int soLuongBanSao, const std::string& viTri = "", long long giaTien = 0, const std::string& nhaXuatBan = "", bool emitSignal = true);                  // them dau sach + ban sao (all-in-one)
 std::string ThemBanSaoMoi(const std::string& isbn, int soLuong, const std::string& viTri = ""); // them ban sao vao dau sach co san
 std::string CapNhatThongTinDauSach(const std::string &isbn, const std::string &ten, int trang,
                                    const std::string &tg, int nam, const std::string &tl, 

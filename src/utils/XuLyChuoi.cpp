@@ -463,59 +463,68 @@ std::string ChuanHoaGioiTinh(const std::string& chuoiGioiTinh) {
 }
 
 // Chuan hoa vi tri ke sach
+// Chuan hoa vi tri ke sach (Updated for Unicode support)
 std::string ChuanHoaViTri(const std::string& chuoiViTri) {
-    std::string chuoiSach = ChuanHoaKhoangTrang(CatKhoangTrang(chuoiViTri));
-    if (chuoiSach.empty()) {
-        return std::string();
+    QString qstr = QString::fromStdString(chuoiViTri).trimmed();
+    
+    // Remove extra spaces
+    qstr.replace(QRegularExpression("\\s+"), " ");
+    
+    if (qstr.isEmpty()) return "";
+    
+    // Check for valid characters (Letters, Numbers, Space, Hyphen, Dot)
+    // Supports Vietnamese accents via \p{L}
+    QRegularExpression regex("^[\\p{L}\\p{M}\\d\\s\\-\\.]+$");
+    if (!regex.match(qstr).hasMatch()) {
+        return ""; // Invalid chars
     }
     
-    std::string cacTu[8];
-    int soTu = TachTokenKhoangTrang(chuoiSach, cacTu, 8);
-    if (soTu == 0) {
-        return std::string();
-    }
+    // Logic: 
+    // "ke a1" -> "Kệ A1"
+    // "tang 1" -> "Tầng 1"
+    // "day b" -> "Dãy B"
     
-    // Lambda kiem tra co chu so trong chuoi
-    auto coChuSo = [](const std::string& chuoiKiemTra) {
-        for (size_t i = 0; i < chuoiKiemTra.length(); ++i) {
-            if (chuoiKiemTra[i] >= '0' && chuoiKiemTra[i] <= '9') {
-                return true;
-            }
-        }
-        return false;
+    // List of common prefixes to normalize (Order matters for overlapping)
+    // Format: {Unaccented Lower, Accented Proper}
+    struct PrefixMap { QString plain; QString proper; };
+    QList<PrefixMap> prefixes = {
+        {"ke", "Kệ"},
+        {"tang", "Tầng"},
+        {"day", "Dãy"},
+        {"phong", "Phòng"},
+        {"tu", "Tủ"},
+        {"ngan", "Ngăn"},
+        {"khu", "Khu"},
+        {"lau", "Lầu"}
     };
     
-    // Lambda kiem tra ky tu ASCII
-    auto laChuCaiAscii = [](char kyTu) {
-        return (kyTu >= 'A' && kyTu <= 'Z') || (kyTu >= 'a' && kyTu <= 'z');
-    };
+    QString lowerStr = qstr.toLower();
     
-    // Neu bat dau bang "ke" hoac "Ke"
-    std::string tuDauThuong = ChuyenInThuong(cacTu[0]);
-    if (tuDauThuong == "ke") {
-        if (soTu == 1) {
-            return std::string();
+    for (const auto& p : prefixes) {
+        if (lowerStr.startsWith(p.plain + " ")) {
+             // Extract remainder (keep original case or Upper? Upper/Title case is safer for codes)
+             QString remainder = qstr.mid(p.plain.length()).trimmed();
+             if (remainder.isEmpty()) continue;
+             
+             // If remainder is short code (e.g. "a1"), Upper it -> "A1"
+             // If remainder is text, maybe Title Case? Let's default to Sentence Case logic (First upper)
+             // But for location codes, Upper is usually best.
+             return (p.proper + " " + remainder.toUpper()).toStdString();
         }
-        
-        std::string phanConLai = cacTu[1];
-        for (int i = 2; i < soTu; ++i) {
-            phanConLai += ' ' + cacTu[i];
-        }
-        return std::string("Ke ") + ChuyenInHoa(phanConLai);
     }
     
-    // Neu co dau gach ngang va chu so: "A-12" -> "Ke A-12"
-    if (chuoiSach.find('-') != std::string::npos && coChuSo(chuoiSach)) {
-        return std::string("Ke ") + ChuyenInHoa(chuoiSach);
+    // Special case: Short code like "A-12" or "A12" -> Add "Kệ" default
+    QRegularExpression shortCodeRegex("^[A-Za-z]+[\\-]?\\d+$");
+    if (shortCodeRegex.match(qstr).hasMatch()) {
+        return ("Kệ " + qstr.toUpper()).toStdString();
     }
     
-    // Neu bat dau bang chu cai va chu so: "A12" -> "Ke A12"
-    if (!chuoiSach.empty() && laChuCaiAscii(chuoiSach[0]) && 
-        chuoiSach.size() > 1 && (chuoiSach[1] >= '0' && chuoiSach[1] <= '9')) {
-        return std::string("Ke ") + ChuyenInHoa(chuoiSach);
+    // Default: Return as is with first char upper
+    if (!qstr.isEmpty()) {
+        qstr[0] = qstr[0].toUpper();
     }
     
-    return chuoiSach;
+    return qstr.toStdString();
 }
 
 //CHUAN HOA DU LIEU 

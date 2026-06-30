@@ -1,35 +1,37 @@
-QT += core testlib sql
+QT += testlib
+QT -= gui
 
-# Define output directory
-DESTDIR = ../build/tests
+CONFIG += qt console warn_on depend_includepath testcase
+CONFIG -= app_bundle
 
-# Include project headers
+TEMPLATE = app
+
+# Add C++17 support
+CONFIG += c++17
+
+# Include paths
 INCLUDEPATH += ../include \
+               ../include/models \
                ../include/utils \
-               ../include/models
-INCLUDEPATH += ../src
+               ../include/ui
 
-# Sources to test (Core Logic)
-SOURCES += ../src/utils/NgayThang.cpp \
-           ../src/utils/XuLyChuoi.cpp \
-           ../src/utils/ThongBao.cpp \
-           ../src/models/DocGia.cpp \
-           ../src/models/MuonTra.cpp \
-           mock_SettingsManager.cpp \
-           mock_DatabaseManager.cpp \
-           mock_AuditLogger.cpp \
-           mock_EventBus.cpp \
-           mock_FileSystem.cpp \
-           mock_NhapLieu.cpp \
-           mock_DauSach.cpp
+# Test sources
+SOURCES += test_importmanager.cpp \
+           importmanager_internal.cpp
 
-
-# Test Sources
-SOURCES += main.cpp
+# Link minimal sources needed for parse functions
+SOURCES += ../src/utils/XuLyChuoi.cpp
 
 # Headers
-HEADERS += tst_NgayThang.h tst_DocGia.h tst_MuonTra.h
+HEADERS += importmanager_internal.h \
+           ../include/utils/XuLyChuoi.h
 
-# Config
-CONFIG += console
-CONFIG -= app_bundle
+# Qt SQL module (needed by ImportManager)
+QT += sql core
+
+# Output
+TARGET = test_importmanager
+DESTDIR = ../bin/tests
+
+# Defines
+DEFINES += QT_DEPRECATED_WARNINGS

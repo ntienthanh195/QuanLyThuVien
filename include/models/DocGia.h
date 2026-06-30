@@ -151,8 +151,7 @@ struct DocGiaQuaHanDTO {
 // Prototype AVL
 PTRDG RotateLeft(PTRDG root);
 PTRDG RotateRight(PTRDG root);
-PTRDG RotateRight(PTRDG root);
-void InsertDocGia(PTRDG& root, PTRDG node, bool syncDB = true);
+void InsertDocGia(PTRDG& root, PTRDG node, bool syncDB = true, bool emitSignal = true);
 
 // DATABASE LOADING
 void NapDocGiaTuDB_Fixed(PTRDG &root, std::vector<PTRDS>& dsDauSach, int soLuongDS);

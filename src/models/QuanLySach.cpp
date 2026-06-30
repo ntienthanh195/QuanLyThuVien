@@ -25,6 +25,7 @@
 #include "utils/DatabaseManager.h"
 #include <QSqlQuery>
 #include <QSqlError>
+#include <QSqlDriver>
 #include "utils/AuditLogger.h"
 
 
@@ -967,6 +968,19 @@ void NapDanhSachTuDB() {
             long long gia = q.value(8).toLongLong();
             std::string nxb = q.value(9).toString().toStdString(); // New column
 
+            // [AUTO-FIX] Standardize ON LOAD to clean up legacy data
+            std::string stdTen, stdTg, stdTl, stdNxb;
+            ChuanHoaTenUnicode(ten, 1, 500, stdTen);
+            ChuanHoaTenUnicode(tg, 1, 100, stdTg);
+            ChuanHoaTenUnicode(tl, 1, 100, stdTl);
+            ChuanHoaTenUnicode(nxb, 1, 100, stdNxb);
+            
+            if (!stdTen.empty()) ten = stdTen;
+            if (!stdTg.empty()) tg = stdTg;
+            if (!stdTl.empty()) tl = stdTl;
+            if (!stdNxb.empty()) nxb = stdNxb;
+            // -----------------------------------------------------
+
             themDauSach(dsDauSach, soLuongDauSach, isbn, ten, trang, tg, nam, tl, true, gia, nxb);
             
             // Update soLuotMuon
@@ -987,6 +1001,11 @@ void NapDanhSachTuDB() {
             std::string ma = q.value(0).toString().toStdString();
             TrangThaiSach tt = (TrangThaiSach)q.value(1).toInt();
             std::string vt = q.value(2).toString().toStdString();
+            
+            // [AUTO-FIX] Standardize Location on Load
+            std::string stdVt = ChuanHoaViTri(vt);
+            if (!stdVt.empty()) vt = stdVt; // Use standardized version if valid
+            
             std::string isbn = q.value(3).toString().toStdString();
             
             PTRDS ds = TimDauSachTheoISBN(dsDauSach, soLuongDauSach, isbn);
@@ -1120,7 +1139,7 @@ ThongTinDauSach LayThongTinDauSach(const std::string& isbn) {
 // them dau sach + ban sao (all-in-one, tu dong sap xep)
 std::string ThemDauSachMoi(const std::string& isbn, const std::string& ten, int trang,
                            const std::string& tg, int nam, const std::string& tl, 
-                           int soLuongBanSao, const std::string& viTri, long long giaTien, const std::string& nhaXuatBan) {
+                           int soLuongBanSao, const std::string& viTri, long long giaTien, const std::string& nhaXuatBan, bool emitSignal) {
     // validation so luong ban sao
     if (soLuongBanSao <= 0) {
         return "Loi: So luong ban sao phai lon hon 0!";
@@ -1128,11 +1147,41 @@ std::string ThemDauSachMoi(const std::string& isbn, const std::string& ten, int 
     if (soLuongBanSao > MAX_BAN_SAO) {
         return "Loi: So luong ban sao vuot qua gioi han " + std::to_string(MAX_BAN_SAO) + "!";
     }
+
+    // --- ENFORCE STANDARDIZATION (Phân tích kỹ: Core phải tự lo chuẩn hóa) ---
+    std::string stdTen, stdTg, stdTl, stdNxb;
+    ChuanHoaTenUnicode(ten, 1, 500, stdTen);
+    ChuanHoaTenUnicode(tg, 1, 100, stdTg);
+    ChuanHoaTenUnicode(tl, 1, 100, stdTl);
+    // NXB có thể là tên riêng (KD, Trẻ...), chuẩn hóa Title Case là hợp lý
+    ChuanHoaTenUnicode(nhaXuatBan, 1, 100, stdNxb);
+    
+    // Vị Trí: Chuẩn hóa tự động (Kệ, Tầng...)
+    std::string stdViTri = ChuanHoaViTri(viTri);
+    
+    // Nếu rỗng thì dùng giá trị gốc (phòng trường hợp chuẩn hóa fail)
+    if (!stdTen.empty()) const_cast<std::string&>(ten) = stdTen;
+    if (!stdTg.empty()) const_cast<std::string&>(tg) = stdTg;
+    if (!stdTl.empty()) const_cast<std::string&>(tl) = stdTl;
+    if (!stdNxb.empty()) const_cast<std::string&>(nhaXuatBan) = stdNxb;
+    // Vi tri có thể rỗng
+    const_cast<std::string&>(viTri) = stdViTri; 
+    // -------------------------------------------------------------------------
     
     // goi backend them dau sach
-    bool ok = themDauSach(dsDauSach, soLuongDauSach, isbn, ten, trang, tg, nam, tl, true, giaTien, nhaXuatBan);
-    if (!ok) {
-        return "Loi: Khong them duoc dau sach (Backend error)!";
+    // Check if duplicate ISBN exists
+    PTRDS existingBook = TimDauSachTheoISBN(dsDauSach, soLuongDauSach, isbn);
+    if (existingBook) {
+        // [AUTO-FIX] If duplicate, UPDATE info (Price, Author, etc.) then Add Copies
+        std::cout << "[IMPORT] ISBN " << isbn << " exists. Updating info...\n";
+        CapNhatThongTinDauSach(isbn, ten, trang, tg, nam, tl, viTri, giaTien, nhaXuatBan);
+        // Continue to add copies below...
+    } else {
+        // New book
+        bool ok = themDauSach(dsDauSach, soLuongDauSach, isbn, ten, trang, tg, nam, tl, true, giaTien, nhaXuatBan);
+        if (!ok) {
+            return "Loi: Khong them duoc dau sach (Backend error)!";
+        }
     }
     
     // tim lai dau sach vua them
@@ -1159,6 +1208,9 @@ std::string ThemDauSachMoi(const std::string& isbn, const std::string& ten, int 
     
     // --- DB SYNC ---
     QSqlQuery q(DatabaseManager::instance().database());
+    int bookId = -1;
+
+    // 1. Try INSERT Title
     q.prepare("INSERT INTO dau_sach (isbn, ten_sach, so_trang, tac_gia, nam_xuat_ban, the_loai, gia_tien, nha_xuat_ban) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     q.addBindValue(QString::fromStdString(isbn));
     q.addBindValue(QString::fromStdString(ChuyenThanhTitleCase(ten)));
@@ -1169,34 +1221,52 @@ std::string ThemDauSachMoi(const std::string& isbn, const std::string& ten, int 
     q.addBindValue((qint64)giaTien);
     q.addBindValue(QString::fromStdString(nhaXuatBan));
     
-    int newBookId = -1;
     if (q.exec()) {
-        newBookId = q.lastInsertId().toInt();
+        bookId = q.lastInsertId().toInt();
     } else {
-        std::cout << "[DB ERROR] Failed to insert dau_sach: " << q.lastError().text().toStdString() << "\n";
+        // If fail (likely duplicate ISBN), retrieve existing ID
+        QSqlQuery qId(DatabaseManager::instance().database());
+        qId.prepare("SELECT id FROM dau_sach WHERE isbn = ?");
+        qId.addBindValue(QString::fromStdString(isbn));
+        if (qId.exec() && qId.next()) {
+            bookId = qId.value(0).toInt();
+        } else {
+            std::cout << "[DB ERROR] Failed to insert/find dau_sach: " << q.lastError().text().toStdString() << "\n";
+        }
     }
 
-    // Sync newly added copies (they are at the head of the list)
-    if (newBookId != -1 && dauSach && dauSach->dms) {
+    // 2. Insert Copies (Ban Sao)
+    if (bookId != -1 && dauSach && dauSach->dms) {
         PTRDMS p = dauSach->dms;
         int count = 0;
-        DatabaseManager::instance().database().transaction();
+        
+        // [FIX] Only start transaction if no transaction is currently active
+        QSqlDatabase db = DatabaseManager::instance().database();
+        bool startedTrans = false;
+        if (db.driver()->hasFeature(QSqlDriver::Transactions) && db.transaction()) {
+            startedTrans = true;
+        }
+
+        QSqlQuery qc(db);
+        qc.prepare("INSERT INTO ban_sao (ma_sach, dau_sach_id, trang_thai, vi_tri) VALUES (?, ?, ?, ?)");
+
         while (p && count < soLuongBanSao) {
-            QSqlQuery qc(DatabaseManager::instance().database());
-            // FIXED: Added dau_sach_id column
-            qc.prepare("INSERT INTO ban_sao (ma_sach, dau_sach_id, trang_thai, vi_tri) VALUES (?, ?, ?, ?)");
             qc.addBindValue(QString::fromStdString(p->maSach));
-            qc.addBindValue(newBookId); 
+            qc.addBindValue(bookId);
             qc.addBindValue((int)p->trangThai);
             qc.addBindValue(QString::fromStdString(p->viTri));
+            
             if (!qc.exec()) {
                  std::cout << "[DB ERROR] Failed to insert ban_sao: " << qc.lastError().text().toStdString() << "\n";
             }
-            
+
             p = p->next;
             count++;
         }
-        DatabaseManager::instance().database().commit();
+        
+        if (startedTrans) {
+            db.commit();
+        }
     }
     // --- END DB SYNC ---
     
@@ -1205,9 +1275,11 @@ std::string ThemDauSachMoi(const std::string& isbn, const std::string& ten, int 
                      "Them dau sach moi: " + QString::fromStdString(ten));
     
     // [REALTIME UPDATE]
-    try {
-        EventBus::instance().dauSachAdded(QString::fromStdString(isbn));
-    } catch(...) {}
+    if (emitSignal) {
+        try {
+            EventBus::instance().dauSachAdded(QString::fromStdString(isbn));
+        } catch(...) {}
+    }
     
     return "";  // thanh cong
 }
@@ -1259,14 +1331,23 @@ std::string ThemBanSaoMoi(const std::string& isbn, int soLuong, const std::strin
         if (bookId != -1) {
             PTRDMS p = dauSach->dms;
             int count = 0;
-            DatabaseManager::instance().database().transaction();
+            
+            // [FIX] Transaction safety
+            QSqlDatabase db = DatabaseManager::instance().database();
+            bool startedTrans = false;
+            if (db.driver()->hasFeature(QSqlDriver::Transactions) && db.transaction()) {
+                startedTrans = true;
+            }
+
+            QSqlQuery qc(db);
+            qc.prepare("INSERT INTO ban_sao (ma_sach, dau_sach_id, trang_thai, vi_tri) VALUES (?, ?, ?, ?)");
+
             while (p && count < soLuong) {
-                QSqlQuery qc(DatabaseManager::instance().database());
-                qc.prepare("INSERT INTO ban_sao (ma_sach, dau_sach_id, trang_thai, vi_tri) VALUES (?, ?, ?, ?)");
                 qc.addBindValue(QString::fromStdString(p->maSach));
                 qc.addBindValue(bookId);
                 qc.addBindValue((int)p->trangThai);
                 qc.addBindValue(QString::fromStdString(p->viTri));
+                
                 if (!qc.exec()) {
                     std::cout << "[DB ERROR] Failed to insert ban_sao (ThemBanSaoMoi): " << qc.lastError().text().toStdString() << "\n";
                 }
@@ -1274,7 +1355,10 @@ std::string ThemBanSaoMoi(const std::string& isbn, int soLuong, const std::strin
                 p = p->next;
                 count++;
             }
-            DatabaseManager::instance().database().commit();
+            
+            if (startedTrans) {
+                db.commit();
+            }
         } else {
              std::cout << "[DB ERROR] Cannot find book ID for ISBN: " << isbn << " to add copies.\n";
         }
@@ -1295,8 +1379,24 @@ std::string ThemBanSaoMoi(const std::string& isbn, int soLuong, const std::strin
 std::string CapNhatThongTinDauSach(const std::string& isbn, const std::string& ten, int trang,
                                    const std::string& tg, int nam, const std::string& tl, 
                                    const std::string& viTri, long long giaTien, const std::string& nhaXuatBan) {
+    // --- ENFORCE STANDARDIZATION ---
+    std::string stdTen, stdTg, stdTl, stdNxb;
+    ChuanHoaTenUnicode(ten, 1, 500, stdTen);
+    ChuanHoaTenUnicode(tg, 1, 100, stdTg);
+    ChuanHoaTenUnicode(tl, 1, 100, stdTl);
+    ChuanHoaTenUnicode(nhaXuatBan, 1, 100, stdNxb);
+    std::string stdViTri = ChuanHoaViTri(viTri);
+    
+    // Assign back to params (const_cast trick or just use new vars in call)
+    // Cleaner to use new vars in call
+    std::string finalTen = stdTen.empty() ? ten : stdTen;
+    std::string finalTg = stdTg.empty() ? tg : stdTg;
+    std::string finalTl = stdTl.empty() ? tl : stdTl;
+    std::string finalNxb = stdNxb.empty() ? nhaXuatBan : stdNxb;
+    // --------------------------------
+    
     // goi backend cap nhat
-    std::string loi = CapNhatDauSach(dsDauSach, soLuongDauSach, isbn, ten, trang, tg, nam, tl, viTri, giaTien, nhaXuatBan);
+    std::string loi = CapNhatDauSach(dsDauSach, soLuongDauSach, isbn, finalTen, trang, finalTg, nam, finalTl, stdViTri, giaTien, finalNxb);
     
     if (loi.empty()) {
         // tu dong sap xep sau khi cap nhat (phong truong hop ten thay doi)

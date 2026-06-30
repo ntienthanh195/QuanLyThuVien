@@ -57,7 +57,7 @@ private:
     QLineEdit *oNhapISBN;
     QLineEdit *oNhapTenSach;
     QLineEdit *oNhapTacGia;
-    QLineEdit *oNhapTheLoai; // Changed from QComboBox
+    QComboBox *oNhapTheLoai; // Editable ComboBox cho dropdown + nhập tay
     QSpinBox *oNhapNamXB;
     QSpinBox *oNhapSoTrang;
     QSpinBox *oNhapSoBanSao;

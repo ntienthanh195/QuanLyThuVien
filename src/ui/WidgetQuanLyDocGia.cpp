@@ -9,6 +9,8 @@
 #include "utils/ToastNotification.h"
 
 #include <vector>
+#include <algorithm>
+#include "utils/XuLyChuoi.h"
 #include "utils/LanguageManager.h"
 #include "ui/dialogs/HopThoaiThemDocGia.h"
 #include "ui/dialogs/HopThoaiSuaDocGia.h"
@@ -794,6 +796,23 @@ void WidgetQuanLyDocGia::xuLyLocKetHopToanBo() {
         if (hienThi) danhSachDocGia.push_back(p);
     }
 
+    // Sắp xếp danh sách theo tên tăng dần
+    if (!danhSachDocGia.empty()) {
+        std::sort(danhSachDocGia.begin(), danhSachDocGia.end(), [](PTRDG a, PTRDG b) {
+            if (!a || !b) return false;
+            // So sánh theo Tên trước
+            std::string ten1 = ChuanHoaChuoiTimKiem(a->data.Ten);
+            std::string ten2 = ChuanHoaChuoiTimKiem(b->data.Ten);
+            if (ten1 != ten2) return ten1 < ten2;
+            // Nếu Tên giống nhau, so sánh theo Họ
+            std::string ho1 = ChuanHoaChuoiTimKiem(a->data.Ho);
+            std::string ho2 = ChuanHoaChuoiTimKiem(b->data.Ho);
+            if (ho1 != ho2) return ho1 < ho2;
+            // Nếu cả Tên và Họ giống nhau, so sánh theo Mã thẻ
+            return a->data.MaThe < b->data.MaThe;
+        });
+    }
+
     if (modelDocGia) { if (auto m = dynamic_cast<DocGiaTableModel*>(modelDocGia)) m->refresh(); }
     emit thongBaoCapNhat(LanguageManager::instance().getText("MSG_LOADED_READERS").arg((int)danhSachDocGia.size()));
 }
@@ -813,10 +832,30 @@ void WidgetQuanLyDocGia::hienThiKetQuaTimKiem(PTRDG ketQua[], int soKetQua) {
         if (gioiTinhLoc == 2 && p->data.Phai != "Nu") hienThi = false;
         if (hienThi) danhSachDocGia.push_back(p);
     }
+    
+    // Sắp xếp kết quả tìm kiếm theo tên tăng dần
+    if (!danhSachDocGia.empty()) {
+        std::sort(danhSachDocGia.begin(), danhSachDocGia.end(), [](PTRDG a, PTRDG b) {
+            if (!a || !b) return false;
+            std::string ten1 = ChuanHoaChuoiTimKiem(a->data.Ten);
+            std::string ten2 = ChuanHoaChuoiTimKiem(b->data.Ten);
+            if (ten1 != ten2) return ten1 < ten2;
+            std::string ho1 = ChuanHoaChuoiTimKiem(a->data.Ho);
+            std::string ho2 = ChuanHoaChuoiTimKiem(b->data.Ho);
+            if (ho1 != ho2) return ho1 < ho2;
+            return a->data.MaThe < b->data.MaThe;
+        });
+    }
+    
     if (modelDocGia) { if (auto m = dynamic_cast<DocGiaTableModel*>(modelDocGia)) m->refresh(); }
 }
 void WidgetQuanLyDocGia::xuLyNhapDuLieuTu() {
-    QString file = QFileDialog::getOpenFileName(this, LanguageManager::instance().getText("TITLE_SELECT_EXCEL"), QDir::currentPath(), LanguageManager::instance().getText("FILTER_EXCEL_FILES"));
+    QString file = QFileDialog::getOpenFileName(this, 
+                                                LanguageManager::instance().getText("TITLE_SELECT_EXCEL"), 
+                                                QDir::currentPath(), 
+                                                LanguageManager::instance().getText("FILTER_EXCEL_FILES"),
+                                                nullptr,
+                                                QFileDialog::DontUseNativeDialog); // 🛡️ Fix crash on Windows
     if (file.isEmpty()) return;
 
     ImportManager importer(this);

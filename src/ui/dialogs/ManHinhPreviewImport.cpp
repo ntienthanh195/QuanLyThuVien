@@ -208,32 +208,20 @@ void ManHinhPreviewImport::loadCsv(const QString &csvPath, QTableView *tableView
     bool isHeader = true;
     while (!in.atEnd()) {
         QString line = in.readLine();
+        // Skip BOM if present at start of first line
+        if (isHeader && line.startsWith(QChar(0xFEFF))) {
+            line = line.mid(1);
+        }
         if (line.trimmed().isEmpty()) continue;
         
-        // Basic split - IMPROVE IF NEEDED
-        QStringList row;
-        bool inQuote = false;
-        QString field;
-        for (int i = 0; i < line.length(); ++i) {
-            QChar c = line[i];
-            if (c == '"') {
-                inQuote = !inQuote;
-            } else if (c == ',' && !inQuote) {
-                row.append(field);
-                field.clear();
-            } else {
-                field.append(c);
-            }
-        }
-        row.append(field); // Last field
-
-        // Cleanup quotes
-        for (int i = 0; i < row.size(); ++i) {
-             if (row[i].startsWith('"') && row[i].endsWith('"')) {
-                 row[i] = row[i].mid(1, row[i].length()-2);
-                 // Unescape double quotes if any "" -> "
-                 row[i].replace("\"\"", "\"");
-             }
+        // Simple consistent split by PIPE
+        // Assuming ImportManager now uses PIPE as delimiter
+        QStringList row = line.split('|');
+        
+        // No quote handling needed for pipe-separated internal format
+        // Just trim
+        for (int i=0; i<row.size(); ++i) {
+             row[i] = row[i].trimmed();
         }
 
         if (isHeader) {
