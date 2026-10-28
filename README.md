@@ -96,7 +96,3 @@ QuanLyThuVien/
    powershell.exe -ExecutionPolicy Bypass -File .\deploy.ps1
    ```
    Thư mục đóng gói hoàn chỉnh sẵn sàng chạy độc lập sẽ được tạo tại `QuanLyThuVien_Portable`.
-
----
-
-Thông tin nguồn và bản quyền: [NOTICE.md](NOTICE.md).
